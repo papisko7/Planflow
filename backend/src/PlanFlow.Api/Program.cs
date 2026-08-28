@@ -1,11 +1,13 @@
 using PlanFlow.Api;
 using PlanFlow.Api.AuthPolicy;
+using PlanFlow.Application;
 using PlanFlow.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
+builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddControllers();
 builder.Services.AddSwaggerDocumentation();

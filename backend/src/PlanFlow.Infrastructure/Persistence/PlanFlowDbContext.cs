@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PlanFlow.Application.Common.Interfaces;
 using PlanFlow.Domain.Entities;
 
 namespace PlanFlow.Infrastructure.Persistence;
@@ -6,9 +7,10 @@ namespace PlanFlow.Infrastructure.Persistence;
 /// <summary>
 /// EF Core gateway to PostgreSQL. Table shapes live in <c>Configurations/*</c>
 /// (one <see cref="Microsoft.EntityFrameworkCore.IEntityTypeConfiguration{TEntity}"/> per entity)
-/// so this class stays a thin composition root.
+/// so this class stays a thin composition root. Implements <see cref="IApplicationDbContext"/> so
+/// Application-layer MediatR handlers depend on the abstraction, not this concrete type.
 /// </summary>
-public class PlanFlowDbContext : DbContext
+public class PlanFlowDbContext : DbContext, IApplicationDbContext
 {
     public PlanFlowDbContext(DbContextOptions<PlanFlowDbContext> options) : base(options)
     {
