@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using PlanFlow.Application.Common.Caching;
 using PlanFlow.Application.Common.Exceptions;
 using PlanFlow.Application.Common.Interfaces;
 using PlanFlow.Domain.Entities;
@@ -9,10 +10,12 @@ namespace PlanFlow.Application.Tasks.Commands.DeleteTask;
 public class DeleteTaskCommandHandler : IRequestHandler<DeleteTaskCommand>
 {
     private readonly IApplicationDbContext _context;
+    private readonly ICacheService _cache;
 
-    public DeleteTaskCommandHandler(IApplicationDbContext context)
+    public DeleteTaskCommandHandler(IApplicationDbContext context, ICacheService cache)
     {
         _context = context;
+        _cache = cache;
     }
 
     public async Task Handle(DeleteTaskCommand request, CancellationToken cancellationToken)
@@ -26,5 +29,8 @@ public class DeleteTaskCommandHandler : IRequestHandler<DeleteTaskCommand>
         _context.Tasks.Remove(task);
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        await _cache.RemoveAsync(CacheKeys.TeamTasks(task.TeamId), cancellationToken);
+        await _cache.RemoveAsync(CacheKeys.TaskUrgency(task.Id), cancellationToken);
     }
 }

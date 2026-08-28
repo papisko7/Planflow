@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using PlanFlow.Application.Common.Caching;
 using PlanFlow.Application.Common.Exceptions;
 using PlanFlow.Application.Common.Interfaces;
 using PlanFlow.Application.Tasks.Common;
@@ -11,10 +12,12 @@ namespace PlanFlow.Application.Tasks.Commands.UpdateTask;
 public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskDto>
 {
     private readonly IApplicationDbContext _context;
+    private readonly ICacheService _cache;
 
-    public UpdateTaskCommandHandler(IApplicationDbContext context)
+    public UpdateTaskCommandHandler(IApplicationDbContext context, ICacheService cache)
     {
         _context = context;
+        _cache = cache;
     }
 
     public async Task<TaskDto> Handle(UpdateTaskCommand request, CancellationToken cancellationToken)
@@ -58,6 +61,9 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
         });
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        await _cache.RemoveAsync(CacheKeys.TeamTasks(task.TeamId), cancellationToken);
+        await _cache.RemoveAsync(CacheKeys.TaskUrgency(task.Id), cancellationToken);
 
         return TaskDto.FromEntity(task);
     }

@@ -1,4 +1,5 @@
 using MediatR;
+using PlanFlow.Application.Common.Caching;
 using PlanFlow.Application.Common.Interfaces;
 using PlanFlow.Application.Tasks.Common;
 using PlanFlow.Domain.Entities;
@@ -9,10 +10,12 @@ namespace PlanFlow.Application.Tasks.Commands.CreateTask;
 public class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, TaskDto>
 {
     private readonly IApplicationDbContext _context;
+    private readonly ICacheService _cache;
 
-    public CreateTaskCommandHandler(IApplicationDbContext context)
+    public CreateTaskCommandHandler(IApplicationDbContext context, ICacheService cache)
     {
         _context = context;
+        _cache = cache;
     }
 
     public async Task<TaskDto> Handle(CreateTaskCommand request, CancellationToken cancellationToken)
@@ -42,6 +45,7 @@ public class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, TaskD
         });
 
         await _context.SaveChangesAsync(cancellationToken);
+        await _cache.RemoveAsync(CacheKeys.TeamTasks(task.TeamId), cancellationToken);
 
         return TaskDto.FromEntity(task);
     }
