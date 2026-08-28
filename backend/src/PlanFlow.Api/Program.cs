@@ -1,4 +1,5 @@
 using PlanFlow.Api;
+using PlanFlow.Api.AuthPolicy;
 using PlanFlow.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,6 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddControllers();
 builder.Services.AddSwaggerDocumentation();
+builder.Services.AddRbacPolicies();
 
 var app = builder.Build();
 
