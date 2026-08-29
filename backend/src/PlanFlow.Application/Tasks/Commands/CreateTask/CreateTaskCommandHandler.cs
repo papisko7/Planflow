@@ -4,6 +4,7 @@ using PlanFlow.Application.Common.Interfaces;
 using PlanFlow.Application.Tasks.Common;
 using PlanFlow.Domain.Entities;
 using PlanFlow.Domain.Enums;
+using ScoreTriggerSource = PlanFlow.Domain.Enums.ScoreTriggerSource;
 
 namespace PlanFlow.Application.Tasks.Commands.CreateTask;
 
@@ -32,7 +33,7 @@ public class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, TaskD
         };
 
         // A brand-new task can't yet block anything, so the blocking component starts at 0.
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, DateTime.UtcNow);
+        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, DateTime.UtcNow, ScoreTriggerSource.ManualCreate);
         task.CurrentUrgencyScore = scoreLog.FinalScore;
 
         _context.Tasks.Add(task);

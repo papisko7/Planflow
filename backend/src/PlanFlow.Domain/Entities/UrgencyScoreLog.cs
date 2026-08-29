@@ -1,4 +1,5 @@
 using PlanFlow.Domain.Common;
+using PlanFlow.Domain.Enums;
 
 namespace PlanFlow.Domain.Entities;
 
@@ -22,4 +23,7 @@ public class UrgencyScoreLog : BaseEntity
 
     /// <summary>True if the AI component fell back to 0 because the AI planner call failed.</summary>
     public bool AiFallbackUsed { get; set; }
+
+    /// <summary>Describes the origin of this score calculation (manual edit, scheduled job, AI assessment, etc.).</summary>
+    public ScoreTriggerSource TriggerSource { get; set; }
 }

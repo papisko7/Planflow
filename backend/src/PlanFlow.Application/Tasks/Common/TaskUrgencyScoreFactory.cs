@@ -1,4 +1,5 @@
 using PlanFlow.Domain.Entities;
+using PlanFlow.Domain.Enums;
 using PlanFlow.Domain.Services;
 
 namespace PlanFlow.Application.Tasks.Common;
@@ -27,10 +28,11 @@ public static class TaskUrgencyScoreFactory
     /// <param name="task">The task to score (its current in-memory field values are used).</param>
     /// <param name="blockedTaskCount">How many other tasks are blocked by this one.</param>
     /// <param name="nowUtc">Reference time for deadline/override-expiry math (injected for testability).</param>
-    public static UrgencyScoreLog BuildScoreLog(TaskItem task, int blockedTaskCount, DateTime nowUtc)
+    /// <param name="triggerSource">Describes the origin of this score calculation.</param>
+    public static UrgencyScoreLog BuildScoreLog(TaskItem task, int blockedTaskCount, DateTime nowUtc, ScoreTriggerSource triggerSource = ScoreTriggerSource.ManualUpdate)
     {
         var deadlineComponent = ComputeDeadlineComponent(task.DeadlineUtc, nowUtc);
-        const double aiComponent = 0.0;
+        var aiComponent = task.AiAssessmentScore ?? 0.0;
         var blockingComponent = Math.Clamp(blockedTaskCount / BlockingSaturationCount, 0.0, 1.0);
         var impactComponent = Math.Clamp(task.ImpactScore / MaxImpactScore, 0.0, 1.0);
         var userOverrideComponent = ComputeOverrideComponent(task, nowUtc);
@@ -47,8 +49,8 @@ public static class TaskUrgencyScoreFactory
             ImpactComponent = impactComponent,
             UserOverrideComponent = userOverrideComponent,
             FinalScore = finalScore,
-            // Always true until Phase 2.2 wires a real IAiPlannerClient.
-            AiFallbackUsed = true
+            AiFallbackUsed = task.AiAssessmentScore is null,
+            TriggerSource = triggerSource
         };
     }
 

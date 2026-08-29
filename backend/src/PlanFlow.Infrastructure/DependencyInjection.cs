@@ -47,6 +47,7 @@ public static class DependencyInjection
             // Each job gets its own JobKey/trigger pair; Quartz's DI integration opens a fresh
             // DI scope per execution, so jobs can safely take scoped services like IApplicationDbContext.
             AddIntervalJob<SyncCalendarJob>(quartz, "SyncCalendarJob", TimeSpan.FromMinutes(5));
+            AddIntervalJob<AnalyzeTasksJob>(quartz, "AnalyzeTasksJob", TimeSpan.FromHours(2));
             AddIntervalJob<PrioritizationJob>(quartz, "PrioritizationJob", TimeSpan.FromHours(1));
             AddIntervalJob<AlertingJob>(quartz, "AlertingJob", TimeSpan.FromMinutes(1));
 

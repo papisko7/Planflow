@@ -6,6 +6,7 @@ using PlanFlow.Application.Common.Interfaces;
 using PlanFlow.Application.Tasks.Common;
 using PlanFlow.Domain.Entities;
 using PlanFlow.Domain.Enums;
+using ScoreTriggerSource = PlanFlow.Domain.Enums.ScoreTriggerSource;
 
 namespace PlanFlow.Application.Tasks.Commands.UpdateTask;
 
@@ -45,7 +46,7 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
         var blockedTaskCount = await _context.Tasks
             .CountAsync(t => t.BlockedByTaskId == task.Id, cancellationToken);
 
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount, nowUtc);
+        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount, nowUtc, ScoreTriggerSource.ManualUpdate);
         task.CurrentUrgencyScore = scoreLog.FinalScore;
         _context.UrgencyScoreLogs.Add(scoreLog);
 

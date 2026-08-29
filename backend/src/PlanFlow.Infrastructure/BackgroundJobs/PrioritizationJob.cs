@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using PlanFlow.Application.Common.Caching;
 using PlanFlow.Application.Common.Interfaces;
 using PlanFlow.Application.Tasks.Common;
+using PlanFlow.Domain.Enums;
 using Quartz;
 using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 
@@ -52,7 +53,7 @@ public class PrioritizationJob : IJob
         foreach (var task in activeTasks)
         {
             var blockedCount = blockedCounts.GetValueOrDefault(task.Id, 0);
-            var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedCount, nowUtc);
+            var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedCount, nowUtc, ScoreTriggerSource.ScheduledRecalculation);
 
             task.CurrentUrgencyScore = scoreLog.FinalScore;
             task.UpdatedAtUtc = nowUtc;
