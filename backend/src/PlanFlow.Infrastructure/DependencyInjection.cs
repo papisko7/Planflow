@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PlanFlow.Application.AiPlanner.Common;
 using PlanFlow.Application.Common.Interfaces;
+using PlanFlow.Infrastructure.AiClients;
 using PlanFlow.Infrastructure.BackgroundJobs;
 using PlanFlow.Infrastructure.Caching;
 using PlanFlow.Infrastructure.Persistence;
@@ -34,6 +36,11 @@ public static class DependencyInjection
         services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
+
+        // Register AI Planner client based on configuration (mock by default)
+        services.AddHttpClient();
+        services.AddSingleton<IAiPlannerClient>(sp =>
+            AiPlannerClientFactory.CreateClient(configuration, sp.GetRequiredService<IHttpClientFactory>().CreateClient()));
 
         services.AddQuartz(quartz =>
         {
