@@ -1,3 +1,9 @@
+// Shown instead of the main app when there is no session (see SessionContext/RootNavigator).
+export type AuthStackParamList = {
+  Login: undefined;
+  Register: undefined;
+};
+
 // Shared param list for the root bottom-tab navigator, kept next to the navigator that uses it.
 export type RootTabParamList = {
   Dashboard: undefined;

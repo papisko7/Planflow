@@ -1,0 +1,106 @@
+# PlanFlow mobile E2E — core lifecycle (Phase 3.6).
+# Covers: Register -> Team workspace context -> Task creation (deadline/impact/blocking) -> Urgency Score sort.
+#
+# Prerequisites (see mobile/PROGRESS.md / README for detail):
+#   - backend running and reachable from the device/emulator (Android emulator: use 10.0.2.2, not localhost)
+#   - app built with EXPO_PUBLIC_API_URL pointing at that backend (a dev client or EAS build — Expo Go
+#     alone cannot be reliably targeted by Maestro's appId launch, since Expo Go's own package name
+#     would be used instead of com.planflow.mobile)
+#   - Maestro CLI >= 1.30 (uses the ${...} JS templating below to generate a unique email per run)
+#
+# Run: maestro test mobile/.maestro/main_user_flow.yaml
+
+appId: com.planflow.mobile
+---
+- launchApp:
+    clearState: true
+
+# --- Step A: Register ---------------------------------------------------------------------
+- tapOn: "No account? Register"
+- tapOn:
+    id: "register-displayName-input"
+- inputText: "QA Runner"
+- tapOn:
+    id: "register-email-input"
+- inputText: "qa.runner+${new Date().getTime()}@planflow.test"
+- tapOn:
+    id: "register-password-input"
+- inputText: "MaestroTest!123"
+- tapOn:
+    id: "register-submit-button"
+
+# Landing on the main workspace: the bottom tab bar is only rendered once the session is signed in.
+- assertVisible: "Teams"
+- assertVisible: "Dashboard"
+
+# --- Step B: Team workspace context --------------------------------------------------------
+- tapOn: "Teams"
+- tapOn:
+    id: "create-team-button"
+- tapOn:
+    id: "create-team-name-input"
+- inputText: "QA Team Alpha"
+- tapOn:
+    id: "create-team-submit-button"
+- assertVisible: "QA Team Alpha"
+
+- tapOn:
+    id: "create-team-button"
+- tapOn:
+    id: "create-team-name-input"
+- inputText: "QA Team Beta"
+- tapOn:
+    id: "create-team-submit-button"
+- assertVisible: "Task distribution — QA Team Beta"
+
+# Switch context back to Alpha and confirm the workload card follows the selection.
+- tapOn: "QA Team Alpha"
+- assertVisible: "Task distribution — QA Team Alpha"
+
+# --- Step C: Task creation (deadline, impact, blocking) ------------------------------------
+# TasksScreen always targets the caller's first team (creation order), i.e. QA Team Alpha.
+- tapOn: "Tasks"
+- tapOn:
+    id: "create-task-button"
+- tapOn:
+    id: "create-task-title-input"
+- inputText: "Setup environment"
+- tapOn:
+    id: "create-task-impact-input"
+- inputText: "1"
+- tapOn:
+    id: "create-task-submit-button"
+- assertVisible: "Setup environment"
+
+- tapOn:
+    id: "create-task-button"
+- tapOn:
+    id: "create-task-title-input"
+- inputText: "Ship release"
+- tapOn:
+    id: "create-task-deadline-days-input"
+- inputText: "0"
+- tapOn:
+    id: "create-task-impact-input"
+- inputText: "10"
+- tapOn:
+    text: "Setup environment"
+    index: 0 # the chip in the create-form header, not the task card rendered below it — selects it as "blocked by"
+- tapOn:
+    id: "create-task-submit-button"
+- assertVisible: "Ship release"
+- assertVisible: "⛔ Blocked" # confirms the blockedByTaskId relationship was persisted
+
+# --- Step D: Urgency Score verification -----------------------------------------------------
+# Deterministic given the formula (0.35*deadline + 0.20*impact, ai/blocking/override all 0 here):
+#   "Ship release"       -> deadline=0d (overdue-equivalent, component=1.0) + impact=10 (component=1.0)
+#                            => finalScore = 0.35 + 0.20 = 0.55 -> Medium tier (>=0.4)
+#   "Setup environment"  -> no deadline (component=0) + impact=1 (component=0.1)
+#                            => finalScore = 0.02 -> Low tier
+- tapOn: "Dashboard"
+- assertVisible:
+    id: "dashboard-section-medium"
+- assertVisible: "Ship release"
+- assertVisible:
+    id: "dashboard-section-low"
+- assertVisible: "Setup environment"

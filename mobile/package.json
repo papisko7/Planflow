@@ -23,7 +23,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "e2e": "maestro test .maestro/main_user_flow.yaml"
   },
   "private": true
 }

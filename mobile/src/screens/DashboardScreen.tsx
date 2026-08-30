@@ -117,7 +117,7 @@ export default function DashboardScreen() {
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => <TaskCard task={item} onPress={onTaskPress} />}
       renderSectionHeader={({ section }) => (
-        <View style={styles.sectionHeader}>
+        <View testID={`dashboard-section-${section.tier}`} style={styles.sectionHeader}>
           <Text style={styles.sectionHeaderText}>{section.title}</Text>
         </View>
       )}

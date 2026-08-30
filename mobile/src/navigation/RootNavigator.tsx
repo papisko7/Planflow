@@ -1,3 +1,4 @@
+import { ActivityIndicator, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -7,6 +8,8 @@ import TeamsScreen from '../screens/TeamsScreen';
 import CalendarScreen from '../screens/CalendarScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import TaskDetailScreen from '../screens/TaskDetailScreen';
+import AuthNavigator from './AuthNavigator';
+import { useSession } from '../context/SessionContext';
 import { colors } from '../theme/theme';
 import type { RootStackParamList, RootTabParamList } from './types';
 
@@ -34,18 +37,32 @@ function Tabs() {
 }
 
 export default function RootNavigator() {
+  const { status } = useSession();
+
+  if (status === 'checking') {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
-      <Stack.Navigator
-        screenOptions={{
-          headerStyle: { backgroundColor: colors.surface },
-          headerTitleStyle: { color: colors.text },
-          headerTintColor: colors.primary,
-        }}
-      >
-        <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
-        <Stack.Screen name="TaskDetail" component={TaskDetailScreen} options={{ title: 'Task Details' }} />
-      </Stack.Navigator>
+      {status === 'signedOut' ? (
+        <AuthNavigator />
+      ) : (
+        <Stack.Navigator
+          screenOptions={{
+            headerStyle: { backgroundColor: colors.surface },
+            headerTitleStyle: { color: colors.text },
+            headerTintColor: colors.primary,
+          }}
+        >
+          <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
+          <Stack.Screen name="TaskDetail" component={TaskDetailScreen} options={{ title: 'Task Details' }} />
+        </Stack.Navigator>
+      )}
     </NavigationContainer>
   );
 }

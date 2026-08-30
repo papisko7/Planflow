@@ -27,6 +27,7 @@ function TaskCardComponent({ task, onPress }: TaskCardProps) {
 
   return (
     <Pressable
+      testID={`task-card-${task.id}`}
       onPress={onPress ? () => onPress(task) : undefined}
       style={({ pressed }) => [styles.card, { borderLeftColor: TIER_COLOR[tier], opacity: pressed ? 0.7 : 1 }]}
     >

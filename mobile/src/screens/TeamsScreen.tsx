@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { restoreSession } from '../services/authService';
-import { getMyTeams } from '../services/teamService';
+import { createTeam, getMyTeams } from '../services/teamService';
 import { getTeamTasks } from '../services/taskService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { getUrgencyTier, URGENCY_TIER_META } from '../utils/urgencyGrouping';
@@ -47,6 +47,9 @@ export default function TeamsScreen() {
   const [tasksLoading, setTasksLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [creatingTeam, setCreatingTeam] = useState(false);
+  const [newTeamName, setNewTeamName] = useState('');
+  const [createSubmitting, setCreateSubmitting] = useState(false);
 
   const loadTeams = useCallback(async () => {
     const hasSession = await restoreSession();
@@ -113,6 +116,24 @@ export default function TeamsScreen() {
     }
   }, [loadTeams, selectedTeamId]);
 
+  const onCreateTeam = useCallback(async () => {
+    const name = newTeamName.trim();
+    if (!name) return;
+    setCreateSubmitting(true);
+    try {
+      const team = await createTeam({ name, description: null });
+      setTeams((current) => [...current, team]);
+      setSelectedTeamId(team.id);
+      setNewTeamName('');
+      setCreatingTeam(false);
+    } catch (err) {
+      const apiError = err as ApiError;
+      setErrorMessage(apiError.message ?? 'Failed to create team.');
+    } finally {
+      setCreateSubmitting(false);
+    }
+  }, [newTeamName]);
+
   const workload = useMemo(() => buildWorkload(teamTasks), [teamTasks]);
   const selectedTeam = teams.find((t) => t.id === selectedTeamId) ?? null;
 
@@ -148,11 +169,58 @@ export default function TeamsScreen() {
       data={teams}
       keyExtractor={(item) => item.id}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-      ListHeaderComponent={<Text style={styles.sectionLabel}>Your teams</Text>}
+      ListHeaderComponent={
+        <View>
+          <View style={styles.headerRow}>
+            <Text style={styles.sectionLabel}>Your teams</Text>
+            {!creatingTeam ? (
+              <Pressable testID="create-team-button" onPress={() => setCreatingTeam(true)} style={styles.smallButton}>
+                <Text style={styles.smallButtonText}>+ New team</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          {creatingTeam ? (
+            <View style={styles.createTeamForm}>
+              <TextInput
+                testID="create-team-name-input"
+                style={styles.input}
+                placeholder="Team name"
+                placeholderTextColor={colors.textMuted}
+                value={newTeamName}
+                onChangeText={setNewTeamName}
+              />
+              <View style={styles.createTeamActions}>
+                <Pressable
+                  testID="create-team-submit-button"
+                  style={styles.smallButton}
+                  onPress={onCreateTeam}
+                  disabled={createSubmitting}
+                >
+                  {createSubmitting ? (
+                    <ActivityIndicator color={colors.surface} size="small" />
+                  ) : (
+                    <Text style={styles.smallButtonText}>Create</Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  testID="create-team-cancel-button"
+                  onPress={() => {
+                    setCreatingTeam(false);
+                    setNewTeamName('');
+                  }}
+                >
+                  <Text style={styles.subtitle}>Cancel</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+        </View>
+      }
       renderItem={({ item }) => {
         const active = item.id === selectedTeamId;
         return (
           <Pressable
+            testID={`team-row-${item.id}`}
             onPress={() => setSelectedTeamId(item.id)}
             style={[styles.teamRow, active ? styles.teamRowActive : null]}
           >
@@ -213,6 +281,24 @@ const styles = StyleSheet.create({
   title: { ...typography.title, color: colors.text },
   subtitle: { ...typography.body, color: colors.textMuted, textAlign: 'center' },
   sectionLabel: { ...typography.subtitle, color: colors.text, marginBottom: spacing.sm },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  smallButton: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  smallButtonText: { color: colors.surface, fontWeight: '700', fontSize: 12 },
+  createTeamForm: { gap: spacing.sm, marginBottom: spacing.md },
+  createTeamActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  input: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    color: colors.text,
+  },
   teamRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
