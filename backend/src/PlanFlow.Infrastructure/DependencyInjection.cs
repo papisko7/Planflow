@@ -1,9 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using PlanFlow.Application.AiPlanner.Common;
 using PlanFlow.Application.Common.Interfaces;
-using PlanFlow.Infrastructure.AiClients;
 using PlanFlow.Infrastructure.BackgroundJobs;
 using PlanFlow.Infrastructure.Caching;
 using PlanFlow.Infrastructure.Persistence;
@@ -37,17 +35,11 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
 
-        // Register AI Planner client based on configuration (mock by default)
-        services.AddHttpClient();
-        services.AddSingleton<IAiPlannerClient>(sp =>
-            AiPlannerClientFactory.CreateClient(configuration, sp.GetRequiredService<IHttpClientFactory>().CreateClient()));
-
         services.AddQuartz(quartz =>
         {
             // Each job gets its own JobKey/trigger pair; Quartz's DI integration opens a fresh
             // DI scope per execution, so jobs can safely take scoped services like IApplicationDbContext.
             AddIntervalJob<SyncCalendarJob>(quartz, "SyncCalendarJob", TimeSpan.FromMinutes(5));
-            AddIntervalJob<AnalyzeTasksJob>(quartz, "AnalyzeTasksJob", TimeSpan.FromHours(2));
             AddIntervalJob<PrioritizationJob>(quartz, "PrioritizationJob", TimeSpan.FromHours(1));
             AddIntervalJob<AlertingJob>(quartz, "AlertingJob", TimeSpan.FromMinutes(1));
 

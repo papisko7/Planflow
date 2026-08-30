@@ -7,8 +7,8 @@ namespace PlanFlow.Application.Tasks.Common;
 /// <summary>
 /// Maps a <see cref="TaskItem"/>'s raw fields onto the five normalized [0,1] inputs
 /// <see cref="UrgencyScoreCalculator"/> expects, and builds the resulting audit log entry.
-/// This normalization is a placeholder: Phase 2.1 formalizes it (and Phase 2.2 wires a real
-/// AI Planner in place of the always-zero <c>aiComponent</c> fallback used here).
+/// The AI component always falls back to 0 (<see cref="TaskItem.AiAssessmentScore"/> is never
+/// populated — no AI integration in this system by design).
 /// </summary>
 public static class TaskUrgencyScoreFactory
 {

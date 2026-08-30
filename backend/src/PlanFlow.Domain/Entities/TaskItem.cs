@@ -33,10 +33,10 @@ public class TaskItem : BaseEntity
     /// <summary>Latest computed urgency score in [0,1]; denormalized for fast dashboard sorting/queries.</summary>
     public double CurrentUrgencyScore { get; set; }
 
-    /// <summary>AI-assessed importance from the AI Planner (Phase 2.3); normalized to [0,1]. Null = not yet assessed or assessment failed (fallback to 0).</summary>
+    /// <summary>Optional external assessment input to the urgency formula's AI component; normalized to [0,1]. Always null in the current build (no AI integration) — the formula treats null as 0.</summary>
     public double? AiAssessmentScore { get; set; }
 
-    /// <summary>Timestamp of the last successful AI assessment, used to avoid redundant API calls.</summary>
+    /// <summary>Timestamp of the last assessment, if <see cref="AiAssessmentScore"/> was ever set.</summary>
     public DateTime? AiAssessmentAtUtc { get; set; }
 
     public ICollection<TaskItem> BlockedTasks { get; set; } = new List<TaskItem>();
