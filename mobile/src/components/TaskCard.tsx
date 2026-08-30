@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { getUrgencyTier, URGENCY_TIER_META } from '../utils/urgencyGrouping';
 import type { TaskDto } from '../types/task';
@@ -18,14 +18,18 @@ function formatDeadline(deadlineUtc: string | null): string | null {
 
 export interface TaskCardProps {
   task: TaskDto;
+  onPress?: (task: TaskDto) => void;
 }
 
-function TaskCardComponent({ task }: TaskCardProps) {
+function TaskCardComponent({ task, onPress }: TaskCardProps) {
   const tier = getUrgencyTier(task.currentUrgencyScore);
   const deadline = formatDeadline(task.deadlineUtc);
 
   return (
-    <View style={[styles.card, { borderLeftColor: TIER_COLOR[tier] }]}>
+    <Pressable
+      onPress={onPress ? () => onPress(task) : undefined}
+      style={({ pressed }) => [styles.card, { borderLeftColor: TIER_COLOR[tier], opacity: pressed ? 0.7 : 1 }]}
+    >
       <View style={styles.headerRow}>
         <Text style={styles.title} numberOfLines={2}>
           {task.title}
@@ -50,7 +54,7 @@ function TaskCardComponent({ task }: TaskCardProps) {
       <Text style={styles.tierLabel}>
         {URGENCY_TIER_META[tier].badge} {URGENCY_TIER_META[tier].label}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 

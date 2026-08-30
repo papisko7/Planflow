@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { TaskCard } from '../components/TaskCard';
 import { restoreSession } from '../services/authService';
 import { getMyTeams } from '../services/teamService';
 import { getTeamTasks } from '../services/taskService';
 import { colors, spacing, typography } from '../theme/theme';
 import { groupTasksByUrgency } from '../utils/urgencyGrouping';
+import type { RootStackParamList } from '../navigation/types';
 import type { ApiError } from '../types/api';
 import type { TaskDto } from '../types/task';
 
 type LoadState = 'loading' | 'ready' | 'error' | 'signedOut';
 
 export default function DashboardScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [state, setState] = useState<LoadState>('loading');
   const [tasks, setTasks] = useState<TaskDto[]>([]);
   const [teamId, setTeamId] = useState<string | null>(null);
@@ -75,6 +79,11 @@ export default function DashboardScreen() {
 
   const sections = useMemo(() => groupTasksByUrgency(tasks), [tasks]);
 
+  const onTaskPress = useCallback(
+    (task: TaskDto) => navigation.navigate('TaskDetail', { taskId: task.id }),
+    [navigation],
+  );
+
   if (state === 'loading') {
     return (
       <View style={styles.centered}>
@@ -106,7 +115,7 @@ export default function DashboardScreen() {
       style={styles.list}
       sections={sections}
       keyExtractor={(item) => item.id}
-      renderItem={({ item }) => <TaskCard task={item} />}
+      renderItem={({ item }) => <TaskCard task={item} onPress={onTaskPress} />}
       renderSectionHeader={({ section }) => (
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionHeaderText}>{section.title}</Text>
