@@ -9,6 +9,10 @@ export const colors = {
   border: '#E5E7EB',
   danger: '#DC2626',
   success: '#16A34A',
+  urgencyCritical: '#DC2626',
+  urgencyHigh: '#D97706',
+  urgencyMedium: '#16A34A',
+  urgencyLow: '#9CA3AF',
 } as const;
 
 export const spacing = {
