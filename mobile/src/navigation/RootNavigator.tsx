@@ -3,6 +3,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import DashboardScreen from '../screens/DashboardScreen';
 import TasksScreen from '../screens/TasksScreen';
+import TeamsScreen from '../screens/TeamsScreen';
+import CalendarScreen from '../screens/CalendarScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import TaskDetailScreen from '../screens/TaskDetailScreen';
 import { colors } from '../theme/theme';
@@ -24,6 +26,8 @@ function Tabs() {
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
       <Tab.Screen name="Tasks" component={TasksScreen} />
+      <Tab.Screen name="Teams" component={TeamsScreen} />
+      <Tab.Screen name="Calendar" component={CalendarScreen} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
   );

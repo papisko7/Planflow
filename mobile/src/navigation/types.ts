@@ -2,6 +2,8 @@
 export type RootTabParamList = {
   Dashboard: undefined;
   Tasks: undefined;
+  Teams: undefined;
+  Calendar: undefined;
   Settings: undefined;
 };
 
