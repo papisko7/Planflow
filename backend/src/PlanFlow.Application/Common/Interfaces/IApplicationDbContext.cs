@@ -18,6 +18,7 @@ public interface IApplicationDbContext
     DbSet<UrgencyScoreLog> UrgencyScoreLogs { get; }
     DbSet<Alert> Alerts { get; }
     DbSet<ChatMessage> ChatMessages { get; }
+    DbSet<CalendarIntegration> CalendarIntegrations { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

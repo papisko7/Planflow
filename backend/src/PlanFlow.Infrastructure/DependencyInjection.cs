@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PlanFlow.Application.Common.Interfaces;
 using PlanFlow.Infrastructure.BackgroundJobs;
 using PlanFlow.Infrastructure.Caching;
+using PlanFlow.Infrastructure.ExternalServices.Google;
 using PlanFlow.Infrastructure.Persistence;
 using PlanFlow.Infrastructure.Security;
 using Quartz;
@@ -34,6 +36,16 @@ public static class DependencyInjection
         services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
+
+        // Keys persisted to disk (not the default in-memory ring) so encrypted CalendarIntegration
+        // tokens stay decryptable across app restarts/redeploys instead of being silently orphaned.
+        services.AddDataProtection()
+            .SetApplicationName("PlanFlow")
+            .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(AppContext.BaseDirectory, "dataprotection-keys")));
+        services.AddSingleton<ITokenEncryptionService, DataProtectionTokenEncryptionService>();
+
+        services.Configure<GoogleOAuthOptions>(configuration.GetSection("GoogleOAuth"));
+        services.AddHttpClient<IGoogleOAuthClient, GoogleOAuthClient>();
 
         services.AddQuartz(quartz =>
         {
