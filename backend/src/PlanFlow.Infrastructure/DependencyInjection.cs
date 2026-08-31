@@ -46,6 +46,7 @@ public static class DependencyInjection
 
         services.Configure<GoogleOAuthOptions>(configuration.GetSection("GoogleOAuth"));
         services.AddHttpClient<IGoogleOAuthClient, GoogleOAuthClient>();
+        services.AddHttpClient<IGoogleCalendarClient, GoogleCalendarClient>();
 
         services.AddQuartz(quartz =>
         {

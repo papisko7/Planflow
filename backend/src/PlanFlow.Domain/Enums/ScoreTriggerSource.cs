@@ -9,5 +9,6 @@ public enum ScoreTriggerSource
     ManualUpdate = 1,
     ScheduledRecalculation = 2,
     AiAssessment = 3,
-    AiFallback = 4
+    AiFallback = 4,
+    CalendarSync = 5
 }

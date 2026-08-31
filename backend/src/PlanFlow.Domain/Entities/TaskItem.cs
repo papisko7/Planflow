@@ -39,6 +39,13 @@ public class TaskItem : BaseEntity
     /// <summary>Timestamp of the last assessment, if <see cref="AiAssessmentScore"/> was ever set.</summary>
     public DateTime? AiAssessmentAtUtc { get; set; }
 
+    /// <summary>Google Calendar event ID this task was synced from, if it originated from a calendar sync; null for manually-created tasks.</summary>
+    public string? ExternalCalendarEventId { get; set; }
+
+    /// <summary>The <see cref="CalendarIntegration"/> this task was synced from, if any. Combined with <see cref="ExternalCalendarEventId"/>, this is the idempotency key SyncCalendarJob upserts on.</summary>
+    public Guid? SourceCalendarIntegrationId { get; set; }
+    public CalendarIntegration? SourceCalendarIntegration { get; set; }
+
     public ICollection<TaskItem> BlockedTasks { get; set; } = new List<TaskItem>();
     public ICollection<TaskHistory> History { get; set; } = new List<TaskHistory>();
     public ICollection<UrgencyScoreLog> UrgencyScoreLogs { get; set; } = new List<UrgencyScoreLog>();
