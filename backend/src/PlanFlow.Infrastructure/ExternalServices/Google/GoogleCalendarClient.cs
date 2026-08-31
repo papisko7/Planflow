@@ -45,10 +45,18 @@ public class GoogleCalendarClient : IGoogleCalendarClient
         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
 
         using var response = await _httpClient.SendAsync(request, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
+            // Distinct from other failures so SyncCalendarJob can force a token refresh and retry
+            // once, instead of just waiting out the resilience handler's retry budget below.
             throw new UnauthorizedException("Google rejected the Calendar events request (expired/revoked access token).");
         }
+
+        // Any other failure (429 rate limit, 5xx, or a transport-level timeout as HttpRequestException)
+        // is left to throw HttpRequestException via EnsureSuccessStatusCode, which the resilience
+        // handler registered in DependencyInjection retries with exponential backoff before it ever
+        // reaches SyncCalendarJob's per-integration catch block.
+        response.EnsureSuccessStatusCode();
 
         var body = await response.Content.ReadFromJsonAsync<GoogleEventsResponse>(cancellationToken)
             ?? throw new UnauthorizedException("Google returned an empty Calendar events response.");

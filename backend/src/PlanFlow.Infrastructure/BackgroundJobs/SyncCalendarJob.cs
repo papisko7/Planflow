@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PlanFlow.Application.Calendar.Common;
 using PlanFlow.Application.Common.Caching;
+using PlanFlow.Application.Common.Exceptions;
 using PlanFlow.Application.Common.Interfaces;
 using PlanFlow.Application.Tasks.Common;
 using PlanFlow.Domain.Entities;
@@ -105,7 +106,21 @@ public class SyncCalendarJob : IJob
         }
 
         var accessToken = await _accessTokenProvider.GetValidAccessTokenAsync(integration, cancellationToken);
-        var events = await _calendarClient.ListEventsAsync(accessToken, integration.LastSyncedAtUtc, cancellationToken);
+        IReadOnlyList<GoogleCalendarEvent> events;
+        try
+        {
+            events = await _calendarClient.ListEventsAsync(accessToken, integration.LastSyncedAtUtc, cancellationToken);
+        }
+        catch (UnauthorizedException)
+        {
+            // Google rejected the token even though our locally stored expiry said it was still
+            // valid (e.g. consent was revoked and re-granted out of band). Force a refresh and
+            // retry exactly once instead of failing this run and waiting for the next 5-minute
+            // poll — a second UnauthorizedException here is a genuine failure and propagates to
+            // the caller's per-integration catch block like any other.
+            accessToken = await _accessTokenProvider.RefreshAccessTokenAsync(integration, cancellationToken);
+            events = await _calendarClient.ListEventsAsync(accessToken, integration.LastSyncedAtUtc, cancellationToken);
+        }
 
         var nowUtc = DateTime.UtcNow;
         var created = 0;

@@ -35,6 +35,17 @@ public class GoogleAccessTokenProvider
             return _tokenEncryptionService.Decrypt(integration.EncryptedAccessToken);
         }
 
+        return await RefreshAccessTokenAsync(integration, cancellationToken);
+    }
+
+    /// <summary>
+    /// Unconditionally exchanges the stored refresh token for a new access token, bypassing the
+    /// local expiry check. Used when Google rejects a request with a 401 even though our locally
+    /// stored expiry says the token should still be valid (e.g. the user revoked and re-granted
+    /// consent) — see <see cref="PlanFlow.Infrastructure.BackgroundJobs.SyncCalendarJob"/>.
+    /// </summary>
+    public async Task<string> RefreshAccessTokenAsync(CalendarIntegration integration, CancellationToken cancellationToken)
+    {
         var refreshToken = _tokenEncryptionService.Decrypt(integration.EncryptedRefreshToken);
         var refreshed = await _googleOAuthClient.RefreshAccessTokenAsync(refreshToken, cancellationToken);
 
