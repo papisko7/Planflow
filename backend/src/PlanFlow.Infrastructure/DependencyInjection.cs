@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using PlanFlow.Application.Common.Interfaces;
 using PlanFlow.Infrastructure.BackgroundJobs;
 using PlanFlow.Infrastructure.Caching;
@@ -14,23 +15,42 @@ namespace PlanFlow.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
-        // Pooled context (vs. AddDbContext's per-request "new instance") reuses a fixed number of
-        // DbContext instances across requests, which in turn reuses Npgsql's own connection pool
-        // instead of opening/closing a physical connection per request.
-        services.AddDbContextPool<PlanFlowDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("PlanFlowDb")));
-
-        // Resolve the Application-layer abstraction to the same pooled DbContext instance.
-        services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<PlanFlowDbContext>());
-
-        var redisConnectionString = configuration.GetConnectionString("Redis");
-        services.AddStackExchangeRedisCache(options =>
+        // WebApplicationFactory-based integration tests (PlanFlow.Tests/Api) run the real Api host
+        // under the "Testing" environment so they get a throwaway InMemory database and cache
+        // instead of needing a real PostgreSQL/Redis instance — everything else in this method
+        // (Quartz, data protection, HTTP clients) still runs unchanged for those tests.
+        if (environment.IsEnvironment("Testing"))
         {
-            options.Configuration = redisConnectionString;
-            options.InstanceName = "planflow:";
-        });
+            // The database name must be captured once outside the options delegate — AddDbContext
+            // re-invokes this delegate to build fresh DbContextOptions per scope, so a Guid.NewGuid()
+            // call inside it would hand every scope its own empty database instead of a shared one.
+            var testingDatabaseName = $"planflow-testing-{Guid.NewGuid()}";
+            services.AddDbContext<PlanFlowDbContext>(options =>
+                options.UseInMemoryDatabase(testingDatabaseName));
+            services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<PlanFlowDbContext>());
+            services.AddDistributedMemoryCache();
+        }
+        else
+        {
+            // Pooled context (vs. AddDbContext's per-request "new instance") reuses a fixed number of
+            // DbContext instances across requests, which in turn reuses Npgsql's own connection pool
+            // instead of opening/closing a physical connection per request.
+            services.AddDbContextPool<PlanFlowDbContext>(options =>
+                options.UseNpgsql(configuration.GetConnectionString("PlanFlowDb")));
+
+            // Resolve the Application-layer abstraction to the same pooled DbContext instance.
+            services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<PlanFlowDbContext>());
+
+            var redisConnectionString = configuration.GetConnectionString("Redis");
+            services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = redisConnectionString;
+                options.InstanceName = "planflow:";
+            });
+        }
+
         services.AddSingleton<ICacheService, RedisCacheService>();
 
         services.Configure<JwtOptions>(configuration.GetSection("Jwt"));

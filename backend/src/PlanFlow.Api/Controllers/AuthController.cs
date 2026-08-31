@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using PlanFlow.Api.Contracts;
 using PlanFlow.Application.Auth.Commands.Login;
 using PlanFlow.Application.Auth.Commands.RefreshToken;
@@ -12,6 +13,7 @@ namespace PlanFlow.Api.Controllers;
 [ApiController]
 [Route("api/auth")]
 [AllowAnonymous]
+[EnableRateLimiting(RateLimitingConfig.AuthPolicy)]
 public class AuthController : ControllerBase
 {
     private readonly ISender _sender;

@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using PlanFlow.Api.Common;
 using PlanFlow.Api.Contracts;
 using PlanFlow.Application.Calendar.Commands.DisconnectGoogleCalendar;
@@ -36,6 +37,7 @@ public class CalendarController : ControllerBase
     /// </summary>
     [HttpGet("callback")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingConfig.AuthPolicy)]
     public async Task<IActionResult> Callback([FromQuery] GoogleCallbackRequest request, CancellationToken cancellationToken)
     {
         if (!string.IsNullOrEmpty(request.Error))

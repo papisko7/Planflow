@@ -60,16 +60,23 @@ public class TasksController : ControllerBase
         return CreatedAtAction(nameof(GetTask), new { taskId = task.Id }, task);
     }
 
-    // Single-task routes below don't carry a {teamId} in the URL, so they can only check that the
-    // caller holds the permission for SOME team (via the "team_role" claim) — not that it's for
-    // THIS task's team. Closing that gap needs the multi-team JWT/team-switch redesign already
-    // flagged as Phase 4.3 in PermissionAuthorizationHandler; team-scoped routes above already
-    // enforce the stronger check cheaply because their teamId is known upfront.
+    // Single-task routes below don't carry a {teamId} in the URL, so the [Authorize(Policy=...)]
+    // attribute alone only proves the caller holds the permission for SOME team (via the
+    // "team_role" claim) — not that it's for THIS task's team. We close that gap with an explicit
+    // resource-ownership check against the task's real TeamId (Phase 4.3). A full fix would carry
+    // {teamId} in the route like the team-scoped endpoints above; that needs the multi-team
+    // JWT/team-switch redesign, out of scope here.
     [HttpGet("api/tasks/{taskId:guid}")]
     [Authorize(Policy = nameof(Permission.ViewTasks))]
     public async Task<IActionResult> GetTask(Guid taskId, CancellationToken cancellationToken)
     {
         var task = await _sender.Send(new GetTaskDetailQuery(taskId), cancellationToken);
+
+        if (User.GetTeamId() != task.Task.TeamId)
+        {
+            return Forbid();
+        }
+
         return Ok(task);
     }
 
@@ -77,6 +84,13 @@ public class TasksController : ControllerBase
     [Authorize(Policy = nameof(Permission.EditAnyTask))]
     public async Task<IActionResult> UpdateTask(Guid taskId, UpdateTaskRequest request, CancellationToken cancellationToken)
     {
+        var existing = await _sender.Send(new GetTaskDetailQuery(taskId), cancellationToken);
+
+        if (User.GetTeamId() != existing.Task.TeamId)
+        {
+            return Forbid();
+        }
+
         var task = await _sender.Send(
             new UpdateTaskCommand(
                 taskId,
@@ -99,6 +113,13 @@ public class TasksController : ControllerBase
     [Authorize(Policy = nameof(Permission.DeleteTask))]
     public async Task<IActionResult> DeleteTask(Guid taskId, CancellationToken cancellationToken)
     {
+        var existing = await _sender.Send(new GetTaskDetailQuery(taskId), cancellationToken);
+
+        if (User.GetTeamId() != existing.Task.TeamId)
+        {
+            return Forbid();
+        }
+
         await _sender.Send(new DeleteTaskCommand(taskId), cancellationToken);
         return NoContent();
     }
