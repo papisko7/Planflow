@@ -26,6 +26,7 @@ appId: com.planflow.mobile
 - tapOn:
     id: "register-password-input"
 - inputText: "MaestroTest!123"
+- hideKeyboard
 - tapOn:
     id: "register-submit-button"
 
@@ -40,6 +41,7 @@ appId: com.planflow.mobile
 - tapOn:
     id: "create-team-name-input"
 - inputText: "QA Team Alpha"
+- hideKeyboard
 - tapOn:
     id: "create-team-submit-button"
 - assertVisible: "QA Team Alpha"
@@ -49,6 +51,7 @@ appId: com.planflow.mobile
 - tapOn:
     id: "create-team-name-input"
 - inputText: "QA Team Beta"
+- hideKeyboard
 - tapOn:
     id: "create-team-submit-button"
 - assertVisible: "Task distribution — QA Team Beta"
@@ -68,6 +71,7 @@ appId: com.planflow.mobile
 - tapOn:
     id: "create-task-impact-input"
 - inputText: "1"
+- hideKeyboard
 - tapOn:
     id: "create-task-submit-button"
 - assertVisible: "Setup environment"
@@ -79,10 +83,15 @@ appId: com.planflow.mobile
 - inputText: "Ship release"
 - tapOn:
     id: "create-task-deadline-days-input"
-- inputText: "0"
+- inputText: "1" # not "0": the backend requires DeadlineUtc strictly in the future (CreateTaskCommandValidator), and by the
+                  # time a "0 days from now" timestamp reaches the server it has already elapsed, so the create silently
+                  # 400s (found by actually running this flow — the app also doesn't surface that error in the form, a
+                  # separate gap worth fixing later). 1 day out keeps the deadline component ~0.97, close enough to the
+                  # tier math below.
 - tapOn:
     id: "create-task-impact-input"
 - inputText: "10"
+- hideKeyboard
 - tapOn:
     text: "Setup environment"
     index: 0 # the chip in the create-form header, not the task card rendered below it — selects it as "blocked by"
@@ -93,8 +102,8 @@ appId: com.planflow.mobile
 
 # --- Step D: Urgency Score verification -----------------------------------------------------
 # Deterministic given the formula (0.35*deadline + 0.20*impact, ai/blocking/override all 0 here):
-#   "Ship release"       -> deadline=0d (overdue-equivalent, component=1.0) + impact=10 (component=1.0)
-#                            => finalScore = 0.35 + 0.20 = 0.55 -> Medium tier (>=0.4)
+#   "Ship release"       -> deadline=1d (component=1-1/30≈0.967) + impact=10 (component=1.0)
+#                            => finalScore ≈ 0.35*0.967 + 0.20 ≈ 0.538 -> Medium tier (>=0.4, <0.6)
 #   "Setup environment"  -> no deadline (component=0) + impact=1 (component=0.1)
 #                            => finalScore = 0.02 -> Low tier
 - tapOn: "Dashboard"
