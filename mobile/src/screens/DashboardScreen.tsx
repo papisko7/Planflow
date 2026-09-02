@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { TaskCard } from '../components/TaskCard';
 import { restoreSession } from '../services/authService';
@@ -58,11 +58,19 @@ export default function DashboardScreen() {
     }
   }, [teamId, resolveTeam, loadTasks]);
 
-  useEffect(() => {
-    setState('loading');
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Bottom-tab screens stay mounted across tab switches, so a mount-only effect would only ever
+  // see the team list as it existed the first time Dashboard was focused (e.g. "no teams yet" if
+  // the user hadn't created one at app start) and never refresh after that. useFocusEffect re-runs
+  // on every tab focus instead.
+  useFocusEffect(
+    useCallback(() => {
+      if (state !== 'ready') {
+        setState('loading');
+      }
+      load();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [load]),
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

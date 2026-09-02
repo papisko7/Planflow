@@ -1,12 +1,15 @@
 import { http } from './httpClient';
+import { ensureTeamContext } from './authService';
 import type { CreateTaskRequest, TaskDetailDto, TaskDto, UpdateTaskRequest } from '../types/task';
 
 export async function getTeamTasks(teamId: string): Promise<TaskDto[]> {
+  await ensureTeamContext(teamId);
   const { data } = await http.get<TaskDto[]>(`/api/teams/${teamId}/tasks`);
   return data;
 }
 
 export async function createTask(teamId: string, request: CreateTaskRequest): Promise<TaskDto> {
+  await ensureTeamContext(teamId);
   const { data } = await http.post<TaskDto>(`/api/teams/${teamId}/tasks`, request);
   return data;
 }
