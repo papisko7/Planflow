@@ -40,7 +40,7 @@ public class AuthController : ControllerBase
     [HttpPost("refresh")]
     public async Task<ActionResult<AuthResultDto>> Refresh(RefreshRequest request, CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(new RefreshTokenCommand(request.UserId, request.RefreshToken), cancellationToken);
+        var result = await _sender.Send(new RefreshTokenCommand(request.UserId, request.RefreshToken, request.TeamId), cancellationToken);
         return Ok(result);
     }
 }

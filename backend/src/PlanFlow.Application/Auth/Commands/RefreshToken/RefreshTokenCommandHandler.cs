@@ -4,6 +4,7 @@ using PlanFlow.Application.Auth.Common;
 using PlanFlow.Application.Common.Exceptions;
 using PlanFlow.Application.Common.Interfaces;
 using PlanFlow.Application.Common.Security;
+using PlanFlow.Domain.Enums;
 
 namespace PlanFlow.Application.Auth.Commands.RefreshToken;
 
@@ -33,7 +34,18 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, A
             throw new UnauthorizedException("Invalid refresh token.");
         }
 
-        var (accessToken, accessExpiresAtUtc) = _jwtTokenService.GenerateAccessToken(user, teamRole: null, teamId: null);
+        TeamRole? teamRole = null;
+        if (request.TeamId is not null)
+        {
+            var membership = await _context.TeamMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.TeamId == request.TeamId && m.UserId == user.Id, cancellationToken)
+                ?? throw new ForbiddenAccessException("You are not a member of this team.");
+
+            teamRole = membership.Role;
+        }
+
+        var (accessToken, accessExpiresAtUtc) = _jwtTokenService.GenerateAccessToken(user, teamRole, request.TeamId);
         var (refreshToken, refreshExpiresAtUtc) = _jwtTokenService.GenerateRefreshToken();
 
         user.RefreshTokenHash = TokenHasher.Hash(refreshToken);
