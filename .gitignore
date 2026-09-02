@@ -53,6 +53,10 @@ build/
 .next/
 out/
 
+# Benchmark run output (Phase 5.2) - regenerated on every `dotnet run`, not source
+backend/benchmarks/results/*
+!backend/benchmarks/results/phase5.2-summary.md
+
 # Testing
 coverage/
 .nyc_output/
