@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PlanFlow.Application.Common.Interfaces;
 using PlanFlow.Domain.Entities;
 using PlanFlow.Domain.Enums;
+using PlanFlow.Tests.Integration.PostgresIntegration;
 
 namespace PlanFlow.Tests.Api;
 
@@ -13,6 +14,16 @@ namespace PlanFlow.Tests.Api;
 /// pipeline (JWT authentication, RBAC policies, rate limiting) via <see cref="CustomWebApplicationFactory"/>
 /// instead of unit-testing each piece in isolation.
 /// </summary>
+/// <remarks>
+/// Shares <see cref="PostgresCollection"/> with the Testcontainers-backed tests purely to force xUnit
+/// to run them sequentially rather than in parallel: two <see cref="Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory{TEntryPoint}"/>
+/// hosts of the same <c>Program</c> booting concurrently race on Quartz's static logging bridge
+/// (<c>Quartz.Logging.LogProvider</c>), which throws <see cref="ObjectDisposedException"/> on
+/// "LoggerFactory" when one host's provider gets disposed mid-startup of the other. This fixture
+/// (<see cref="CustomWebApplicationFactory"/>) is unrelated to <see cref="PostgresWebApplicationFactory"/>
+/// and still resolved independently via <see cref="IClassFixture{TFixture}"/> below.
+/// </remarks>
+[Collection(PostgresCollection.Name)]
 public class SecurityIntegrationTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly CustomWebApplicationFactory _factory;

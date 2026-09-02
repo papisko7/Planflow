@@ -32,6 +32,21 @@ public static class DependencyInjection
             services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<PlanFlowDbContext>());
             services.AddDistributedMemoryCache();
         }
+        else if (environment.IsEnvironment("PostgresIntegrationTesting"))
+        {
+            // PlanFlow.Tests/Integration/Postgres runs the real Api host against a real,
+            // Testcontainers-provisioned PostgreSQL instance (ConnectionStrings:PlanFlowDb points at
+            // the container) instead of InMemory, so real SQL translation/migrations/FK cascades are
+            // actually exercised. Kept as its own branch (not layered onto "Testing" above) because
+            // registering both UseInMemoryDatabase and UseNpgsql on the same IServiceCollection makes
+            // EF Core throw ("multiple database providers registered") — only one AddDbContext call
+            // may ever run per service collection. Cache stays in-memory, same as "Testing", since
+            // these tests don't need a real Redis instance either.
+            services.AddDbContext<PlanFlowDbContext>(options =>
+                options.UseNpgsql(configuration.GetConnectionString("PlanFlowDb")));
+            services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<PlanFlowDbContext>());
+            services.AddDistributedMemoryCache();
+        }
         else
         {
             // Pooled context (vs. AddDbContext's per-request "new instance") reuses a fixed number of
