@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { restoreSession } from '../services/authService';
 import { createTeam, getMyTeams } from '../services/teamService';
 import { getTeamTasks } from '../services/taskService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { getUrgencyTier, URGENCY_TIER_META } from '../utils/urgencyGrouping';
+import type { RootStackParamList } from '../navigation/types';
 import type { ApiError } from '../types/api';
 import type { TeamDto } from '../types/team';
 import type { TaskDto } from '../types/task';
@@ -40,6 +43,7 @@ function buildWorkload(tasks: TaskDto[]): WorkloadRow[] {
 }
 
 export default function TeamsScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [state, setState] = useState<LoadState>('loading');
   const [teams, setTeams] = useState<TeamDto[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
@@ -239,7 +243,16 @@ export default function TeamsScreen() {
       ListFooterComponent={
         selectedTeam ? (
           <View style={styles.workloadCard}>
-            <Text style={styles.sectionLabel}>Task distribution — {selectedTeam.name}</Text>
+            <View style={styles.headerRow}>
+              <Text style={styles.sectionLabel}>Task distribution — {selectedTeam.name}</Text>
+              <Pressable
+                testID="open-team-chat-button"
+                style={styles.smallButton}
+                onPress={() => navigation.navigate('Chat', { teamId: selectedTeam.id, teamName: selectedTeam.name })}
+              >
+                <Text style={styles.smallButtonText}>Chat</Text>
+              </Pressable>
+            </View>
             {tasksLoading ? (
               <ActivityIndicator color={colors.primary} style={styles.workloadSpinner} />
             ) : workload.length === 0 ? (

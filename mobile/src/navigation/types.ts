@@ -18,4 +18,5 @@ export type RootTabParamList = {
 export type RootStackParamList = {
   Tabs: undefined;
   TaskDetail: { taskId: string };
+  Chat: { teamId: string; teamName: string };
 };
