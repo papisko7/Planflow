@@ -17,7 +17,10 @@
     "react-native-screens": "~4.26.0"
   },
   "devDependencies": {
+    "@testing-library/react-native": "^14.0.1",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.2.2",
+    "jest-expo": "~57.0.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -25,7 +28,11 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "test": "jest",
     "e2e": "maestro test .maestro/main_user_flow.yaml"
+  },
+  "jest": {
+    "preset": "jest-expo"
   },
   "private": true
 }
