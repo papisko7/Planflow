@@ -16,6 +16,11 @@ export function setAccessToken(token: string | null): void {
   accessToken = token;
 }
 
+// Read by ChatScreen's SignalR `accessTokenFactory`, which can't use the axios interceptor.
+export function getAccessToken(): string | null {
+  return accessToken;
+}
+
 export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
   onUnauthorized = handler;
 }

@@ -7,9 +7,16 @@ import type { AuthResultDto, LoginRequest, RegisterRequest } from '../types/auth
 // Authorization header or trigger the 401 -> refresh interceptor on `http`, which would recurse.
 const authHttp = axios.create({ baseURL: API_BASE_URL });
 
+let currentUserId: string | null = null;
+
+export function getCurrentUserId(): string | null {
+  return currentUserId;
+}
+
 async function persist(result: AuthResultDto): Promise<AuthResultDto> {
   await saveSession({ accessToken: result.accessToken, refreshToken: result.refreshToken, userId: result.userId });
   setAccessToken(result.accessToken);
+  currentUserId = result.userId;
   return result;
 }
 
@@ -70,6 +77,7 @@ export async function restoreSession(): Promise<boolean> {
     return false;
   }
   setAccessToken(session.accessToken);
+  currentUserId = session.userId;
   return true;
 }
 

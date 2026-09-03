@@ -8,6 +8,7 @@ import TeamsScreen from '../screens/TeamsScreen';
 import CalendarScreen from '../screens/CalendarScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import TaskDetailScreen from '../screens/TaskDetailScreen';
+import ChatScreen from '../screens/ChatScreen';
 import AuthNavigator from './AuthNavigator';
 import { useSession } from '../context/SessionContext';
 import { colors } from '../theme/theme';
@@ -61,6 +62,11 @@ export default function RootNavigator() {
         >
           <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
           <Stack.Screen name="TaskDetail" component={TaskDetailScreen} options={{ title: 'Task Details' }} />
+          <Stack.Screen
+            name="Chat"
+            component={ChatScreen}
+            options={({ route }) => ({ title: route.params.teamName })}
+          />
         </Stack.Navigator>
       )}
     </NavigationContainer>
