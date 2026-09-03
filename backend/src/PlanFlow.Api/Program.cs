@@ -1,5 +1,6 @@
 using PlanFlow.Api;
 using PlanFlow.Api.AuthPolicy;
+using PlanFlow.Api.Hubs;
 using PlanFlow.Api.Middleware;
 using PlanFlow.Application;
 using PlanFlow.Infrastructure;
@@ -15,6 +16,7 @@ builder.Services.AddSwaggerDocumentation();
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddRbacPolicies();
 builder.Services.AddApiRateLimiting();
+builder.Services.AddSignalR();
 
 var app = builder.Build();
 
@@ -35,6 +37,7 @@ app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<ChatHub>("/hubs/chat");
 
 app.Run();
 
