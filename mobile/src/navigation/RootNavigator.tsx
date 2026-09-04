@@ -9,6 +9,7 @@ import CalendarScreen from '../screens/CalendarScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import TaskDetailScreen from '../screens/TaskDetailScreen';
 import ChatScreen from '../screens/ChatScreen';
+import OneNextActionScreen from '../screens/OneNextActionScreen';
 import AuthNavigator from './AuthNavigator';
 import { useSession } from '../context/SessionContext';
 import { colors } from '../theme/theme';
@@ -67,6 +68,7 @@ export default function RootNavigator() {
             component={ChatScreen}
             options={({ route }) => ({ title: route.params.teamName })}
           />
+          <Stack.Screen name="OneNextAction" component={OneNextActionScreen} options={{ title: 'Focus Mode' }} />
         </Stack.Navigator>
       )}
     </NavigationContainer>

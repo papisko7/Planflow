@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { TaskCard } from '../components/TaskCard';
@@ -92,6 +92,11 @@ export default function DashboardScreen() {
     [navigation],
   );
 
+  const onFocusModePress = useCallback(() => {
+    if (!teamId) return;
+    navigation.navigate('OneNextAction', { teamId });
+  }, [navigation, teamId]);
+
   if (state === 'loading') {
     return (
       <View style={styles.centered}>
@@ -129,6 +134,11 @@ export default function DashboardScreen() {
           <Text style={styles.sectionHeaderText}>{section.title}</Text>
         </View>
       )}
+      ListHeaderComponent={
+        <Pressable testID="focus-mode-button" onPress={onFocusModePress} style={styles.focusButton}>
+          <Text style={styles.focusButtonText}>🎯 Enter Focus Mode</Text>
+        </Pressable>
+      }
       stickySectionHeadersEnabled
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       ListEmptyComponent={
@@ -155,4 +165,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   sectionHeaderText: { ...typography.subtitle, color: colors.text },
+  focusButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  focusButtonText: { ...typography.subtitle, color: colors.surface },
 });
