@@ -1,11 +1,11 @@
-import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRoute, type RouteProp } from '@react-navigation/native';
 import { getTeamTasks, updateTask } from '../services/taskService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { getUrgencyTier, URGENCY_TIER_META } from '../utils/urgencyGrouping';
 import { selectOneNextAction } from '../utils/oneNextAction';
+import { generateMicroBreakdown, type MicroStep } from '../utils/microBreakdownEngine';
 import type { RootStackParamList } from '../navigation/types';
 import type { ApiError } from '../types/api';
 import { TaskStatus, type TaskDto } from '../types/task';
@@ -34,7 +34,6 @@ function formatTimeRemaining(deadlineUtc: string | null): string {
 
 export default function OneNextActionScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'OneNextAction'>>();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { teamId } = route.params;
 
   const [state, setState] = useState<LoadState>('loading');
@@ -62,6 +61,15 @@ export default function OneNextActionScreen() {
   );
 
   const activeTask = useMemo(() => selectOneNextAction(tasks), [tasks]);
+
+  const [breakdownSteps, setBreakdownSteps] = useState<MicroStep[] | null>(null);
+  const [completedStepIds, setCompletedStepIds] = useState<Set<string>>(new Set());
+
+  // A fresh active task (completed/deferred/reloaded) means any prior breakdown is stale.
+  useEffect(() => {
+    setBreakdownSteps(null);
+    setCompletedStepIds(new Set());
+  }, [activeTask?.id]);
 
   const applyTaskUpdate = useCallback(
     async (task: TaskDto, patch: Partial<TaskDto>) => {
@@ -101,10 +109,24 @@ export default function OneNextActionScreen() {
     });
   }, [activeTask, applyTaskUpdate]);
 
+  // "I'm Stuck": toggle a static, rule-based 5-minute breakdown inline — no navigation away
+  // from focus mode, and no AI call (see microBreakdownEngine's template catalog).
   const onBreakDown = useCallback(() => {
     if (!activeTask) return;
-    navigation.navigate('TaskDetail', { taskId: activeTask.id });
-  }, [activeTask, navigation]);
+    setBreakdownSteps((prev) => (prev ? null : generateMicroBreakdown(activeTask)));
+  }, [activeTask]);
+
+  const onToggleStep = useCallback((stepId: string) => {
+    setCompletedStepIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(stepId)) {
+        next.delete(stepId);
+      } else {
+        next.add(stepId);
+      }
+      return next;
+    });
+  }, []);
 
   if (state === 'loading') {
     return (
@@ -152,8 +174,32 @@ export default function OneNextActionScreen() {
       <View style={styles.actions}>
         <PrimaryButton testID="focus-complete-button" label="✅ Mark as Complete" onPress={onMarkComplete} disabled={actionPending} />
         <SecondaryButton testID="focus-defer-button" label="⏰ Defer / Snooze 24h" onPress={onDefer} disabled={actionPending} />
-        <SecondaryButton testID="focus-breakdown-button" label="🧩 Break Down Task" onPress={onBreakDown} disabled={actionPending} />
+        <SecondaryButton
+          testID="focus-breakdown-button"
+          label={breakdownSteps ? '🧩 Hide Breakdown' : "🧩 I'm Stuck? Break It Down"}
+          onPress={onBreakDown}
+          disabled={actionPending}
+        />
       </View>
+
+      {breakdownSteps ? (
+        <View style={styles.breakdownList} testID="micro-breakdown-list">
+          {breakdownSteps.map((step) => {
+            const done = completedStepIds.has(step.id);
+            return (
+              <Pressable
+                key={step.id}
+                testID={`micro-step-${step.id}`}
+                onPress={() => onToggleStep(step.id)}
+                style={styles.breakdownRow}
+              >
+                <Text style={styles.breakdownCheckbox}>{done ? '☑' : '⬜'}</Text>
+                <Text style={[styles.breakdownText, done ? styles.breakdownTextDone : null]}>{step.text}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -172,4 +218,9 @@ const styles = StyleSheet.create({
   timeRemaining: { ...typography.body, color: colors.text, fontWeight: '600', marginTop: spacing.sm },
   scoreText: { ...typography.body, color: colors.textMuted },
   actions: { gap: spacing.sm },
+  breakdownList: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
+  breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  breakdownCheckbox: { fontSize: 18 },
+  breakdownText: { ...typography.body, color: colors.text, flexShrink: 1 },
+  breakdownTextDone: { color: colors.textMuted, textDecorationLine: 'line-through' },
 });

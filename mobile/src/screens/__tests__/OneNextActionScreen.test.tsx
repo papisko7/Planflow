@@ -94,14 +94,44 @@ describe('OneNextActionScreen', () => {
     );
   });
 
-  it('navigates to TaskDetail when breaking down the active task', async () => {
+  it('shows an inline micro-step checklist when breaking down the active task', async () => {
+    mockedGetTeamTasks.mockResolvedValue([buildTask({ title: 'Fix the login bug' })]);
+
+    await render(<OneNextActionScreen />);
+    await waitFor(() => expect(screen.getByText('Fix the login bug')).toBeTruthy());
+
+    fireEvent.press(screen.getByTestId('focus-breakdown-button'));
+
+    expect(mockNavigate).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByTestId('micro-breakdown-list')).toBeTruthy());
+    expect(screen.getByText('Locate the target source file')).toBeTruthy();
+  });
+
+  it('hides the checklist when the breakdown button is pressed again', async () => {
     mockedGetTeamTasks.mockResolvedValue([buildTask()]);
 
     await render(<OneNextActionScreen />);
     await waitFor(() => expect(screen.getByText('Write the thesis chapter')).toBeTruthy());
 
     fireEvent.press(screen.getByTestId('focus-breakdown-button'));
+    await waitFor(() => expect(screen.getByTestId('micro-breakdown-list')).toBeTruthy());
 
-    expect(mockNavigate).toHaveBeenCalledWith('TaskDetail', { taskId: 'task-1' });
+    fireEvent.press(screen.getByTestId('focus-breakdown-button'));
+    await waitFor(() => expect(screen.queryByTestId('micro-breakdown-list')).toBeNull());
+  });
+
+  it('toggles a micro-step as completed when tapped', async () => {
+    mockedGetTeamTasks.mockResolvedValue([buildTask()]);
+
+    await render(<OneNextActionScreen />);
+    await waitFor(() => expect(screen.getByText('Write the thesis chapter')).toBeTruthy());
+
+    fireEvent.press(screen.getByTestId('focus-breakdown-button'));
+    await waitFor(() => expect(screen.getByTestId('micro-breakdown-list')).toBeTruthy());
+
+    const firstStep = screen.getByTestId('micro-step-task-1-step-1');
+    fireEvent.press(firstStep);
+
+    await waitFor(() => expect(screen.getByText('☑')).toBeTruthy());
   });
 });
