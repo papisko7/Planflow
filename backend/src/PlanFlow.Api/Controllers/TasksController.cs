@@ -7,6 +7,7 @@ using PlanFlow.Application.Tasks.Commands.CreateTask;
 using PlanFlow.Application.Tasks.Commands.DeleteTask;
 using PlanFlow.Application.Tasks.Commands.UpdateTask;
 using PlanFlow.Application.Tasks.Queries.GetTaskDetail;
+using PlanFlow.Application.Tasks.Queries.GetTaskScoreHistory;
 using PlanFlow.Application.Tasks.Queries.GetTasksByTeam;
 using PlanFlow.Domain.Authorization;
 
@@ -78,6 +79,22 @@ public class TasksController : ControllerBase
         }
 
         return Ok(task);
+    }
+
+    // Full audit trail of the deterministic Urgency Score: one entry per computation, newest first.
+    [HttpGet("api/tasks/{taskId:guid}/score-history")]
+    [Authorize(Policy = nameof(Permission.ViewTasks))]
+    public async Task<IActionResult> GetScoreHistory(Guid taskId, CancellationToken cancellationToken)
+    {
+        var existing = await _sender.Send(new GetTaskDetailQuery(taskId), cancellationToken);
+
+        if (User.GetTeamId() != existing.Task.TeamId)
+        {
+            return Forbid();
+        }
+
+        var history = await _sender.Send(new GetTaskScoreHistoryQuery(taskId), cancellationToken);
+        return Ok(history);
     }
 
     [HttpPut("api/tasks/{taskId:guid}")]

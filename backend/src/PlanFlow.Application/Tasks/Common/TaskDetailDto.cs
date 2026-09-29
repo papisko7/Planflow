@@ -1,4 +1,5 @@
 using PlanFlow.Domain.Entities;
+using PlanFlow.Domain.Enums;
 
 namespace PlanFlow.Application.Tasks.Common;
 
@@ -14,6 +15,7 @@ public record UrgencyScoreBreakdownDto(
     double UserOverrideComponent,
     double FinalScore,
     bool AiFallbackUsed,
+    ScoreTriggerSource TriggerSource,
     DateTime CreatedAtUtc)
 {
     public static UrgencyScoreBreakdownDto FromEntity(UrgencyScoreLog log) => new(
@@ -24,6 +26,7 @@ public record UrgencyScoreBreakdownDto(
         log.UserOverrideComponent,
         log.FinalScore,
         log.AiFallbackUsed,
+        log.TriggerSource,
         log.CreatedAtUtc);
 }
 

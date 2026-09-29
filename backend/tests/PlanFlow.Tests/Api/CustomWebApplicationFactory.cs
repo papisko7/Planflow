@@ -14,6 +14,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // Quartz caches the previous host's (now disposed) LoggerFactory in a static; clear it so
+        // back-to-back hosts in one test run do not hit ObjectDisposedException during startup.
+        Quartz.Logging.LogProvider.SetCurrentLogProvider(null);
         builder.UseEnvironment("Testing");
     }
 }
