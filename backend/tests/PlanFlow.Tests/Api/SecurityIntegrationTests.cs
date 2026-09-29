@@ -92,6 +92,70 @@ public class SecurityIntegrationTests : IClassFixture<CustomWebApplicationFactor
     }
 
     [Fact]
+    public async Task GetScoreHistory_FromAnotherTeam_Returns403()
+    {
+        var (teamAId, userA) = await SeedTeamWithMemberAsync(TeamRole.Member);
+        var (teamBId, _) = await SeedTeamWithMemberAsync(TeamRole.Member);
+        var taskInTeamB = await SeedTaskAsync(teamBId);
+        var client = await ClientForAsync(userA, teamAId, TeamRole.Member);
+
+        var response = await client.GetAsync($"api/tasks/{taskInTeamB}/score-history");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetScoreHistory_OwnTeam_Returns200WithLoggedEntries()
+    {
+        var (teamId, userId) = await SeedTeamWithMemberAsync(TeamRole.Member);
+        var taskId = await SeedTaskAsync(teamId);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
+            context.UrgencyScoreLogs.Add(new UrgencyScoreLog { TaskItemId = taskId, FinalScore = 0.5, TriggerSource = ScoreTriggerSource.ManualCreate });
+            await context.SaveChangesAsync(CancellationToken.None);
+        }
+        var client = await ClientForAsync(userId, teamId, TeamRole.Member);
+
+        var response = await client.GetAsync($"api/tasks/{taskId}/score-history");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("triggerSource", body);
+    }
+
+    [Fact]
+    public async Task GetTeamMembers_AsMember_Returns200()
+    {
+        var (teamId, userId) = await SeedTeamWithMemberAsync(TeamRole.Guest);
+        var client = await ClientForAsync(userId, teamId, TeamRole.Guest);
+
+        var response = await client.GetAsync($"api/teams/{teamId}/members");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetTeamMembers_AsNonMember_Returns403()
+    {
+        var (teamAId, userA) = await SeedTeamWithMemberAsync(TeamRole.Owner);
+        var (teamBId, _) = await SeedTeamWithMemberAsync(TeamRole.Owner);
+        var client = await ClientForAsync(userA, teamAId, TeamRole.Owner);
+
+        var response = await client.GetAsync($"api/teams/{teamBId}/members");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    private async Task<HttpClient> ClientForAsync(Guid userId, Guid teamId, TeamRole role)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", await MintAccessTokenAsync(userId, teamId, role));
+        return client;
+    }
+
+    [Fact]
     public async Task LoginEndpoint_ExceedingRateLimit_Returns429()
     {
         // A fresh client per iteration keeps the same underlying TestServer connection (and thus

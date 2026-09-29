@@ -5,6 +5,7 @@ using PlanFlow.Api.Common;
 using PlanFlow.Api.Contracts;
 using PlanFlow.Application.Teams.Commands.AddTeamMember;
 using PlanFlow.Application.Teams.Commands.CreateTeam;
+using PlanFlow.Application.Teams.Queries.GetTeamMembers;
 using PlanFlow.Application.Teams.Queries.GetUserTeams;
 
 namespace PlanFlow.Api.Controllers;
@@ -33,6 +34,14 @@ public class TeamsController : ControllerBase
     {
         var teams = await _sender.Send(new GetUserTeamsQuery(User.GetUserId()), cancellationToken);
         return Ok(teams);
+    }
+
+    // Membership (not a JWT claim) is verified inside the handler, for the same reason as AddMember.
+    [HttpGet("{teamId:guid}/members")]
+    public async Task<IActionResult> GetMembers(Guid teamId, CancellationToken cancellationToken)
+    {
+        var members = await _sender.Send(new GetTeamMembersQuery(teamId, User.GetUserId()), cancellationToken);
+        return Ok(members);
     }
 
     // No policy attribute here on purpose: AddTeamMemberCommandHandler already looks up the
