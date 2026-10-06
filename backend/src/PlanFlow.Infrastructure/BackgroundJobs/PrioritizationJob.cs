@@ -13,7 +13,8 @@ namespace PlanFlow.Infrastructure.BackgroundJobs;
 /// Recomputes <see cref="PlanFlow.Domain.Entities.TaskItem.CurrentUrgencyScore"/> for every
 /// non-terminal task, since deadline pressure (the heaviest-weighted component, see
 /// <see cref="PlanFlow.Domain.Services.UrgencyScoreCalculator"/>) changes purely with the
-/// passage of time even when nobody touches the task.
+/// passage of time even when nobody touches the task. It uses the same team-wide rescoring as the
+/// task handlers, so dependency effects (inherited urgency, blocked penalty) stay consistent.
 /// </summary>
 public class PrioritizationJob : IJob
 {
@@ -42,35 +43,20 @@ public class PrioritizationJob : IJob
             return;
         }
 
-        var blockedCounts = await _context.Tasks
-            .Where(t => t.BlockedByTaskId != null)
-            .GroupBy(t => t.BlockedByTaskId!.Value)
-            .Select(g => new { TaskId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(g => g.TaskId, g => g.Count, cancellationToken);
-
-        var affectedTeamIds = new HashSet<Guid>();
-
-        foreach (var task in activeTasks)
-        {
-            var blockedCount = blockedCounts.GetValueOrDefault(task.Id, 0);
-            var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedCount, nowUtc, ScoreTriggerSource.ScheduledRecalculation);
-
-            task.CurrentUrgencyScore = scoreLog.FinalScore;
-            task.UpdatedAtUtc = nowUtc;
-            _context.UrgencyScoreLogs.Add(scoreLog);
-
-            affectedTeamIds.Add(task.TeamId);
-            await _cache.RemoveAsync(CacheKeys.TaskUrgency(task.Id), cancellationToken);
-        }
-
+        var changedTaskIds = TeamUrgencyRecalculator.Apply(_context, activeTasks, nowUtc, ScoreTriggerSource.ScheduledRecalculation);
         await _context.SaveChangesAsync(cancellationToken);
 
+        var affectedTeamIds = activeTasks.Select(t => t.TeamId).Distinct().ToList();
         foreach (var teamId in affectedTeamIds)
         {
             await _cache.RemoveAsync(CacheKeys.TeamTasks(teamId), cancellationToken);
         }
+        foreach (var taskId in changedTaskIds)
+        {
+            await _cache.RemoveAsync(CacheKeys.TaskUrgency(taskId), cancellationToken);
+        }
 
-        _logger.LogInformation("PrioritizationJob recalculated urgency for {Count} tasks across {TeamCount} teams.",
-            activeTasks.Count, affectedTeamIds.Count);
+        _logger.LogInformation("PrioritizationJob rescored {Count} tasks ({Changed} changed) across {TeamCount} teams.",
+            activeTasks.Count, changedTaskIds.Count, affectedTeamIds.Count);
     }
 }

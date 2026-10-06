@@ -6,7 +6,8 @@ namespace PlanFlow.Domain.Entities;
 /// <summary>
 /// Snapshot of one Urgency Score computation for a <see cref="TaskItem"/>, capturing every
 /// weighted component so the result is explainable and reproducible for the thesis evaluation:
-/// FinalScore = 0.35*Deadline + 0.20*Ai + 0.15*Blocking + 0.20*Impact + 0.10*UserOverride.
+/// weighted sum 0.45*Deadline + 0.20*Blocking + 0.25*Impact + 0.10*UserOverride, then the deadline and
+/// inheritance floors and, for blocked tasks, the blocked penalty (see UrgencyScoreCalculator).
 /// </summary>
 public class UrgencyScoreLog : BaseEntity
 {
@@ -14,16 +15,17 @@ public class UrgencyScoreLog : BaseEntity
     public TaskItem TaskItem { get; set; } = null!;
 
     public double DeadlineComponent { get; set; }
-    public double AiComponent { get; set; }
     public double BlockingComponent { get; set; }
-    public double ImpactComponent { get; set; }
+
+    /// <summary>Null when the task's impact was not rated at the time of this calculation.</summary>
+    public double? ImpactComponent { get; set; }
     public double UserOverrideComponent { get; set; }
+
+    /// <summary>True when the task was waiting on an unfinished blocker, so its score was reduced.</summary>
+    public bool IsBlocked { get; set; }
 
     public double FinalScore { get; set; }
 
-    /// <summary>True if the AI component fell back to 0 because the AI planner call failed.</summary>
-    public bool AiFallbackUsed { get; set; }
-
-    /// <summary>Describes the origin of this score calculation (manual edit, scheduled job, AI assessment, etc.).</summary>
+    /// <summary>Describes the origin of this score calculation (manual edit, scheduled job, calendar sync, etc.).</summary>
     public ScoreTriggerSource TriggerSource { get; set; }
 }

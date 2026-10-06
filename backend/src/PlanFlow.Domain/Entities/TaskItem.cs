@@ -20,7 +20,9 @@ public class TaskItem : BaseEntity
     public Enums.TaskStatus Status { get; set; } = Enums.TaskStatus.Todo;
 
     public DateTime? DeadlineUtc { get; set; }
-    public int ImpactScore { get; set; }
+
+    /// <summary>Impact on a 0–10 scale; null = not rated yet (e.g. imported from Google Calendar), which the algorithm treats as "unknown", not zero.</summary>
+    public int? ImpactScore { get; set; }
 
     /// <summary>Task this one is blocked by, if any (used for the "blocking" urgency component).</summary>
     public Guid? BlockedByTaskId { get; set; }
@@ -32,12 +34,6 @@ public class TaskItem : BaseEntity
 
     /// <summary>Latest computed urgency score in [0,1]; denormalized for fast dashboard sorting/queries.</summary>
     public double CurrentUrgencyScore { get; set; }
-
-    /// <summary>Optional external assessment input to the urgency formula's AI component; normalized to [0,1]. Always null in the current build (no AI integration) — the formula treats null as 0.</summary>
-    public double? AiAssessmentScore { get; set; }
-
-    /// <summary>Timestamp of the last assessment, if <see cref="AiAssessmentScore"/> was ever set.</summary>
-    public DateTime? AiAssessmentAtUtc { get; set; }
 
     /// <summary>Google Calendar event ID this task was synced from, if it originated from a calendar sync; null for manually-created tasks.</summary>
     public string? ExternalCalendarEventId { get; set; }

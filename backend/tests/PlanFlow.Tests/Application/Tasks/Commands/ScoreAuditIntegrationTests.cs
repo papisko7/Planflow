@@ -40,7 +40,7 @@ public class ScoreAuditIntegrationTests
         context.Add(team);
         context.SaveChanges();
 
-        var handler = new CreateTaskCommandHandler(context, mockCache.Object);
+        var handler = new CreateTaskCommandHandler(context, mockCache.Object, new PlanFlow.Application.Notifications.NotificationService(context));
         var command = new CreateTaskCommand(
             teamId,
             "New Task",
@@ -85,14 +85,13 @@ public class ScoreAuditIntegrationTests
             Status = TaskStatus.Todo,
             ImpactScore = 5,
             CurrentUrgencyScore = 0.5,
-            AiAssessmentScore = null
         };
 
         context.Add(team);
         context.Add(task);
         context.SaveChanges();
 
-        var handler = new UpdateTaskCommandHandler(context, mockCache.Object);
+        var handler = new UpdateTaskCommandHandler(context, mockCache.Object, new PlanFlow.Application.Notifications.NotificationService(context));
         var command = new UpdateTaskCommand(
             taskId,
             "Updated Title",
@@ -144,7 +143,6 @@ public class ScoreAuditIntegrationTests
             Status = TaskStatus.Todo,
             ImpactScore = 5,
             CurrentUrgencyScore = 0.3,
-            AiAssessmentScore = null
         };
 
         context.Add(team);
@@ -185,7 +183,7 @@ public class ScoreAuditIntegrationTests
         context.SaveChanges();
 
         // Create task via handler (generates ManualCreate log)
-        var createHandler = new CreateTaskCommandHandler(context, mockCache.Object);
+        var createHandler = new CreateTaskCommandHandler(context, mockCache.Object, new PlanFlow.Application.Notifications.NotificationService(context));
         var createdByUserId = Guid.NewGuid();
         var createCmd = new CreateTaskCommand(
             teamId,
@@ -200,7 +198,7 @@ public class ScoreAuditIntegrationTests
         var taskResult = await createHandler.Handle(createCmd, CancellationToken.None);
 
         // Update task (generates ManualUpdate log)
-        var updateHandler = new UpdateTaskCommandHandler(context, mockCache.Object);
+        var updateHandler = new UpdateTaskCommandHandler(context, mockCache.Object, new PlanFlow.Application.Notifications.NotificationService(context));
         var updatedByUserId = Guid.NewGuid();
         var updateCmd = new UpdateTaskCommand(
             taskResult.Id,
@@ -245,7 +243,7 @@ public class ScoreAuditIntegrationTests
         context.Add(team);
         context.SaveChanges();
 
-        var handler = new CreateTaskCommandHandler(context, mockCache.Object);
+        var handler = new CreateTaskCommandHandler(context, mockCache.Object, new PlanFlow.Application.Notifications.NotificationService(context));
 
         // Act: Create multiple tasks
         var userId1 = Guid.NewGuid();

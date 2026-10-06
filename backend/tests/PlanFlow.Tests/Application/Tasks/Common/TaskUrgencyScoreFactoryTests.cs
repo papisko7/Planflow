@@ -1,23 +1,28 @@
 using PlanFlow.Application.Tasks.Common;
 using PlanFlow.Domain.Entities;
+using PlanFlow.Domain.Enums;
+using PlanFlow.Domain.Services;
+using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 
 namespace PlanFlow.Tests.Application.Tasks.Common;
 
 /// <summary>
 /// Unit tests for <see cref="TaskUrgencyScoreFactory"/>.
-/// Verifies normalization of TaskItem fields to [0,1] range and the resulting score log.
+/// Verifies normalization of TaskItem fields to [0,1], the deadline curve, and how the dependency chain
+/// (blockers inherit urgency, blocked tasks are lowered) shapes the final scores of a team.
 /// </summary>
 public class TaskUrgencyScoreFactoryTests
 {
     private static readonly DateTime ReferenceTime = new(2026, 8, 29, 12, 0, 0, DateTimeKind.Utc);
 
-    private TaskItem CreateTaskItem(
+    private static TaskItem CreateTaskItem(
         Guid? id = null,
         DateTime? deadline = null,
-        int impactScore = 5,
+        int? impactScore = 5,
         Guid? blockedByTaskId = null,
         double? manualOverride = null,
-        DateTime? overrideExpiresAt = null)
+        DateTime? overrideExpiresAt = null,
+        TaskStatus status = TaskStatus.Todo)
     {
         return new TaskItem
         {
@@ -29,315 +34,341 @@ public class TaskUrgencyScoreFactoryTests
             BlockedByTaskId = blockedByTaskId,
             ManualUrgencyOverride = manualOverride,
             ManualUrgencyOverrideExpiresAtUtc = overrideExpiresAt,
-            Status = PlanFlow.Domain.Enums.TaskStatus.Todo
+            Status = status
         };
     }
+
+    private static UrgencyScoreLog Build(TaskItem task, DateTime? now = null, double blocking = 0.0, bool isBlocked = false) =>
+        TaskUrgencyScoreFactory.BuildScoreLog(task, blocking, isBlocked, now ?? ReferenceTime);
+
+    // ---- Deadline curve ----
 
     [Fact]
     public void BuildScoreLog_NoDeadline_DeadlineComponentZero()
     {
-        var task = CreateTaskItem(deadline: null);
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, ReferenceTime);
-
-        Assert.Equal(0.0, log.DeadlineComponent);
+        Assert.Equal(0.0, Build(CreateTaskItem(deadline: null)).DeadlineComponent);
     }
 
     [Fact]
     public void BuildScoreLog_OverdueTask_DeadlineComponentOne()
     {
-        var now = ReferenceTime;
-        var overdueDeadline = now.AddDays(-1);
-        var task = CreateTaskItem(deadline: overdueDeadline);
-
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, now);
+        var log = Build(CreateTaskItem(deadline: ReferenceTime.AddDays(-1)));
 
         Assert.Equal(1.0, log.DeadlineComponent);
     }
 
-    [Fact]
-    public void BuildScoreLog_DeadlineTomorrow_DeadlineComponentHigh()
+    [Theory]
+    [InlineData(1, 0.8669)]
+    [InlineData(3, 0.6514)]
+    [InlineData(7, 0.3679)]
+    [InlineData(14, 0.1353)]
+    public void BuildScoreLog_DeadlineInNDays_FollowsExponentialCurve(double days, double expected)
     {
-        var now = ReferenceTime;
-        var tomorrow = now.AddDays(1);
-        var task = CreateTaskItem(deadline: tomorrow);
+        var log = Build(CreateTaskItem(deadline: ReferenceTime.AddDays(days)));
 
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, now);
-
-        Assert.True(log.DeadlineComponent > 0.9);
-        Assert.Equal(1.0 - 1.0 / 30.0, log.DeadlineComponent, precision: 2);
+        Assert.Equal(expected, log.DeadlineComponent, precision: 3);
     }
 
     [Fact]
-    public void BuildScoreLog_DeadlineIn30Days_DeadlineComponentZero()
+    public void BuildScoreLog_DeadlineIn30Days_DeadlineComponentNearZero()
     {
-        var now = ReferenceTime;
-        var in30Days = now.AddDays(30);
-        var task = CreateTaskItem(deadline: in30Days);
+        var log = Build(CreateTaskItem(deadline: ReferenceTime.AddDays(30)));
 
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, now);
-
-        Assert.Equal(0.0, log.DeadlineComponent, precision: 2);
+        Assert.True(log.DeadlineComponent < 0.02);
     }
 
     [Fact]
-    public void BuildScoreLog_DeadlineIn15Days_DeadlineComponentMid()
+    public void BuildScoreLog_DeadlineCurve_RisesFastestInTheLastDays()
     {
-        var now = ReferenceTime;
-        var in15Days = now.AddDays(15);
-        var task = CreateTaskItem(deadline: in15Days);
+        double Component(double days) => Build(CreateTaskItem(deadline: ReferenceTime.AddDays(days))).DeadlineComponent;
 
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, now);
-
-        Assert.True(log.DeadlineComponent > 0.4);
-        Assert.True(log.DeadlineComponent < 0.6);
+        // The same one-day step matters far more near the deadline than a month out.
+        Assert.True(Component(1) - Component(2) > Component(20) - Component(21));
+        Assert.True(Component(0.25) > Component(1) && Component(1) > Component(3));
     }
+
+    // ---- Imminent floor ----
+
+    [Fact]
+    public void BuildScoreLog_DueToday_LowImpact_StillAtLeastTheFloor()
+    {
+        var log = Build(CreateTaskItem(deadline: ReferenceTime.AddHours(5), impactScore: 0));
+
+        Assert.True(log.FinalScore >= UrgencyScoreCalculator.ImminentDeadlineFloor);
+    }
+
+    [Fact]
+    public void BuildScoreLog_OverdueTaskWithNoImpact_OutranksUndatedTaskWithMaxEverything()
+    {
+        var overdue = Build(CreateTaskItem(deadline: ReferenceTime.AddDays(-2), impactScore: 0));
+        var undated = Build(CreateTaskItem(deadline: null, impactScore: 10, manualOverride: 1.0), blocking: 0.5);
+
+        Assert.True(overdue.FinalScore > undated.FinalScore);
+    }
+
+    [Fact]
+    public void BuildScoreLog_DeadlineJustOverADayAway_NoFloor()
+    {
+        var log = Build(CreateTaskItem(deadline: ReferenceTime.AddHours(30), impactScore: 0));
+
+        Assert.True(log.FinalScore < UrgencyScoreCalculator.ImminentDeadlineFloor);
+    }
+
+    // ---- Impact ----
 
     [Fact]
     public void BuildScoreLog_ImpactZero_ImpactComponentZero()
     {
-        var task = CreateTaskItem(impactScore: 0);
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, ReferenceTime);
-
-        Assert.Equal(0.0, log.ImpactComponent);
+        Assert.Equal(0.0, Build(CreateTaskItem(impactScore: 0)).ImpactComponent);
     }
 
     [Fact]
     public void BuildScoreLog_ImpactTen_ImpactComponentOne()
     {
-        var task = CreateTaskItem(impactScore: 10);
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, ReferenceTime);
-
-        Assert.Equal(1.0, log.ImpactComponent);
+        Assert.Equal(1.0, Build(CreateTaskItem(impactScore: 10)).ImpactComponent);
     }
 
     [Fact]
     public void BuildScoreLog_ImpactFive_ImpactComponentHalf()
     {
-        var task = CreateTaskItem(impactScore: 5);
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, ReferenceTime);
-
-        Assert.Equal(0.5, log.ImpactComponent, precision: 2);
+        Assert.Equal(0.5, Build(CreateTaskItem(impactScore: 5)).ImpactComponent);
     }
 
     [Fact]
     public void BuildScoreLog_ImpactAbove10_Clamped()
     {
-        var task = CreateTaskItem(impactScore: 15);
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, ReferenceTime);
-
-        Assert.Equal(1.0, log.ImpactComponent);
+        Assert.Equal(1.0, Build(CreateTaskItem(impactScore: 15)).ImpactComponent);
     }
 
     [Fact]
-    public void BuildScoreLog_BlockingZeroTasks_BlockingComponentZero()
+    public void BuildScoreLog_ImpactNotRated_ComponentIsNullNotZero()
     {
-        var task = CreateTaskItem();
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, ReferenceTime);
-
-        Assert.Equal(0.0, log.BlockingComponent);
+        Assert.Null(Build(CreateTaskItem(impactScore: null)).ImpactComponent);
     }
 
     [Fact]
-    public void BuildScoreLog_BlockingOneTask_BlockingComponentSmall()
+    public void BuildScoreLog_ImpactNotRated_IsNotPunishedComparedToImpactZero()
     {
-        var task = CreateTaskItem();
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 1, ReferenceTime);
+        var deadline = ReferenceTime.AddDays(5);
+        var unrated = Build(CreateTaskItem(deadline: deadline, impactScore: null));
+        var ratedZero = Build(CreateTaskItem(deadline: deadline, impactScore: 0));
 
-        Assert.Equal(0.2, log.BlockingComponent, precision: 2);
+        Assert.True(unrated.FinalScore > ratedZero.FinalScore);
     }
 
-    [Fact]
-    public void BuildScoreLog_BlockingFiveTasks_BlockingComponentOne()
-    {
-        var task = CreateTaskItem();
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 5, ReferenceTime);
-
-        Assert.Equal(1.0, log.BlockingComponent);
-    }
-
-    [Fact]
-    public void BuildScoreLog_BlockingMoreThanFive_BlockingComponentClamped()
-    {
-        var task = CreateTaskItem();
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 10, ReferenceTime);
-
-        Assert.Equal(1.0, log.BlockingComponent);
-    }
+    // ---- Override ----
 
     [Fact]
     public void BuildScoreLog_NoManualOverride_OverrideComponentZero()
     {
-        var task = CreateTaskItem(manualOverride: null);
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, ReferenceTime);
-
-        Assert.Equal(0.0, log.UserOverrideComponent);
+        Assert.Equal(0.0, Build(CreateTaskItem(manualOverride: null)).UserOverrideComponent);
     }
 
     [Fact]
     public void BuildScoreLog_ActiveManualOverride_OverrideComponentUsed()
     {
-        var task = CreateTaskItem(
-            manualOverride: 0.7,
-            overrideExpiresAt: ReferenceTime.AddHours(1));
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, ReferenceTime);
+        var task = CreateTaskItem(manualOverride: 0.7, overrideExpiresAt: ReferenceTime.AddHours(1));
 
-        Assert.Equal(0.7, log.UserOverrideComponent);
+        Assert.Equal(0.7, Build(task).UserOverrideComponent);
     }
 
     [Fact]
     public void BuildScoreLog_ExpiredManualOverride_OverrideComponentZero()
     {
-        var now = ReferenceTime;
-        var task = CreateTaskItem(
-            manualOverride: 0.7,
-            overrideExpiresAt: now.AddHours(-1));
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, now);
+        var task = CreateTaskItem(manualOverride: 0.7, overrideExpiresAt: ReferenceTime.AddHours(-1));
 
-        Assert.Equal(0.0, log.UserOverrideComponent);
+        Assert.Equal(0.0, Build(task).UserOverrideComponent);
     }
 
     [Fact]
     public void BuildScoreLog_ManualOverrideExactlyExpires_OverrideComponentZero()
     {
-        var now = ReferenceTime;
-        var task = CreateTaskItem(
-            manualOverride: 0.7,
-            overrideExpiresAt: now);
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, now);
+        var task = CreateTaskItem(manualOverride: 0.7, overrideExpiresAt: ReferenceTime);
 
-        Assert.Equal(0.0, log.UserOverrideComponent);
+        Assert.Equal(0.0, Build(task).UserOverrideComponent);
     }
 
     [Fact]
     public void BuildScoreLog_ManualOverrideOutOfRange_Clamped()
     {
-        var task = CreateTaskItem(
-            manualOverride: 1.5,
-            overrideExpiresAt: ReferenceTime.AddHours(1));
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, ReferenceTime);
+        Assert.Equal(1.0, Build(CreateTaskItem(manualOverride: 3.0)).UserOverrideComponent);
+    }
 
-        Assert.Equal(1.0, log.UserOverrideComponent);
+    // ---- Final score / log ----
+
+    [Fact]
+    public void BuildScoreLog_FinalScoreMatchesWeightedFormula()
+    {
+        // Deadline in 7 days (0.3679), impact 6, override 0.5, blocking 0.4 -> plain weighted sum, no floors hit.
+        var task = CreateTaskItem(deadline: ReferenceTime.AddDays(7), impactScore: 6, manualOverride: 0.5);
+
+        var log = Build(task, blocking: 0.4);
+
+        var expected = 0.45 * Math.Exp(-1) + 0.20 * 0.4 + 0.25 * 0.6 + 0.10 * 0.5;
+        Assert.Equal(expected, log.FinalScore, precision: 5);
     }
 
     [Fact]
-    public void BuildScoreLog_AiComponentAlwaysZero_UntilPhase22()
+    public void BuildScoreLog_AllComponentsMin_ScoreZero()
     {
-        var task = CreateTaskItem();
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, ReferenceTime);
-
-        Assert.Equal(0.0, log.AiComponent);
-        Assert.True(log.AiFallbackUsed);
-    }
-
-    [Fact]
-    public void BuildScoreLog_FinalScoreCalculated()
-    {
-        var task = CreateTaskItem(
-            deadline: ReferenceTime.AddDays(1),
-            impactScore: 10,
-            manualOverride: 0.5,
-            overrideExpiresAt: ReferenceTime.AddHours(1));
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 3, ReferenceTime);
-
-        var expectedScore =
-            0.35 * log.DeadlineComponent +
-            0.20 * log.AiComponent +
-            0.15 * log.BlockingComponent +
-            0.20 * log.ImpactComponent +
-            0.10 * log.UserOverrideComponent;
-
-        Assert.Equal(expectedScore, log.FinalScore, precision: 5);
-        Assert.True(log.FinalScore > 0.5);
-        Assert.True(log.FinalScore <= 1.0);
-    }
-
-    [Fact]
-    public void BuildScoreLog_AllComponentsMin_ScoreLow()
-    {
-        var task = CreateTaskItem(
-            deadline: null,
-            impactScore: 0,
-            manualOverride: null,
-            overrideExpiresAt: null);
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, ReferenceTime);
+        var log = Build(CreateTaskItem(deadline: null, impactScore: 0));
 
         Assert.Equal(0.0, log.FinalScore);
     }
 
     [Fact]
-    public void BuildScoreLog_AllComponentsMax_ScoreHigh()
+    public void BuildScoreLog_AllComponentsMax_ScoreOne()
     {
-        var task = CreateTaskItem(
-            deadline: ReferenceTime.AddHours(-1),
-            impactScore: 10,
-            manualOverride: 1.0,
-            overrideExpiresAt: ReferenceTime.AddHours(1));
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 5, ReferenceTime);
+        var task = CreateTaskItem(deadline: ReferenceTime.AddDays(-1), impactScore: 10, manualOverride: 1.0);
 
-        var expectedScore =
-            0.35 * 1.0 + 0.20 * 0.0 + 0.15 * 1.0 + 0.20 * 1.0 + 0.10 * 1.0;
-        Assert.Equal(expectedScore, log.FinalScore, precision: 5);
-    }
-
-    [Fact]
-    public void BuildScoreLog_HighDeadlineLowImpact_DeadlineWins()
-    {
-        var task = CreateTaskItem(
-            deadline: ReferenceTime.AddHours(-1),
-            impactScore: 0,
-            manualOverride: null);
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, ReferenceTime);
-
-        Assert.Equal(0.35, log.FinalScore, precision: 2);
+        Assert.Equal(1.0, Build(task, blocking: 1.0).FinalScore, precision: 5);
     }
 
     [Fact]
     public void BuildScoreLog_TaskItemIdPreserved()
     {
-        var taskId = Guid.NewGuid();
-        var task = CreateTaskItem(id: taskId);
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, ReferenceTime);
+        var task = CreateTaskItem();
 
-        Assert.Equal(taskId, log.TaskItemId);
+        Assert.Equal(task.Id, Build(task).TaskItemId);
     }
 
     [Fact]
     public void BuildScoreLog_IsDeterministic()
     {
-        var task = CreateTaskItem(
-            deadline: ReferenceTime.AddDays(5),
-            impactScore: 7,
-            manualOverride: 0.3,
-            overrideExpiresAt: ReferenceTime.AddDays(1));
+        var task = CreateTaskItem(deadline: ReferenceTime.AddDays(4), impactScore: 7, manualOverride: 0.3);
 
-        var log1 = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 2, ReferenceTime);
-        var log2 = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 2, ReferenceTime);
-
-        Assert.Equal(log1.FinalScore, log2.FinalScore);
-        Assert.Equal(log1.DeadlineComponent, log2.DeadlineComponent);
-        Assert.Equal(log1.BlockingComponent, log2.BlockingComponent);
+        Assert.Equal(Build(task, blocking: 0.2).FinalScore, Build(task, blocking: 0.2).FinalScore);
     }
 
     [Fact]
-    public void BuildScoreLog_BlockedTaskDoesNotInfluenceOwnScore()
+    public void BuildScoreLog_BlockedTask_ScoreIsHalvedAndFlagged()
     {
-        var task = CreateTaskItem(blockedByTaskId: Guid.NewGuid());
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, ReferenceTime);
+        var task = CreateTaskItem(deadline: ReferenceTime.AddDays(2), impactScore: 8);
 
-        Assert.Equal(0.0, log.BlockingComponent);
+        var free = Build(task);
+        var blocked = Build(task, isBlocked: true);
+
+        Assert.False(free.IsBlocked);
+        Assert.True(blocked.IsBlocked);
+        Assert.Equal(free.FinalScore * UrgencyScoreCalculator.BlockedTaskFactor, blocked.FinalScore, precision: 5);
     }
 
-    [Theory]
-    [InlineData(1, 0.2)]
-    [InlineData(2, 0.4)]
-    [InlineData(3, 0.6)]
-    [InlineData(4, 0.8)]
-    [InlineData(5, 1.0)]
-    public void BuildScoreLog_BlockingComponent_ScalesCorrectly(int blockedCount, double expectedComponent)
-    {
-        var task = CreateTaskItem();
-        var log = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedCount, ReferenceTime);
+    // ---- Team-wide dependency resolution ----
 
-        Assert.Equal(expectedComponent, log.BlockingComponent, precision: 2);
+    private static IReadOnlyDictionary<Guid, UrgencyScoreLog> ScoreTeam(params TaskItem[] tasks) =>
+        TaskUrgencyScoreFactory.BuildTeamScoreLogs(tasks, ReferenceTime, ScoreTriggerSource.ScheduledRecalculation);
+
+    [Fact]
+    public void BuildTeamScoreLogs_TaskWithoutDependencies_MatchesSingleScore()
+    {
+        var task = CreateTaskItem(deadline: ReferenceTime.AddDays(3), impactScore: 4);
+
+        var logs = ScoreTeam(task);
+
+        Assert.Equal(Build(task).FinalScore, logs[task.Id].FinalScore, precision: 9);
+        Assert.False(logs[task.Id].IsBlocked);
+        Assert.Equal(0.0, logs[task.Id].BlockingComponent);
+    }
+
+    [Fact]
+    public void BuildTeamScoreLogs_Blocker_InheritsUrgencyOfBlockedTask()
+    {
+        var blocker = CreateTaskItem(deadline: null, impactScore: 0);
+        var blocked = CreateTaskItem(deadline: ReferenceTime.AddHours(6), impactScore: 10, blockedByTaskId: blocker.Id);
+
+        var logs = ScoreTeam(blocker, blocked);
+
+        var blockedEffective = logs[blocked.Id].FinalScore / UrgencyScoreCalculator.BlockedTaskFactor;
+        Assert.Equal(0.9 * blockedEffective, logs[blocker.Id].BlockingComponent, precision: 5);
+        Assert.True(logs[blocker.Id].FinalScore >= 0.9 * blockedEffective - 1e-9);
+        Assert.True(logs[blocker.Id].FinalScore > 0.5, "an idle task blocking an urgent one must rise");
+    }
+
+    [Fact]
+    public void BuildTeamScoreLogs_BlockedTask_DropsBelowItsBlocker()
+    {
+        var blocker = CreateTaskItem(deadline: null, impactScore: 0);
+        var blocked = CreateTaskItem(deadline: ReferenceTime.AddHours(6), impactScore: 10, blockedByTaskId: blocker.Id);
+
+        var logs = ScoreTeam(blocker, blocked);
+
+        Assert.True(logs[blocked.Id].IsBlocked);
+        Assert.True(logs[blocked.Id].FinalScore < logs[blocker.Id].FinalScore,
+            "the actionable task (the blocker) must be listed above the one waiting on it");
+    }
+
+    [Fact]
+    public void BuildTeamScoreLogs_InheritanceFollowsTheWholeChain()
+    {
+        var a = CreateTaskItem(deadline: null, impactScore: 0);
+        var b = CreateTaskItem(deadline: null, impactScore: 0, blockedByTaskId: a.Id);
+        var c = CreateTaskItem(deadline: ReferenceTime.AddHours(3), impactScore: 5, blockedByTaskId: b.Id);
+
+        var logs = ScoreTeam(a, b, c);
+
+        // c is due today (>= 0.85 before the blocked penalty); b inherits 0.9 x that, a inherits 0.9 x b.
+        Assert.True(logs[b.Id].BlockingComponent >= 0.9 * 0.85 - 1e-9);
+        Assert.True(logs[a.Id].BlockingComponent >= 0.9 * 0.9 * 0.85 - 1e-9);
+        Assert.True(logs[a.Id].BlockingComponent < logs[b.Id].BlockingComponent);
+    }
+
+    [Fact]
+    public void BuildTeamScoreLogs_BlockerWithSeveralBlockedTasks_InheritsFromTheMostUrgent()
+    {
+        var blocker = CreateTaskItem(deadline: null, impactScore: 0);
+        var calm = CreateTaskItem(deadline: ReferenceTime.AddDays(20), impactScore: 1, blockedByTaskId: blocker.Id);
+        var urgent = CreateTaskItem(deadline: ReferenceTime.AddHours(2), impactScore: 5, blockedByTaskId: blocker.Id);
+
+        var logs = ScoreTeam(blocker, calm, urgent);
+
+        var urgentEffective = logs[urgent.Id].FinalScore / UrgencyScoreCalculator.BlockedTaskFactor;
+        Assert.Equal(0.9 * urgentEffective, logs[blocker.Id].BlockingComponent, precision: 5);
+    }
+
+    [Fact]
+    public void BuildTeamScoreLogs_BlockedTaskScoreDoesNotShrinkWhatTheBlockerInherits()
+    {
+        // The inheritance uses the blocked task's score BEFORE its penalty, otherwise the blocker would
+        // inherit only half of the urgency it is actually holding up.
+        var blocker = CreateTaskItem(deadline: null, impactScore: 0);
+        var blocked = CreateTaskItem(deadline: ReferenceTime.AddHours(2), impactScore: 0, blockedByTaskId: blocker.Id);
+
+        var logs = ScoreTeam(blocker, blocked);
+
+        Assert.True(logs[blocker.Id].BlockingComponent >= 0.9 * UrgencyScoreCalculator.ImminentDeadlineFloor - 1e-9);
+    }
+
+    [Fact]
+    public void BuildTeamScoreLogs_FinishedBlocker_NoLongerBlocksOrInheritsAnything()
+    {
+        // A finished blocker is not part of the active set, so the dependent task is simply free.
+        var finishedBlockerId = Guid.NewGuid();
+        var dependent = CreateTaskItem(deadline: ReferenceTime.AddDays(2), impactScore: 7, blockedByTaskId: finishedBlockerId);
+
+        var logs = ScoreTeam(dependent);
+
+        Assert.False(logs[dependent.Id].IsBlocked);
+        Assert.Equal(Build(dependent).FinalScore, logs[dependent.Id].FinalScore, precision: 9);
+    }
+
+    [Fact]
+    public void BuildTeamScoreLogs_CorruptedBlockingCycle_TerminatesWithValidScores()
+    {
+        var a = CreateTaskItem(deadline: ReferenceTime.AddDays(1), impactScore: 5);
+        var b = CreateTaskItem(deadline: ReferenceTime.AddDays(1), impactScore: 5, blockedByTaskId: a.Id);
+        a.BlockedByTaskId = b.Id;
+
+        var logs = ScoreTeam(a, b);
+
+        Assert.All(logs.Values, l => Assert.InRange(l.FinalScore, 0.0, 1.0));
+    }
+
+    [Fact]
+    public void BuildTeamScoreLogs_ReturnsOneLogPerTaskWithTheGivenTrigger()
+    {
+        var logs = ScoreTeam(CreateTaskItem(), CreateTaskItem(), CreateTaskItem());
+
+        Assert.Equal(3, logs.Count);
+        Assert.All(logs.Values, l => Assert.Equal(ScoreTriggerSource.ScheduledRecalculation, l.TriggerSource));
     }
 }

@@ -34,11 +34,10 @@ public class ScoreAuditLoggingTests
             Status = TaskStatus.Todo,
             ImpactScore = 5,
             CurrentUrgencyScore = 0.0,
-            AiAssessmentScore = null
         };
 
         // Act
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, nowUtc, ScoreTriggerSource.ManualCreate);
+        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockingComponent: 0.0, isBlocked: false, nowUtc, ScoreTriggerSource.ManualCreate);
 
         // Assert
         Assert.NotNull(scoreLog);
@@ -64,46 +63,18 @@ public class ScoreAuditLoggingTests
             DeadlineUtc = deadlineUtc,
             ImpactScore = 8,
             CurrentUrgencyScore = 0.0,
-            AiAssessmentScore = 0.6 // AI gave it a score
         };
 
         // Act
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, nowUtc, ScoreTriggerSource.ManualUpdate);
+        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockingComponent: 0.0, isBlocked: false, nowUtc, ScoreTriggerSource.ManualUpdate);
 
         // Assert
         Assert.True(scoreLog.DeadlineComponent > 0.0, "Deadline component should be > 0 for near-future deadline");
-        Assert.Equal(0.6, scoreLog.AiComponent);
         Assert.Equal(0.0, scoreLog.BlockingComponent); // No blocking tasks
         Assert.True(scoreLog.ImpactComponent > 0.0, "Impact component should reflect impact score");
-        Assert.False(scoreLog.AiFallbackUsed, "Fallback should be false since AI score is present");
         Assert.Equal(ScoreTriggerSource.ManualUpdate, scoreLog.TriggerSource);
     }
 
-    [Fact]
-    public void BuildScoreLog_WithAiFallback_MarksAiFallbackFlag()
-    {
-        // Arrange
-        var nowUtc = DateTime.UtcNow;
-        var team = new Team { Id = Guid.NewGuid(), Name = "Test Team", CreatedAtUtc = nowUtc };
-        var task = new TaskItem
-        {
-            Id = Guid.NewGuid(),
-            TeamId = team.Id,
-            Team = team,
-            Title = "Task Without AI",
-            Status = TaskStatus.Todo,
-            ImpactScore = 5,
-            AiAssessmentScore = null // No AI assessment
-        };
-
-        // Act
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, nowUtc, ScoreTriggerSource.AiFallback);
-
-        // Assert
-        Assert.Equal(0.0, scoreLog.AiComponent);
-        Assert.True(scoreLog.AiFallbackUsed, "Should mark fallback when AI score is null");
-        Assert.Equal(ScoreTriggerSource.AiFallback, scoreLog.TriggerSource);
-    }
 
     [Fact]
     public void BuildScoreLog_WithBlockingTasks_IncludesBlockingComponent()
@@ -119,15 +90,14 @@ public class ScoreAuditLoggingTests
             Title = "Blocking Task",
             Status = TaskStatus.Todo,
             ImpactScore = 5,
-            AiAssessmentScore = null
         };
 
         // Act: This task blocks 3 others
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 3, nowUtc, ScoreTriggerSource.ScheduledRecalculation);
+        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockingComponent: 0.6, isBlocked: false, nowUtc, ScoreTriggerSource.ScheduledRecalculation);
 
         // Assert
-        Assert.True(scoreLog.BlockingComponent > 0.0, "Blocking component should reflect 3 blocked tasks");
-        Assert.True(scoreLog.BlockingComponent < 1.0, "Blocking should not saturate at 3 tasks (saturation is 5)");
+        Assert.True(scoreLog.BlockingComponent > 0.0, "Blocking component should carry the inherited urgency");
+        Assert.True(scoreLog.BlockingComponent < 1.0, "Inherited urgency 0.6 is below 1");
         Assert.Equal(ScoreTriggerSource.ScheduledRecalculation, scoreLog.TriggerSource);
     }
 
@@ -146,7 +116,6 @@ public class ScoreAuditLoggingTests
             Title = "Multi-Trigger Task",
             Status = TaskStatus.Todo,
             ImpactScore = 5,
-            AiAssessmentScore = null
         };
 
         context.Add(team);
@@ -157,8 +126,7 @@ public class ScoreAuditLoggingTests
             ScoreTriggerSource.ManualCreate,
             ScoreTriggerSource.ManualUpdate,
             ScoreTriggerSource.ScheduledRecalculation,
-            ScoreTriggerSource.AiAssessment,
-            ScoreTriggerSource.AiFallback
+            ScoreTriggerSource.CalendarSync
         };
 
         var logs = new List<UrgencyScoreLog>();
@@ -166,7 +134,7 @@ public class ScoreAuditLoggingTests
         // Act
         foreach (var trigger in triggers)
         {
-            var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, 0, nowUtc, trigger);
+            var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, 0.0, false, nowUtc, trigger);
             logs.Add(scoreLog);
             context.UrgencyScoreLogs.Add(scoreLog);
         }
@@ -209,11 +177,10 @@ public class ScoreAuditLoggingTests
             ImpactScore = 5,
             ManualUrgencyOverride = 0.8,
             ManualUrgencyOverrideExpiresAtUtc = expiryUtc,
-            AiAssessmentScore = null
         };
 
         // Act
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, 0, nowUtc, ScoreTriggerSource.ManualUpdate);
+        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, 0.0, false, nowUtc, ScoreTriggerSource.ManualUpdate);
 
         // Assert
         Assert.Equal(0.8, scoreLog.UserOverrideComponent);
@@ -237,11 +204,10 @@ public class ScoreAuditLoggingTests
             ImpactScore = 5,
             ManualUrgencyOverride = 0.9,
             ManualUrgencyOverrideExpiresAtUtc = expiryUtc,
-            AiAssessmentScore = null
         };
 
         // Act
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, 0, nowUtc, ScoreTriggerSource.ManualUpdate);
+        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, 0.0, false, nowUtc, ScoreTriggerSource.ManualUpdate);
 
         // Assert
         Assert.Equal(0.0, scoreLog.UserOverrideComponent);
@@ -262,15 +228,13 @@ public class ScoreAuditLoggingTests
             Title = "Precision Test",
             Status = TaskStatus.Todo,
             DeadlineUtc = deadlineUtc,
-            ImpactScore = 7,
-            AiAssessmentScore = 0.5555 // Specific decimal
+            ImpactScore = 7
         };
 
         // Act
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 2, nowUtc, ScoreTriggerSource.AiAssessment);
+        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockingComponent: 0.4, isBlocked: false, nowUtc, ScoreTriggerSource.ManualUpdate);
 
         // Assert
-        Assert.Equal(0.5555, scoreLog.AiComponent);
         Assert.True(scoreLog.DeadlineComponent > 0.0 && scoreLog.DeadlineComponent < 1.0);
         Assert.True(scoreLog.BlockingComponent > 0.0);
         Assert.True(scoreLog.FinalScore >= 0.0 && scoreLog.FinalScore <= 1.0);
@@ -290,11 +254,10 @@ public class ScoreAuditLoggingTests
             Title = "Default Trigger Task",
             Status = TaskStatus.Todo,
             ImpactScore = 5,
-            AiAssessmentScore = null
         };
 
         // Act: Call without specifying trigger source (should default to ManualUpdate)
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, 0, nowUtc);
+        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, 0.0, false, nowUtc);
 
         // Assert
         Assert.Equal(ScoreTriggerSource.ManualUpdate, scoreLog.TriggerSource);
@@ -315,7 +278,6 @@ public class ScoreAuditLoggingTests
             Title = "History Task",
             Status = TaskStatus.Todo,
             ImpactScore = 5,
-            AiAssessmentScore = null
         };
 
         context.Add(team);
@@ -326,7 +288,7 @@ public class ScoreAuditLoggingTests
         for (int i = 0; i < 3; i++)
         {
             var timeOffset = nowUtc.AddMinutes(i);
-            var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, 0, timeOffset, ScoreTriggerSource.ScheduledRecalculation);
+            var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, 0.0, false, timeOffset, ScoreTriggerSource.ScheduledRecalculation);
             context.UrgencyScoreLogs.Add(scoreLog);
             context.SaveChanges();
         }
