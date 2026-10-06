@@ -1,16 +1,16 @@
 import type { TaskDto } from '../types/task';
+import { dayKey } from './dateUtils';
 
-export interface AgendaSection {
+export interface AgendaSection<T extends TaskDto = TaskDto> {
   dateKey: string;
   title: string;
-  data: TaskDto[];
+  data: T[];
 }
 
 // Local calendar day, not UTC midnight — a deadline of 23:00 UTC should still land on "today"
 // for a viewer in a positive-offset timezone.
-function dateKey(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+export function dateKey(iso: string): string {
+  return dayKey(new Date(iso));
 }
 
 function sectionTitle(key: string): string {
@@ -22,9 +22,9 @@ function sectionTitle(key: string): string {
 
 // Buckets tasks with a deadline into date-keyed sections sorted chronologically; tasks with no
 // deadline can't be placed on a calendar so they're returned separately for their own list.
-export function groupTasksByDueDate(tasks: TaskDto[]): { sections: AgendaSection[]; undated: TaskDto[] } {
-  const buckets = new Map<string, TaskDto[]>();
-  const undated: TaskDto[] = [];
+export function groupTasksByDueDate<T extends TaskDto>(tasks: T[]): { sections: AgendaSection<T>[]; undated: T[] } {
+  const buckets = new Map<string, T[]>();
+  const undated: T[] = [];
 
   for (const task of tasks) {
     if (!task.deadlineUtc) {
