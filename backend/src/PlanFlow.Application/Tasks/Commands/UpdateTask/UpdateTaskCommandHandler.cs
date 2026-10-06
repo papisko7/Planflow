@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PlanFlow.Application.Common.Caching;
 using PlanFlow.Application.Common.Exceptions;
 using PlanFlow.Application.Common.Interfaces;
+using PlanFlow.Application.Notifications;
 using PlanFlow.Application.Tasks.Common;
 using PlanFlow.Domain.Entities;
 using PlanFlow.Domain.Enums;
@@ -14,11 +15,13 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
 {
     private readonly IApplicationDbContext _context;
     private readonly ICacheService _cache;
+    private readonly INotificationService _notifications;
 
-    public UpdateTaskCommandHandler(IApplicationDbContext context, ICacheService cache)
+    public UpdateTaskCommandHandler(IApplicationDbContext context, ICacheService cache, INotificationService notifications)
     {
         _context = context;
         _cache = cache;
+        _notifications = notifications;
     }
 
     public async Task<TaskDto> Handle(UpdateTaskCommand request, CancellationToken cancellationToken)
@@ -27,8 +30,12 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
             .FirstOrDefaultAsync(t => t.Id == request.TaskId, cancellationToken)
             ?? throw new NotFoundException(nameof(TaskItem), request.TaskId);
 
+        await TaskAssignment.EnsureAssigneeInTeamAsync(_context, task.TeamId, request.AssignedUserId, cancellationToken);
+        await TaskDependencies.EnsureValidBlockerAsync(_context, task.TeamId, task.Id, request.BlockedByTaskId, cancellationToken);
+
         var previousStatus = task.Status;
         var previousAssignedUserId = task.AssignedUserId;
+        var before = TaskSnapshot.Of(task); // for the "your task was changed" e-mail
 
         task.Title = request.Title;
         task.Description = request.Description;
@@ -43,12 +50,9 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
         var nowUtc = DateTime.UtcNow;
         task.UpdatedAtUtc = nowUtc;
 
-        var blockedTaskCount = await _context.Tasks
-            .CountAsync(t => t.BlockedByTaskId == task.Id, cancellationToken);
-
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount, nowUtc, ScoreTriggerSource.ManualUpdate);
-        task.CurrentUrgencyScore = scoreLog.FinalScore;
-        _context.UrgencyScoreLogs.Add(scoreLog);
+        // Editing one task can change others (its blocker/blocked neighbours), so the whole team is rescored.
+        var changedTaskIds = await TeamUrgencyRecalculator.RecalculateTeamAsync(
+            _context, task.TeamId, nowUtc, ScoreTriggerSource.ManualUpdate, task, cancellationToken);
 
         _context.TaskHistories.Add(new TaskHistory
         {
@@ -61,10 +65,11 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
                     : TaskChangeType.FieldUpdated
         });
 
+        await TaskNotifications.OnUpdatedAsync(_context, _notifications, task, before, request.UpdatedByUserId, cancellationToken);
+
         await _context.SaveChangesAsync(cancellationToken);
 
-        await _cache.RemoveAsync(CacheKeys.TeamTasks(task.TeamId), cancellationToken);
-        await _cache.RemoveAsync(CacheKeys.TaskUrgency(task.Id), cancellationToken);
+        await TeamUrgencyRecalculator.InvalidateCachesAsync(_cache, task.TeamId, changedTaskIds.Append(task.Id), cancellationToken);
 
         return TaskDto.FromEntity(task);
     }

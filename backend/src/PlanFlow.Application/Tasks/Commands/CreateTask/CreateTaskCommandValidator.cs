@@ -8,7 +8,7 @@ public class CreateTaskCommandValidator : AbstractValidator<CreateTaskCommand>
     {
         RuleFor(x => x.TeamId).NotEmpty();
         RuleFor(x => x.Title).NotEmpty().MaximumLength(256);
-        RuleFor(x => x.ImpactScore).InclusiveBetween(0, 10);
+        RuleFor(x => x.ImpactScore).InclusiveBetween(0, 10).When(x => x.ImpactScore.HasValue);
         RuleFor(x => x.DeadlineUtc)
             .GreaterThan(DateTime.UtcNow)
             .When(x => x.DeadlineUtc.HasValue)

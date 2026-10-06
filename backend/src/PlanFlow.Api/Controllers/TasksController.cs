@@ -46,12 +46,20 @@ public class TasksController : ControllerBase
             return Forbid();
         }
 
+        // Only Owner/Admin hand work to other people; a Member's new task is always their own.
+        var callerId = User.GetUserId();
+        var canAssignOthers = User.HasPermission(Permission.EditAnyTask);
+        if (!canAssignOthers && request.AssignedUserId is { } requestedAssignee && requestedAssignee != callerId)
+        {
+            return Forbid();
+        }
+
         var task = await _sender.Send(
             new CreateTaskCommand(
                 teamId,
                 request.Title,
                 request.Description,
-                request.AssignedUserId,
+                canAssignOthers ? request.AssignedUserId : callerId,
                 request.DeadlineUtc,
                 request.ImpactScore,
                 request.BlockedByTaskId,
@@ -98,7 +106,7 @@ public class TasksController : ControllerBase
     }
 
     [HttpPut("api/tasks/{taskId:guid}")]
-    [Authorize(Policy = nameof(Permission.EditAnyTask))]
+    [Authorize(Policy = nameof(Permission.EditOwnTask))]
     public async Task<IActionResult> UpdateTask(Guid taskId, UpdateTaskRequest request, CancellationToken cancellationToken)
     {
         var existing = await _sender.Send(new GetTaskDetailQuery(taskId), cancellationToken);
@@ -106,6 +114,22 @@ public class TasksController : ControllerBase
         if (User.GetTeamId() != existing.Task.TeamId)
         {
             return Forbid();
+        }
+
+        // A Member may edit a task that is already theirs (and not hand it to someone else), CLAIM an
+        // unassigned one by assigning it to themselves, or ABANDON their own task by clearing the assignee
+        // (it goes back to the unassigned pool). A task owned by somebody else is off limits:
+        // only Owner/Admin can reassign it.
+        if (!User.HasPermission(Permission.EditAnyTask))
+        {
+            var callerId = User.GetUserId();
+            var isOwnTask = existing.Task.AssignedUserId == callerId && request.AssignedUserId == callerId;
+            var isClaim = existing.Task.AssignedUserId is null && request.AssignedUserId == callerId;
+            var isAbandon = existing.Task.AssignedUserId == callerId && request.AssignedUserId is null;
+            if (!isOwnTask && !isClaim && !isAbandon)
+            {
+                return Forbid();
+            }
         }
 
         var task = await _sender.Send(
@@ -127,7 +151,7 @@ public class TasksController : ControllerBase
     }
 
     [HttpDelete("api/tasks/{taskId:guid}")]
-    [Authorize(Policy = nameof(Permission.DeleteTask))]
+    [Authorize(Policy = nameof(Permission.DeleteOwnTask))]
     public async Task<IActionResult> DeleteTask(Guid taskId, CancellationToken cancellationToken)
     {
         var existing = await _sender.Send(new GetTaskDetailQuery(taskId), cancellationToken);
@@ -137,7 +161,13 @@ public class TasksController : ControllerBase
             return Forbid();
         }
 
-        await _sender.Send(new DeleteTaskCommand(taskId), cancellationToken);
+        // Owner/Admin delete any task; a Member only their own (assigned to them).
+        if (!User.HasPermission(Permission.DeleteTask) && existing.Task.AssignedUserId != User.GetUserId())
+        {
+            return Forbid();
+        }
+
+        await _sender.Send(new DeleteTaskCommand(taskId, User.GetUserId()), cancellationToken);
         return NoContent();
     }
 }

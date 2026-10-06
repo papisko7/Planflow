@@ -11,7 +11,7 @@ public record UpdateTaskCommand(
     Domain.Enums.TaskStatus Status,
     Guid? AssignedUserId,
     DateTime? DeadlineUtc,
-    int ImpactScore,
+    int? ImpactScore,
     Guid? BlockedByTaskId,
     double? ManualUrgencyOverride,
     DateTime? ManualUrgencyOverrideExpiresAtUtc,

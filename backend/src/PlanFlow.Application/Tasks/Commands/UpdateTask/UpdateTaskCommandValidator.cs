@@ -8,7 +8,7 @@ public class UpdateTaskCommandValidator : AbstractValidator<UpdateTaskCommand>
     {
         RuleFor(x => x.TaskId).NotEmpty();
         RuleFor(x => x.Title).NotEmpty().MaximumLength(256);
-        RuleFor(x => x.ImpactScore).InclusiveBetween(0, 10);
+        RuleFor(x => x.ImpactScore).InclusiveBetween(0, 10).When(x => x.ImpactScore.HasValue);
         RuleFor(x => x.Status).IsInEnum();
         RuleFor(x => x.ManualUrgencyOverride)
             .InclusiveBetween(0.0, 1.0)

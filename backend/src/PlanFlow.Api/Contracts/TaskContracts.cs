@@ -5,7 +5,7 @@ public record CreateTaskRequest(
     string? Description,
     Guid? AssignedUserId,
     DateTime? DeadlineUtc,
-    int ImpactScore,
+    int? ImpactScore,
     Guid? BlockedByTaskId);
 
 public record UpdateTaskRequest(
@@ -14,7 +14,7 @@ public record UpdateTaskRequest(
     Domain.Enums.TaskStatus Status,
     Guid? AssignedUserId,
     DateTime? DeadlineUtc,
-    int ImpactScore,
+    int? ImpactScore,
     Guid? BlockedByTaskId,
     double? ManualUrgencyOverride,
     DateTime? ManualUrgencyOverrideExpiresAtUtc);

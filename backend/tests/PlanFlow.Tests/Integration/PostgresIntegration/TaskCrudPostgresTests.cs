@@ -173,17 +173,73 @@ public class TaskCrudPostgresTests
         var blocker = await blockerResponse.Content.ReadFromJsonAsync<TaskDto>();
         var blockerInitialScore = blocker!.CurrentUrgencyScore;
 
+        // The blocker inherits urgency from the task it holds up, so that task needs some urgency of its own.
         var blockedResponse = await client.PostAsJsonAsync($"api/teams/{teamId}/tasks", new CreateTaskRequest(
-            "Blocked", null, null, null, 0, blocker.Id));
+            "Blocked", null, null, DateTime.UtcNow.AddHours(5), 8, blocker.Id));
         var blocked = await blockedResponse.Content.ReadFromJsonAsync<TaskDto>();
 
-        // Touch the blocker itself so its score is recomputed with the now-existing dependent task counted.
+        // Creating the dependent rescored the whole team, so the blocker's stored score already rose;
+        // an explicit edit of the blocker keeps it there.
         var updateResponse = await client.PutAsJsonAsync($"api/tasks/{blocker.Id}", new UpdateTaskRequest(
             "Blocker", null, TaskStatus.Todo, null, null, 0, null, null, null));
         var updatedBlocker = await updateResponse.Content.ReadFromJsonAsync<TaskDto>();
 
         updatedBlocker!.CurrentUrgencyScore.Should().BeGreaterThan(blockerInitialScore);
         blocked!.BlockedByTaskId.Should().Be(blocker.Id);
+        // The blocked task itself is lowered below the blocker it waits for.
+        var refreshedBlocked = await client.GetFromJsonAsync<TaskDetailDto>($"api/tasks/{blocked.Id}");
+        refreshedBlocked!.Task.CurrentUrgencyScore.Should().BeLessThan(updatedBlocker.CurrentUrgencyScore);
+        refreshedBlocked.LatestScoreBreakdown!.IsBlocked.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task UpdateTask_BlockedByItself_ReturnsBadRequest()
+    {
+        var (teamId, userId) = await SeedTeamWithMemberAsync(TeamRole.Owner);
+        var client = await AuthenticatedClientAsync(userId, teamId, TeamRole.Owner);
+        var created = await (await client.PostAsJsonAsync($"api/teams/{teamId}/tasks", new CreateTaskRequest(
+            "Solo", null, null, null, 5, null))).Content.ReadFromJsonAsync<TaskDto>();
+
+        var response = await client.PutAsJsonAsync($"api/tasks/{created!.Id}", new UpdateTaskRequest(
+            "Solo", null, TaskStatus.Todo, null, null, 5, created.Id, null, null));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task UpdateTask_DependencyCycle_ReturnsBadRequest()
+    {
+        var (teamId, userId) = await SeedTeamWithMemberAsync(TeamRole.Owner);
+        var client = await AuthenticatedClientAsync(userId, teamId, TeamRole.Owner);
+        var a = await (await client.PostAsJsonAsync($"api/teams/{teamId}/tasks", new CreateTaskRequest(
+            "A", null, null, null, 5, null))).Content.ReadFromJsonAsync<TaskDto>();
+        var b = await (await client.PostAsJsonAsync($"api/teams/{teamId}/tasks", new CreateTaskRequest(
+            "B", null, null, null, 5, a!.Id))).Content.ReadFromJsonAsync<TaskDto>();
+
+        // A is already waiting for nobody and B waits for A; making A wait for B would close the loop.
+        var response = await client.PutAsJsonAsync($"api/tasks/{a.Id}", new UpdateTaskRequest(
+            "A", null, TaskStatus.Todo, null, null, 5, b!.Id, null, null));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task UpdateTask_FinishingTheBlocker_FreesTheBlockedTask()
+    {
+        var (teamId, userId) = await SeedTeamWithMemberAsync(TeamRole.Owner);
+        var client = await AuthenticatedClientAsync(userId, teamId, TeamRole.Owner);
+        var blocker = await (await client.PostAsJsonAsync($"api/teams/{teamId}/tasks", new CreateTaskRequest(
+            "Blocker", null, null, null, 0, null))).Content.ReadFromJsonAsync<TaskDto>();
+        var blocked = await (await client.PostAsJsonAsync($"api/teams/{teamId}/tasks", new CreateTaskRequest(
+            "Blocked", null, null, DateTime.UtcNow.AddDays(2), 8, blocker!.Id))).Content.ReadFromJsonAsync<TaskDto>();
+        var scoreWhileBlocked = (await client.GetFromJsonAsync<TaskDetailDto>($"api/tasks/{blocked!.Id}"))!.Task.CurrentUrgencyScore;
+
+        await client.PutAsJsonAsync($"api/tasks/{blocker.Id}", new UpdateTaskRequest(
+            "Blocker", null, TaskStatus.Done, null, null, 0, null, null, null));
+
+        var freed = await client.GetFromJsonAsync<TaskDetailDto>($"api/tasks/{blocked.Id}");
+        freed!.Task.CurrentUrgencyScore.Should().BeGreaterThan(scoreWhileBlocked);
+        freed.LatestScoreBreakdown!.IsBlocked.Should().BeFalse();
     }
 
     [Fact]
@@ -244,6 +300,78 @@ public class TaskCrudPostgresTests
         var response = await client.GetAsync($"api/tasks/{Guid.NewGuid()}");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task UpdateTask_MemberClaimsUnassignedTask_ThenCanEditAndDeleteIt()
+    {
+        var (teamId, ownerId) = await SeedTeamWithMemberAsync(TeamRole.Owner);
+        var (_, memberId) = await SeedTeamWithMemberAsync(TeamRole.Member, existingTeamId: teamId);
+        var owner = await AuthenticatedClientAsync(ownerId, teamId, TeamRole.Owner);
+        var member = await AuthenticatedClientAsync(memberId, teamId, TeamRole.Member);
+
+        var created = await (await owner.PostAsJsonAsync($"api/teams/{teamId}/tasks", new CreateTaskRequest(
+            "Nobody's task", null, null, null, 3, null))).Content.ReadFromJsonAsync<TaskDto>();
+        created!.AssignedUserId.Should().BeNull();
+
+        // Claim = assign to yourself.
+        var claim = await member.PutAsJsonAsync($"api/tasks/{created.Id}", new UpdateTaskRequest(
+            "Nobody's task", null, TaskStatus.Todo, memberId, null, 3, null, null, null));
+        claim.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Once it is theirs they may edit and delete it like any own task.
+        var edit = await member.PutAsJsonAsync($"api/tasks/{created.Id}", new UpdateTaskRequest(
+            "Now mine", null, TaskStatus.InProgress, memberId, null, 3, null, null, null));
+        edit.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await member.DeleteAsync($"api/tasks/{created.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task UpdateTask_MemberAbandonsOwnTask_ButCannotAbandonSomeoneElses()
+    {
+        var (teamId, ownerId) = await SeedTeamWithMemberAsync(TeamRole.Owner);
+        var (_, memberId) = await SeedTeamWithMemberAsync(TeamRole.Member, existingTeamId: teamId);
+        var owner = await AuthenticatedClientAsync(ownerId, teamId, TeamRole.Owner);
+        var member = await AuthenticatedClientAsync(memberId, teamId, TeamRole.Member);
+
+        var mine = await (await owner.PostAsJsonAsync($"api/teams/{teamId}/tasks", new CreateTaskRequest(
+            "Mine for now", null, memberId, null, 3, null))).Content.ReadFromJsonAsync<TaskDto>();
+        var ownersTask = await (await owner.PostAsJsonAsync($"api/teams/{teamId}/tasks", new CreateTaskRequest(
+            "Owner's task", null, ownerId, null, 3, null))).Content.ReadFromJsonAsync<TaskDto>();
+
+        // Abandon = clear the assignee on a task that is yours; it returns to the unassigned pool.
+        var abandon = await member.PutAsJsonAsync($"api/tasks/{mine!.Id}", new UpdateTaskRequest(
+            "Mine for now", null, TaskStatus.Todo, null, null, 3, null, null, null));
+        abandon.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await abandon.Content.ReadFromJsonAsync<TaskDto>())!.AssignedUserId.Should().BeNull();
+
+        // Someone else's task cannot be dropped by a Member.
+        var drop = await member.PutAsJsonAsync($"api/tasks/{ownersTask!.Id}", new UpdateTaskRequest(
+            "Owner's task", null, TaskStatus.Todo, null, null, 3, null, null, null));
+        drop.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task UpdateTask_MemberCannotTakeOverOrReassignSomeoneElsesTask()
+    {
+        var (teamId, ownerId) = await SeedTeamWithMemberAsync(TeamRole.Owner);
+        var (_, memberId) = await SeedTeamWithMemberAsync(TeamRole.Member, existingTeamId: teamId);
+        var owner = await AuthenticatedClientAsync(ownerId, teamId, TeamRole.Owner);
+        var member = await AuthenticatedClientAsync(memberId, teamId, TeamRole.Member);
+
+        var created = await (await owner.PostAsJsonAsync($"api/teams/{teamId}/tasks", new CreateTaskRequest(
+            "Owner's task", null, ownerId, null, 3, null))).Content.ReadFromJsonAsync<TaskDto>();
+
+        var steal = await member.PutAsJsonAsync($"api/tasks/{created!.Id}", new UpdateTaskRequest(
+            "Owner's task", null, TaskStatus.Todo, memberId, null, 3, null, null, null));
+        steal.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        // Unassigned task: a member may claim it for themselves but not hand it to somebody else.
+        var unassigned = await (await owner.PostAsJsonAsync($"api/teams/{teamId}/tasks", new CreateTaskRequest(
+            "Free task", null, null, null, 3, null))).Content.ReadFromJsonAsync<TaskDto>();
+        var give = await member.PutAsJsonAsync($"api/tasks/{unassigned!.Id}", new UpdateTaskRequest(
+            "Free task", null, TaskStatus.Todo, ownerId, null, 3, null, null, null));
+        give.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     private async Task<(Guid TeamId, Guid UserId)> SeedTeamWithMemberAsync(TeamRole role, Guid? existingTeamId = null)

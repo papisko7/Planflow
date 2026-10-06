@@ -10,6 +10,6 @@ public record CreateTaskCommand(
     string? Description,
     Guid? AssignedUserId,
     DateTime? DeadlineUtc,
-    int ImpactScore,
+    int? ImpactScore,
     Guid? BlockedByTaskId,
     Guid? CreatedByUserId) : IRequest<TaskDto>;

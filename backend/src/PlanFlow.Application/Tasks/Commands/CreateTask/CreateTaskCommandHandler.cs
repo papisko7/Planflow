@@ -1,6 +1,7 @@
 using MediatR;
 using PlanFlow.Application.Common.Caching;
 using PlanFlow.Application.Common.Interfaces;
+using PlanFlow.Application.Notifications;
 using PlanFlow.Application.Tasks.Common;
 using PlanFlow.Domain.Entities;
 using PlanFlow.Domain.Enums;
@@ -12,15 +13,20 @@ public class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, TaskD
 {
     private readonly IApplicationDbContext _context;
     private readonly ICacheService _cache;
+    private readonly INotificationService _notifications;
 
-    public CreateTaskCommandHandler(IApplicationDbContext context, ICacheService cache)
+    public CreateTaskCommandHandler(IApplicationDbContext context, ICacheService cache, INotificationService notifications)
     {
         _context = context;
         _cache = cache;
+        _notifications = notifications;
     }
 
     public async Task<TaskDto> Handle(CreateTaskCommand request, CancellationToken cancellationToken)
     {
+        await TaskAssignment.EnsureAssigneeInTeamAsync(_context, request.TeamId, request.AssignedUserId, cancellationToken);
+        await TaskDependencies.EnsureValidBlockerAsync(_context, request.TeamId, null, request.BlockedByTaskId, cancellationToken);
+
         var task = new TaskItem
         {
             TeamId = request.TeamId,
@@ -32,12 +38,12 @@ public class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, TaskD
             BlockedByTaskId = request.BlockedByTaskId
         };
 
-        // A brand-new task can't yet block anything, so the blocking component starts at 0.
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedTaskCount: 0, DateTime.UtcNow, ScoreTriggerSource.ManualCreate);
-        task.CurrentUrgencyScore = scoreLog.FinalScore;
-
         _context.Tasks.Add(task);
-        _context.UrgencyScoreLogs.Add(scoreLog);
+
+        // A new task can already be blocked by an existing one, and that blocker may now inherit urgency from it.
+        var changedTaskIds = await TeamUrgencyRecalculator.RecalculateTeamAsync(
+            _context, task.TeamId, DateTime.UtcNow, ScoreTriggerSource.ManualCreate, task, cancellationToken);
+
         _context.TaskHistories.Add(new TaskHistory
         {
             TaskItemId = task.Id,
@@ -45,8 +51,10 @@ public class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, TaskD
             ChangeType = TaskChangeType.Created
         });
 
+        await TaskNotifications.OnCreatedAsync(_context, _notifications, task, request.CreatedByUserId, cancellationToken);
+
         await _context.SaveChangesAsync(cancellationToken);
-        await _cache.RemoveAsync(CacheKeys.TeamTasks(task.TeamId), cancellationToken);
+        await TeamUrgencyRecalculator.InvalidateCachesAsync(_cache, task.TeamId, changedTaskIds, cancellationToken);
 
         return TaskDto.FromEntity(task);
     }

@@ -9,25 +9,23 @@ namespace PlanFlow.Application.Tasks.Common;
 /// </summary>
 public record UrgencyScoreBreakdownDto(
     double DeadlineComponent,
-    double AiComponent,
     double BlockingComponent,
-    double ImpactComponent,
+    double? ImpactComponent,
     double UserOverrideComponent,
     double FinalScore,
-    bool AiFallbackUsed,
     ScoreTriggerSource TriggerSource,
-    DateTime CreatedAtUtc)
+    DateTime CreatedAtUtc,
+    bool IsBlocked)
 {
     public static UrgencyScoreBreakdownDto FromEntity(UrgencyScoreLog log) => new(
         log.DeadlineComponent,
-        log.AiComponent,
         log.BlockingComponent,
         log.ImpactComponent,
         log.UserOverrideComponent,
         log.FinalScore,
-        log.AiFallbackUsed,
         log.TriggerSource,
-        log.CreatedAtUtc);
+        log.CreatedAtUtc,
+        log.IsBlocked);
 }
 
 /// <summary>Full detail view for a single task: the task itself plus its latest urgency breakdown.</summary>

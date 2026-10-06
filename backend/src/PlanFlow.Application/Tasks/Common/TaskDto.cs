@@ -14,7 +14,7 @@ public record TaskDto(
     string? Description,
     Domain.Enums.TaskStatus Status,
     DateTime? DeadlineUtc,
-    int ImpactScore,
+    int? ImpactScore,
     Guid? BlockedByTaskId,
     double? ManualUrgencyOverride,
     DateTime? ManualUrgencyOverrideExpiresAtUtc,
