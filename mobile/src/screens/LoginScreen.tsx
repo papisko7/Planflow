@@ -59,6 +59,10 @@ export default function LoginScreen() {
         {submitting ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.buttonText}>Sign in</Text>}
       </Pressable>
 
+      <Pressable testID="login-go-forgot-link" onPress={() => navigation.navigate('ForgotPassword')}>
+        <Text style={styles.link}>Forgot password?</Text>
+      </Pressable>
+
       <Pressable testID="login-go-register-link" onPress={() => navigation.navigate('Register')}>
         <Text style={styles.link}>No account? Register</Text>
       </Pressable>

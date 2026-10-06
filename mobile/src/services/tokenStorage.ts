@@ -5,6 +5,7 @@ import * as SecureStore from 'expo-secure-store';
 const ACCESS_TOKEN_KEY = 'planflow.accessToken';
 const REFRESH_TOKEN_KEY = 'planflow.refreshToken';
 const USER_ID_KEY = 'planflow.userId';
+const DEVICE_ID_KEY = 'planflow.deviceId';
 
 export interface StoredSession {
   accessToken: string;
@@ -40,4 +41,16 @@ export async function clearSession(): Promise<void> {
     SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
     SecureStore.deleteItemAsync(USER_ID_KEY),
   ]);
+}
+
+// A random id created once per installation (it survives logout on purpose). The server remembers which
+// devices an account has used so it can e-mail a "new sign-in" alert for an unfamiliar one.
+export async function getDeviceId(): Promise<string> {
+  const existing = await SecureStore.getItemAsync(DEVICE_ID_KEY);
+  if (existing) {
+    return existing;
+  }
+  const created = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}${Math.random().toString(36).slice(2, 12)}`;
+  await SecureStore.setItemAsync(DEVICE_ID_KEY, created);
+  return created;
 }

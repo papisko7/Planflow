@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { logout as authLogout, restoreSession } from '../services/authService';
+import { logout as authLogout, restoreSession, setSessionExpiredHandler } from '../services/authService';
+import { unregisterPush } from '../services/pushService';
 
 interface SessionState {
   status: 'checking' | 'signedIn' | 'signedOut';
@@ -16,10 +17,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     restoreSession().then((hasSession) => setStatus(hasSession ? 'signedIn' : 'signedOut'));
+    setSessionExpiredHandler(() => setStatus('signedOut'));
+    return () => setSessionExpiredHandler(null);
   }, []);
 
   const signIn = useCallback(() => setStatus('signedIn'), []);
   const signOut = useCallback(async () => {
+    await unregisterPush(); // needs the session, so it goes first: this phone must stop getting the leaving user's pushes
     await authLogout();
     setStatus('signedOut');
   }, []);
