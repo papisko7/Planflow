@@ -7,6 +7,7 @@ public class SearchChatMessagesQueryValidator : AbstractValidator<SearchChatMess
     public SearchChatMessagesQueryValidator()
     {
         RuleFor(x => x.TeamId).NotEmpty();
-        RuleFor(x => x.SearchTerm).NotEmpty().MaximumLength(256);
+        // Empty is allowed on purpose: an empty term matches every message and is how the client loads history.
+        RuleFor(x => x.SearchTerm).NotNull().MaximumLength(256);
     }
 }

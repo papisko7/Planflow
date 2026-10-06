@@ -7,9 +7,11 @@ namespace PlanFlow.Application.Common.Behaviors;
 /// MediatR pipeline behavior that runs all registered FluentValidation validators for a request
 /// before its handler executes, short-circuiting with a <see cref="ValidationException"/> on failure.
 /// This keeps input validation out of handlers so they only contain business logic.
+/// The constraint is deliberately only "notnull": in MediatR 12 a command without a result (<c>IRequest</c>) is not an
+/// <c>IRequest&lt;Unit&gt;</c>, so a stricter constraint would silently skip the validators of every such command.
 /// </summary>
 public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : IRequest<TResponse>
+    where TRequest : notnull
 {
     private readonly IEnumerable<IValidator<TRequest>> _validators;
 
