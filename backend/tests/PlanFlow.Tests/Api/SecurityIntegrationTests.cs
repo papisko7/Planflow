@@ -54,25 +54,134 @@ public class SecurityIntegrationTests : IClassFixture<CustomWebApplicationFactor
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    [Fact]
-    public async Task CreateTask_AsGuestRole_Returns403()
+    private static object NewTaskBody(Guid? assignedUserId) => new
     {
-        var (teamId, userId) = await SeedTeamWithMemberAsync(TeamRole.Guest);
-        var token = await MintAccessTokenAsync(userId, teamId, TeamRole.Guest);
-        var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        title = "Some task",
+        description = (string?)null,
+        assignedUserId,
+        deadlineUtc = (DateTime?)null,
+        impactScore = 5,
+        blockedByTaskId = (Guid?)null
+    };
 
-        var response = await client.PostAsJsonAsync($"api/teams/{teamId}/tasks", new
-        {
-            title = "Should be blocked",
-            description = (string?)null,
-            assignedUserId = (Guid?)null,
-            deadlineUtc = (DateTime?)null,
-            impactScore = 5,
-            blockedByTaskId = (Guid?)null
-        });
+    private static object UpdateTaskBody(Guid? assignedUserId) => new
+    {
+        title = "Edited",
+        description = (string?)null,
+        status = 0,
+        assignedUserId,
+        deadlineUtc = (DateTime?)null,
+        impactScore = 5,
+        blockedByTaskId = (Guid?)null,
+        manualUrgencyOverride = (double?)null,
+        manualUrgencyOverrideExpiresAtUtc = (DateTime?)null
+    };
+
+    [Fact]
+    public async Task CreateTask_MemberAssigningSomeoneElse_Returns403()
+    {
+        var (teamId, userId) = await SeedTeamWithMemberAsync(TeamRole.Member);
+        var client = await ClientForAsync(userId, teamId, TeamRole.Member);
+
+        var response = await client.PostAsJsonAsync($"api/teams/{teamId}/tasks", NewTaskBody(Guid.NewGuid()));
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateTask_AsMember_AssignsTaskToThemselves()
+    {
+        var (teamId, userId) = await SeedTeamWithMemberAsync(TeamRole.Member);
+        var client = await ClientForAsync(userId, teamId, TeamRole.Member);
+
+        var response = await client.PostAsJsonAsync($"api/teams/{teamId}/tasks", NewTaskBody(null));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Contains(userId.ToString(), await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task UpdateTask_MemberOnOwnTask_Returns200()
+    {
+        var (teamId, userId) = await SeedTeamWithMemberAsync(TeamRole.Member);
+        var taskId = await SeedTaskAsync(teamId, userId);
+        var client = await ClientForAsync(userId, teamId, TeamRole.Member);
+
+        var response = await client.PutAsJsonAsync($"api/tasks/{taskId}", UpdateTaskBody(userId));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateTask_MemberOnSomeoneElsesTask_Returns403()
+    {
+        var (teamId, userId) = await SeedTeamWithMemberAsync(TeamRole.Member);
+        var taskId = await SeedTaskAsync(teamId, null);
+        var client = await ClientForAsync(userId, teamId, TeamRole.Member);
+
+        var response = await client.PutAsJsonAsync($"api/tasks/{taskId}", UpdateTaskBody(null));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateTask_MemberReassigningOwnTask_Returns403()
+    {
+        var (teamId, userId) = await SeedTeamWithMemberAsync(TeamRole.Member);
+        var taskId = await SeedTaskAsync(teamId, userId);
+        var client = await ClientForAsync(userId, teamId, TeamRole.Member);
+
+        var response = await client.PutAsJsonAsync($"api/tasks/{taskId}", UpdateTaskBody(Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateTask_AdminOnAnyTask_Returns200()
+    {
+        var (teamId, userId) = await SeedTeamWithMemberAsync(TeamRole.Admin);
+        var taskId = await SeedTaskAsync(teamId, null);
+        var client = await ClientForAsync(userId, teamId, TeamRole.Admin);
+
+        var response = await client.PutAsJsonAsync($"api/tasks/{taskId}", UpdateTaskBody(userId));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteTask_MemberOnSomeoneElsesTask_Returns403()
+    {
+        var (teamId, userId) = await SeedTeamWithMemberAsync(TeamRole.Member);
+        var taskId = await SeedTaskAsync(teamId, null);
+        var client = await ClientForAsync(userId, teamId, TeamRole.Member);
+
+        var response = await client.DeleteAsync($"api/tasks/{taskId}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteTask_MemberOnOwnTask_Returns204()
+    {
+        var (teamId, userId) = await SeedTeamWithMemberAsync(TeamRole.Member);
+        var taskId = await SeedTaskAsync(teamId, userId);
+        var client = await ClientForAsync(userId, teamId, TeamRole.Member);
+
+        var response = await client.DeleteAsync($"api/tasks/{taskId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteTask_AdminOnAnyTask_Returns204()
+    {
+        var (teamId, userId) = await SeedTeamWithMemberAsync(TeamRole.Admin);
+        var taskId = await SeedTaskAsync(teamId, null);
+        var client = await ClientForAsync(userId, teamId, TeamRole.Admin);
+
+        var response = await client.DeleteAsync($"api/tasks/{taskId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 
     [Fact]
@@ -127,8 +236,8 @@ public class SecurityIntegrationTests : IClassFixture<CustomWebApplicationFactor
     [Fact]
     public async Task GetTeamMembers_AsMember_Returns200()
     {
-        var (teamId, userId) = await SeedTeamWithMemberAsync(TeamRole.Guest);
-        var client = await ClientForAsync(userId, teamId, TeamRole.Guest);
+        var (teamId, userId) = await SeedTeamWithMemberAsync(TeamRole.Member);
+        var client = await ClientForAsync(userId, teamId, TeamRole.Member);
 
         var response = await client.GetAsync($"api/teams/{teamId}/members");
 
@@ -200,7 +309,7 @@ public class SecurityIntegrationTests : IClassFixture<CustomWebApplicationFactor
         return (team.Id, user.Id);
     }
 
-    private async Task<Guid> SeedTaskAsync(Guid teamId)
+    private async Task<Guid> SeedTaskAsync(Guid teamId, Guid? assignedUserId = null)
     {
         using var scope = _factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
@@ -209,6 +318,7 @@ public class SecurityIntegrationTests : IClassFixture<CustomWebApplicationFactor
         {
             Id = Guid.NewGuid(),
             TeamId = teamId,
+            AssignedUserId = assignedUserId,
             Title = "Cross-team task",
             ImpactScore = 1
         };

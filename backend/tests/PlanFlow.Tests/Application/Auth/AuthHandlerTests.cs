@@ -24,10 +24,14 @@ public class AuthHandlerTests
     private static async Task<User> SeedUserWithRefreshAsync(PlanFlowDbContext db, string token, DateTime expiresAt)
     {
         var user = await TestDb.AddUserAsync(db);
-        user.RefreshTokenHash = TokenHasher.Hash(token);
-        user.RefreshTokenExpiresAtUtc = expiresAt;
-        await db.SaveChangesAsync();
+        await AddSessionAsync(db, user, token, expiresAt);
         return user;
+    }
+
+    private static async Task AddSessionAsync(PlanFlowDbContext db, User user, string token, DateTime expiresAt)
+    {
+        db.RefreshSessions.Add(new RefreshSession { UserId = user.Id, TokenHash = TokenHasher.Hash(token), ExpiresAtUtc = expiresAt });
+        await db.SaveChangesAsync();
     }
 
     // ---- Register ----
@@ -38,13 +42,13 @@ public class AuthHandlerTests
         var db = TestDb.Create();
         var hasher = new Mock<IPasswordHasher>();
         hasher.Setup(h => h.Hash("pw")).Returns("HASHED");
-        var handler = new RegisterCommandHandler(db, hasher.Object, JwtStub("rt").Object);
+        var handler = new RegisterCommandHandler(db, hasher.Object, JwtStub("rt").Object, new PlanFlow.Application.Notifications.NotificationService(db));
 
         var result = await handler.Handle(new RegisterCommand("a@b.com", "pw", "Ann"), CancellationToken.None);
 
         var stored = db.Users.Single();
         Assert.Equal("HASHED", stored.PasswordHash);
-        Assert.Equal(TokenHasher.Hash("rt"), stored.RefreshTokenHash);
+        Assert.Equal(TokenHasher.Hash("rt"), db.RefreshSessions.Single(s => s.UserId == stored.Id).TokenHash);
         Assert.Equal("access", result.AccessToken);
     }
 
@@ -53,13 +57,42 @@ public class AuthHandlerTests
     {
         var db = TestDb.Create();
         var existing = await TestDb.AddUserAsync(db);
-        var handler = new RegisterCommandHandler(db, Mock.Of<IPasswordHasher>(), JwtStub().Object);
+        var handler = new RegisterCommandHandler(db, Mock.Of<IPasswordHasher>(), JwtStub().Object, new PlanFlow.Application.Notifications.NotificationService(db));
 
         await Assert.ThrowsAsync<ConflictException>(
             () => handler.Handle(new RegisterCommand(existing.Email, "pw", "X"), CancellationToken.None));
     }
 
+    [Fact]
+    public async Task Register_CreatesPersonalTeamOwnedByTheNewUser()
+    {
+        var db = TestDb.Create();
+        var hasher = new Mock<IPasswordHasher>();
+        hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("HASHED");
+        var handler = new RegisterCommandHandler(db, hasher.Object, JwtStub().Object, new PlanFlow.Application.Notifications.NotificationService(db));
+
+        var result = await handler.Handle(new RegisterCommand("a@b.com", "pw", "Ann"), CancellationToken.None);
+
+        Assert.True(db.Teams.Single().IsPersonal);
+        var membership = db.TeamMembers.Single();
+        Assert.Equal(result.UserId, membership.UserId);
+        Assert.Equal(TeamRole.Owner, membership.Role);
+    }
+
     // ---- RefreshToken ----
+
+    [Fact]
+    public async Task Refresh_BackfillsPersonalTeamOnlyOnce()
+    {
+        var db = TestDb.Create();
+        var user = await SeedUserWithRefreshAsync(db, "old", DateTime.UtcNow.AddDays(1));
+        var handler = new RefreshTokenCommandHandler(db, JwtStub("second").Object);
+
+        await handler.Handle(new RefreshTokenCommand(user.Id, "old"), CancellationToken.None);
+        await handler.Handle(new RefreshTokenCommand(user.Id, "second"), CancellationToken.None);
+
+        Assert.Single(db.Teams, t => t.IsPersonal);
+    }
 
     [Fact]
     public async Task Refresh_ValidToken_RotatesRefreshToken()
@@ -70,7 +103,21 @@ public class AuthHandlerTests
 
         await handler.Handle(new RefreshTokenCommand(user.Id, "old"), CancellationToken.None);
 
-        Assert.Equal(TokenHasher.Hash("rotated"), db.Users.Single().RefreshTokenHash);
+        Assert.Equal(TokenHasher.Hash("rotated"), db.RefreshSessions.Single().TokenHash);
+    }
+
+    [Fact]
+    public async Task Refresh_OneDeviceRefreshing_DoesNotInvalidateAnotherDevice()
+    {
+        var db = TestDb.Create();
+        var user = await SeedUserWithRefreshAsync(db, "phone", DateTime.UtcNow.AddDays(1));
+        await AddSessionAsync(db, user, "emulator", DateTime.UtcNow.AddDays(1));
+        var handler = new RefreshTokenCommandHandler(db, JwtStub("phone-2").Object);
+
+        await handler.Handle(new RefreshTokenCommand(user.Id, "phone"), CancellationToken.None);
+
+        // The emulator's token still works after the phone rotated its own.
+        await handler.Handle(new RefreshTokenCommand(user.Id, "emulator"), CancellationToken.None);
     }
 
     [Fact]

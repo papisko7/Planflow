@@ -8,4 +8,4 @@ namespace PlanFlow.Application.Auth.Commands.Login;
 /// the issued access token carries a "team_role" claim for it (see <c>PermissionAuthorizationHandler</c>);
 /// full team-switching without re-login is deferred to Phase 4.3.
 /// </summary>
-public record LoginCommand(string Email, string Password, Guid? TeamId) : IRequest<AuthResultDto>;
+public record LoginCommand(string Email, string Password, Guid? TeamId, string? DeviceId = null, string? DeviceName = null) : IRequest<AuthResultDto>;

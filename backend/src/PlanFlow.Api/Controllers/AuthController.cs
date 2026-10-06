@@ -6,6 +6,8 @@ using PlanFlow.Api.Contracts;
 using PlanFlow.Application.Auth.Commands.Login;
 using PlanFlow.Application.Auth.Commands.RefreshToken;
 using PlanFlow.Application.Auth.Commands.Register;
+using PlanFlow.Application.Auth.Commands.RequestPasswordReset;
+using PlanFlow.Application.Auth.Commands.ResetPassword;
 using PlanFlow.Application.Auth.Common;
 
 namespace PlanFlow.Api.Controllers;
@@ -13,7 +15,9 @@ namespace PlanFlow.Api.Controllers;
 [ApiController]
 [Route("api/auth")]
 [AllowAnonymous]
-[EnableRateLimiting(RateLimitingConfig.AuthPolicy)]
+// The strict auth limit is applied per action (login/register), NOT to the whole controller:
+// refresh needs a valid single-use token so it is not brute-forceable, and the mobile app calls it
+// every time it switches team scope — sharing the 5/min login limit made normal use return 429.
 public class AuthController : ControllerBase
 {
     private readonly ISender _sender;
@@ -24,17 +28,40 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
+    [EnableRateLimiting(RateLimitingConfig.AuthPolicy)]
     public async Task<ActionResult<AuthResultDto>> Register(RegisterRequest request, CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(new RegisterCommand(request.Email, request.Password, request.DisplayName), cancellationToken);
+        var result = await _sender.Send(
+            new RegisterCommand(request.Email, request.Password, request.DisplayName, request.DeviceId, request.DeviceName),
+            cancellationToken);
         return Ok(result);
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting(RateLimitingConfig.AuthPolicy)]
     public async Task<ActionResult<AuthResultDto>> Login(LoginRequest request, CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(new LoginCommand(request.Email, request.Password, request.TeamId), cancellationToken);
+        var result = await _sender.Send(
+            new LoginCommand(request.Email, request.Password, request.TeamId, request.DeviceId, request.DeviceName),
+            cancellationToken);
         return Ok(result);
+    }
+
+    // Always 204, whether or not the e-mail has an account (no account enumeration).
+    [HttpPost("forgot-password")]
+    [EnableRateLimiting(RateLimitingConfig.AuthPolicy)]
+    public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request, CancellationToken cancellationToken)
+    {
+        await _sender.Send(new RequestPasswordResetCommand(request.Email), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("reset-password")]
+    [EnableRateLimiting(RateLimitingConfig.AuthPolicy)]
+    public async Task<IActionResult> ResetPassword(ResetPasswordRequest request, CancellationToken cancellationToken)
+    {
+        await _sender.Send(new ResetPasswordCommand(request.Email, request.Code, request.NewPassword), cancellationToken);
+        return NoContent();
     }
 
     [HttpPost("refresh")]

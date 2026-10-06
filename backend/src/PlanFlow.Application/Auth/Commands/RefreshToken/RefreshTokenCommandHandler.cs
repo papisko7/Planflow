@@ -4,6 +4,7 @@ using PlanFlow.Application.Auth.Common;
 using PlanFlow.Application.Common.Exceptions;
 using PlanFlow.Application.Common.Interfaces;
 using PlanFlow.Application.Common.Security;
+using PlanFlow.Application.Teams.Common;
 using PlanFlow.Domain.Enums;
 
 namespace PlanFlow.Application.Auth.Commands.RefreshToken;
@@ -26,10 +27,11 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, A
 
         var providedHash = TokenHasher.Hash(request.RefreshToken);
 
-        if (user.RefreshTokenHash is null
-            || user.RefreshTokenExpiresAtUtc is null
-            || user.RefreshTokenExpiresAtUtc < DateTime.UtcNow
-            || user.RefreshTokenHash != providedHash)
+        // Look the token up among this user's device sessions; each refresh replaces only that session's token.
+        var session = await _context.RefreshSessions
+            .FirstOrDefaultAsync(s => s.UserId == user.Id && s.TokenHash == providedHash, cancellationToken);
+
+        if (session is null || session.ExpiresAtUtc < DateTime.UtcNow)
         {
             throw new UnauthorizedException("Invalid refresh token.");
         }
@@ -48,8 +50,10 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, A
         var (accessToken, accessExpiresAtUtc) = _jwtTokenService.GenerateAccessToken(user, teamRole, request.TeamId);
         var (refreshToken, refreshExpiresAtUtc) = _jwtTokenService.GenerateRefreshToken();
 
-        user.RefreshTokenHash = TokenHasher.Hash(refreshToken);
-        user.RefreshTokenExpiresAtUtc = refreshExpiresAtUtc;
+        session.TokenHash = TokenHasher.Hash(refreshToken);
+        session.ExpiresAtUtc = refreshExpiresAtUtc;
+        session.UpdatedAtUtc = DateTime.UtcNow;
+        await PersonalTeam.EnsureAsync(_context, user.Id, cancellationToken);
 
         await _context.SaveChangesAsync(cancellationToken);
 

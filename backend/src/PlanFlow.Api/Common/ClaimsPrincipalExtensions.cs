@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using PlanFlow.Application.Common.Exceptions;
+using PlanFlow.Domain.Authorization;
+using PlanFlow.Domain.Enums;
 
 namespace PlanFlow.Api.Common;
 
@@ -13,6 +15,11 @@ public static class ClaimsPrincipalExtensions
 
         return Guid.Parse(value);
     }
+
+    /// <summary>Whether the caller's "team_role" claim grants the permission (same table the [Authorize] policies use).</summary>
+    public static bool HasPermission(this ClaimsPrincipal user, Permission permission) =>
+        Enum.TryParse<TeamRole>(user.FindFirst("team_role")?.Value, ignoreCase: true, out var role)
+        && RoleDefinitions.HasPermission(role, permission);
 
     /// <summary>The team the caller's "team_role" claim applies to, or null if they logged in without a team context.</summary>
     public static Guid? GetTeamId(this ClaimsPrincipal user)

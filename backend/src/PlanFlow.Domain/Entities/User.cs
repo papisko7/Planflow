@@ -13,9 +13,9 @@ public class User : BaseEntity
     public string? AvatarUrl { get; set; }
     public DateTime? LastLoginAtUtc { get; set; }
 
-    /// <summary>Hash of the current refresh token (never the raw token) plus its expiry; set at login/refresh, cleared implicitly by expiry.</summary>
-    public string? RefreshTokenHash { get; set; }
-    public DateTime? RefreshTokenExpiresAtUtc { get; set; }
+    /// <summary>When the owner proved they can read this address (null = not confirmed yet). Optional mails go only to confirmed addresses.</summary>
+    public DateTime? EmailVerifiedAtUtc { get; set; }
+    public bool IsEmailVerified => EmailVerifiedAtUtc is not null;
 
     public ICollection<TeamMember> TeamMemberships { get; set; } = new List<TeamMember>();
     public ICollection<TaskItem> AssignedTasks { get; set; } = new List<TaskItem>();
