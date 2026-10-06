@@ -4,6 +4,7 @@ using PlanFlow.Application.Calendar.Common;
 using PlanFlow.Application.Common.Caching;
 using PlanFlow.Application.Common.Exceptions;
 using PlanFlow.Application.Common.Interfaces;
+using PlanFlow.Application.Notifications;
 using PlanFlow.Application.Tasks.Common;
 using PlanFlow.Domain.Entities;
 using PlanFlow.Domain.Enums;
@@ -28,6 +29,7 @@ public class SyncCalendarJob : IJob
     private readonly GoogleAccessTokenProvider _accessTokenProvider;
     private readonly IGoogleCalendarClient _calendarClient;
     private readonly ICacheService _cache;
+    private readonly INotificationService _notifications;
     private readonly ILogger<SyncCalendarJob> _logger;
 
     public SyncCalendarJob(
@@ -35,12 +37,14 @@ public class SyncCalendarJob : IJob
         GoogleAccessTokenProvider accessTokenProvider,
         IGoogleCalendarClient calendarClient,
         ICacheService cache,
+        INotificationService notifications,
         ILogger<SyncCalendarJob> logger)
     {
         _context = context;
         _accessTokenProvider = accessTokenProvider;
         _calendarClient = calendarClient;
         _cache = cache;
+        _notifications = notifications;
         _logger = logger;
     }
 
@@ -71,6 +75,16 @@ public class SyncCalendarJob : IJob
                 totalUpdated += updated;
                 syncedAccounts++;
             }
+            catch (UnauthorizedException ex)
+            {
+                // Google no longer accepts this connection (consent revoked, refresh token dead). Retrying every
+                // 5 minutes would never succeed, so the connection is switched off and the user is e-mailed once
+                // to reconnect (reconnecting reactivates the same row).
+                failedAccounts++;
+                _logger.LogWarning(ex, "Google rejected CalendarIntegration {IntegrationId} (user {UserId}); deactivating it.",
+                    integration.Id, integration.UserId);
+                await DeactivateAndNotifyAsync(integration, cancellationToken);
+            }
             catch (Exception ex)
             {
                 // A single account's failure (expired/revoked refresh token, Google outage, an
@@ -87,14 +101,34 @@ public class SyncCalendarJob : IJob
             syncedAccounts, failedAccounts, totalCreated, totalUpdated);
     }
 
+    private async Task DeactivateAndNotifyAsync(CalendarIntegration integration, CancellationToken cancellationToken)
+    {
+        try
+        {
+            integration.IsActive = false;
+            integration.UpdatedAtUtc = DateTime.UtcNow;
+            await _notifications.NotifyAsync(
+                NotificationEvent.CalendarConnectionLost,
+                new[] { integration.UserId },
+                EmailTemplates.CalendarConnectionLost(integration.ExternalAccountEmail),
+                cancellationToken: cancellationToken);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not deactivate CalendarIntegration {IntegrationId}.", integration.Id);
+        }
+    }
+
     private async Task<(int Created, int Updated)> SyncIntegrationAsync(CalendarIntegration integration, CancellationToken cancellationToken)
     {
         // A synced task needs a TeamId (tasks are team-owned), but a calendar connection is
-        // per-user. We sync into the earliest team the user joined — the closest thing this
-        // schema has to a "home" team for a personal calendar import.
+        // per-user. Calendar events are personal, so they go into the user's personal team;
+        // accounts without one fall back to the earliest team they joined.
         var destinationTeamId = await _context.TeamMembers
             .Where(m => m.UserId == integration.UserId)
-            .OrderBy(m => m.JoinedAtUtc)
+            .OrderByDescending(m => m.Team.IsPersonal)
+            .ThenBy(m => m.JoinedAtUtc)
             .Select(m => (Guid?)m.TeamId)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -142,7 +176,6 @@ public class SyncCalendarJob : IJob
 
                 task.Status = TaskStatus.Cancelled;
                 task.UpdatedAtUtc = nowUtc;
-                await RecalculateUrgencyAsync(task, nowUtc, cancellationToken);
                 affectedTeamIds.Add(task.TeamId);
                 updated++;
                 continue;
@@ -178,7 +211,6 @@ public class SyncCalendarJob : IJob
                 updated++;
             }
 
-            await RecalculateUrgencyAsync(task, nowUtc, cancellationToken);
             affectedTeamIds.Add(task.TeamId);
         }
 
@@ -187,26 +219,16 @@ public class SyncCalendarJob : IJob
 
         await _context.SaveChangesAsync(cancellationToken);
 
+        // A synced deadline change moves the heaviest-weighted urgency component, so each touched team is
+        // rescored right away (not at the next hourly PrioritizationJob pass), after the new tasks exist in the DB.
         foreach (var teamId in affectedTeamIds)
         {
-            await _cache.RemoveAsync(CacheKeys.TeamTasks(teamId), cancellationToken);
+            var changedTaskIds = await TeamUrgencyRecalculator.RecalculateTeamAsync(
+                _context, teamId, nowUtc, ScoreTriggerSource.CalendarSync, null, cancellationToken);
+            await _context.SaveChangesAsync(cancellationToken);
+            await TeamUrgencyRecalculator.InvalidateCachesAsync(_cache, teamId, changedTaskIds, cancellationToken);
         }
 
         return (created, updated);
-    }
-
-    /// <summary>
-    /// A synced deadline change moves the heaviest-weighted urgency component, so the score (and
-    /// its audit log) must be refreshed immediately rather than waiting for the next hourly
-    /// PrioritizationJob pass.
-    /// </summary>
-    private async Task RecalculateUrgencyAsync(TaskItem task, DateTime nowUtc, CancellationToken cancellationToken)
-    {
-        var blockedCount = await _context.Tasks.CountAsync(t => t.BlockedByTaskId == task.Id, cancellationToken);
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockedCount, nowUtc, ScoreTriggerSource.CalendarSync);
-
-        task.CurrentUrgencyScore = scoreLog.FinalScore;
-        _context.UrgencyScoreLogs.Add(scoreLog);
-        await _cache.RemoveAsync(CacheKeys.TaskUrgency(task.Id), cancellationToken);
     }
 }

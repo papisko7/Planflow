@@ -127,7 +127,7 @@ public class CalendarSyncIntegrationTests
     private static SyncCalendarJob CreateJob(PlanFlowDbContext context, IGoogleCalendarClient calendarClient, IGoogleOAuthClient oauthClient)
     {
         var tokenProvider = new GoogleAccessTokenProvider(oauthClient, CreatePassthroughEncryption().Object, context);
-        return new SyncCalendarJob(context, tokenProvider, calendarClient, CreateNoopCache().Object,
+        return new SyncCalendarJob(context, tokenProvider, calendarClient, CreateNoopCache().Object, new PlanFlow.Application.Notifications.NotificationService(context),
             Mock.Of<Microsoft.Extensions.Logging.ILogger<SyncCalendarJob>>());
     }
 

@@ -40,7 +40,7 @@ public class SyncCalendarJobTests
 
     private static (User User, Team Team) SeedUserWithTeam(PlanFlowDbContext context)
     {
-        var user = new User { Email = "student@example.com", DisplayName = "Student", PasswordHash = "hash" };
+        var user = new User { Email = "student@example.com", DisplayName = "Student", PasswordHash = "hash", EmailVerifiedAtUtc = DateTime.UtcNow };
         var team = new Team { Name = "Thesis Team" };
         context.Users.Add(user);
         context.Teams.Add(team);
@@ -80,7 +80,7 @@ public class SyncCalendarJobTests
         cache ??= CreateCache();
 
         var tokenProvider = new GoogleAccessTokenProvider(oauthClient.Object, encryption.Object, context);
-        return new SyncCalendarJob(context, tokenProvider, calendarClient.Object, cache.Object, Mock.Of<Microsoft.Extensions.Logging.ILogger<SyncCalendarJob>>());
+        return new SyncCalendarJob(context, tokenProvider, calendarClient.Object, cache.Object, new PlanFlow.Application.Notifications.NotificationService(context), Mock.Of<Microsoft.Extensions.Logging.ILogger<SyncCalendarJob>>());
     }
 
     private static Mock<ICacheService> CreateCache()
@@ -270,10 +270,50 @@ public class SyncCalendarJobTests
     }
 
     [Fact]
+    public async Task Execute_GoogleRejectsTheConnection_DeactivatesItAndMailsTheUserOnce()
+    {
+        var context = CreateInMemoryContext();
+        var (user, _) = SeedUserWithTeam(context);
+        var integration = SeedActiveIntegration(context, user.Id);
+        integration.AccessTokenExpiresAtUtc = DateTime.UtcNow.AddMinutes(-5);
+        await context.SaveChangesAsync();
+
+        var oauthClient = new Mock<IGoogleOAuthClient>();
+        oauthClient.Setup(c => c.RefreshAccessTokenAsync("refresh-token", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new PlanFlow.Application.Common.Exceptions.UnauthorizedException("refresh token revoked"));
+
+        var job = CreateJob(context, new Mock<IGoogleCalendarClient>(), oauthClient);
+        await job.Execute(CreateJobContext().Object);
+        await job.Execute(CreateJobContext().Object); // the next 5-minute run no longer polls it
+
+        Assert.False((await context.CalendarIntegrations.SingleAsync()).IsActive);
+        var mail = Assert.Single(context.EmailOutbox);
+        Assert.Equal(NotificationEvent.CalendarConnectionLost, mail.Event);
+        Assert.Equal(user.Email, mail.ToEmail);
+    }
+
+    [Fact]
+    public async Task Execute_GoogleOutage_DoesNotDeactivateOrMail()
+    {
+        var context = CreateInMemoryContext();
+        var (user, _) = SeedUserWithTeam(context);
+        SeedActiveIntegration(context, user.Id);
+
+        var calendarClient = new Mock<IGoogleCalendarClient>();
+        calendarClient.Setup(c => c.ListEventsAsync(It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("Google is down"));
+
+        await CreateJob(context, calendarClient).Execute(CreateJobContext().Object);
+
+        Assert.True((await context.CalendarIntegrations.SingleAsync()).IsActive); // a temporary failure is retried, not given up on
+        Assert.Empty(context.EmailOutbox);
+    }
+
+    [Fact]
     public async Task Execute_UserHasNoTeam_SkipsIntegrationWithoutThrowing()
     {
         var context = CreateInMemoryContext();
-        var user = new User { Email = "teamless@example.com", DisplayName = "Teamless", PasswordHash = "hash" };
+        var user = new User { Email = "teamless@example.com", DisplayName = "Teamless", PasswordHash = "hash", EmailVerifiedAtUtc = DateTime.UtcNow };
         context.Users.Add(user);
         await context.SaveChangesAsync();
         SeedActiveIntegration(context, user.Id);

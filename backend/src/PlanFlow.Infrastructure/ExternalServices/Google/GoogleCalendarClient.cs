@@ -65,8 +65,8 @@ public class GoogleCalendarClient : IGoogleCalendarClient
             .Select(item => new GoogleCalendarEvent(
                 item.Id,
                 item.Summary,
-                item.Start?.DateTimeValue ?? item.Start?.Date,
-                item.End?.DateTimeValue ?? item.End?.Date,
+                item.Start?.ToUtc(),
+                item.End?.ToUtc(),
                 item.Status == "cancelled"))
             .ToList();
     }
@@ -81,7 +81,14 @@ public class GoogleCalendarClient : IGoogleCalendarClient
         [property: JsonPropertyName("start")] GoogleEventDateTime? Start,
         [property: JsonPropertyName("end")] GoogleEventDateTime? End);
 
+    // Timed events carry an offset ("...T15:00:00+02:00"); all-day events carry a bare date ("2026-10-06").
+    // Npgsql only accepts Kind=Utc for timestamptz, so both shapes are normalised to UTC here.
     private record GoogleEventDateTime(
-        [property: JsonPropertyName("dateTime")] DateTime? DateTimeValue,
-        [property: JsonPropertyName("date")] DateTime? Date);
+        [property: JsonPropertyName("dateTime")] DateTimeOffset? DateTimeValue,
+        [property: JsonPropertyName("date")] DateTime? Date)
+    {
+        public DateTime? ToUtc() =>
+            DateTimeValue?.UtcDateTime
+            ?? (Date is { } date ? DateTime.SpecifyKind(date, DateTimeKind.Utc) : null);
+    }
 }
