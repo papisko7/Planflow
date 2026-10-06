@@ -2,14 +2,14 @@ import { StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import type { UrgencyScoreBreakdownDto } from '../types/task';
 
-// Mirrors the weights hard-coded server-side (see UrgencyScoreLog.cs):
-// FinalScore = 0.35*Deadline + 0.20*Ai + 0.15*Blocking + 0.20*Impact + 0.10*UserOverride.
+// Mirrors the weights hard-coded server-side (see UrgencyScoreCalculator.cs):
+// weighted sum 0.45*Deadline + 0.20*Blocking + 0.25*Impact + 0.10*UserOverride, then two floors
+// (due within 24h -> at least 0.85; a blocker is never below what it blocks) and, for a blocked task, x0.5.
 // Shown next to each bar so the breakdown UI doubles as documentation of the formula for the thesis.
 const COMPONENTS: Array<{ key: keyof UrgencyScoreBreakdownDto; label: string; weight: number; color: string }> = [
-  { key: 'deadlineComponent', label: 'Deadline', weight: 0.35, color: colors.urgencyCritical },
-  { key: 'impactComponent', label: 'Impact', weight: 0.2, color: colors.primary },
-  { key: 'aiComponent', label: 'AI Assessment', weight: 0.2, color: colors.urgencyHigh },
-  { key: 'blockingComponent', label: 'Blocking', weight: 0.15, color: colors.urgencyMedium },
+  { key: 'deadlineComponent', label: 'Deadline', weight: 0.45, color: colors.urgencyCritical },
+  { key: 'impactComponent', label: 'Impact', weight: 0.25, color: colors.primary },
+  { key: 'blockingComponent', label: 'Blocks urgent work', weight: 0.2, color: colors.urgencyMedium },
   { key: 'userOverrideComponent', label: 'Manual Override', weight: 0.1, color: colors.textMuted },
 ];
 
@@ -35,7 +35,18 @@ export function UrgencyBreakdown({ breakdown }: UrgencyBreakdownProps) {
       </View>
 
       {COMPONENTS.map(({ key, label, weight, color }) => {
-        const value = breakdown[key] as number;
+        const value = breakdown[key] as number | null;
+        // An unrated impact is not a zero: its weight is shared by the other factors, so show that instead of a bar.
+        if (value === null) {
+          return (
+            <View key={key} style={styles.row}>
+              <View style={styles.rowHeader}>
+                <Text style={styles.rowLabel}>{label}</Text>
+                <Text style={styles.rowValue}>not rated</Text>
+              </View>
+            </View>
+          );
+        }
         return (
           <View key={key} style={styles.row}>
             <View style={styles.rowHeader}>
@@ -51,10 +62,11 @@ export function UrgencyBreakdown({ breakdown }: UrgencyBreakdownProps) {
         );
       })}
 
+      {breakdown.isBlocked ? (
+        <Text style={styles.blockedNote}>Waiting on an unfinished task, so this score is halved until it is done.</Text>
+      ) : null}
+
       <View style={styles.footerRow}>
-        {breakdown.aiFallbackUsed ? (
-          <Text style={styles.fallbackBadge}>⚠️ AI fallback used for this computation</Text>
-        ) : null}
         <Text style={styles.computedAt}>Computed {formatComputedAt(breakdown.createdAtUtc)}</Text>
       </View>
     </View>
@@ -92,6 +104,6 @@ const styles = StyleSheet.create({
   },
   barFill: { height: '100%', borderRadius: radius.sm },
   footerRow: { marginTop: spacing.xs, gap: 4 },
-  fallbackBadge: { color: colors.urgencyHigh, fontSize: 12, fontWeight: '600' },
+  blockedNote: { color: colors.urgencyMedium, fontSize: 12 },
   computedAt: { color: colors.textMuted, fontSize: 12 },
 });

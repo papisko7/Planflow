@@ -1,8 +1,11 @@
-import { memo } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { getCurrentUserId } from '../services/authService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { getUrgencyTier, URGENCY_TIER_META } from '../utils/urgencyGrouping';
-import type { TaskDto } from '../types/task';
+import { TaskStatus, type TaskDto } from '../types/task';
+import { SwipeableRow } from './SwipeableRow';
+import { TaskActionMenu } from './TaskActionMenu';
 
 const TIER_COLOR = {
   critical: colors.urgencyCritical,
@@ -16,19 +19,70 @@ function formatDeadline(deadlineUtc: string | null): string | null {
   return new Date(deadlineUtc).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-export interface TaskCardProps {
-  task: TaskDto;
-  onPress?: (task: TaskDto) => void;
+// Quick actions (see useTaskActions). When given, the card gets swipe gestures
+// (right = delete, left = edit) and a long-press menu.
+export interface TaskCardActions {
+  edit: (task: TaskDto) => void;
+  remove: (task: TaskDto) => void;
+  complete: (task: TaskDto) => void;
+  reopen: (task: TaskDto) => void;
+  claim: (task: TaskDto) => void;
+  abandon: (task: TaskDto) => void;
 }
 
-function TaskCardComponent({ task, onPress }: TaskCardProps) {
+export interface TaskCardProps {
+  // teamName is shown as a chip so tasks from different teams are distinguishable in mixed lists.
+  task: TaskDto & { teamName?: string };
+  onPress?: (task: TaskDto & { teamName?: string }) => void;
+  actions?: TaskCardActions;
+}
+
+// Two taps within this window count as a double tap.
+const DOUBLE_TAP_MS = 250;
+
+function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
+  const [menuVisible, setMenuVisible] = useState(false);
   const tier = getUrgencyTier(task.currentUrgencyScore);
   const deadline = formatDeadline(task.deadlineUtc);
 
-  return (
+  // Double tap toggles done: an open task becomes done, a done task is reopened. To tell it apart from a
+  // single tap, the single tap (open details) waits DOUBLE_TAP_MS for a possible second tap; cards
+  // without actions open instantly because they have no double-tap action.
+  const isDone = task.status === TaskStatus.Done;
+  const isUnassigned = !task.assignedUserId;
+  // Only the current assignee can abandon a task (the API enforces the same).
+  const isMine = !!task.assignedUserId && task.assignedUserId === getCurrentUserId();
+  const pendingTap = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (pendingTap.current) clearTimeout(pendingTap.current);
+    },
+    [],
+  );
+
+  const handlePress = () => {
+    if (!actions) {
+      onPress?.(task);
+      return;
+    }
+    if (pendingTap.current) {
+      clearTimeout(pendingTap.current);
+      pendingTap.current = null;
+      if (isDone) actions.reopen(task);
+      else actions.complete(task);
+      return;
+    }
+    pendingTap.current = setTimeout(() => {
+      pendingTap.current = null;
+      onPress?.(task);
+    }, DOUBLE_TAP_MS);
+  };
+
+  const card = (
     <Pressable
       testID={`task-card-${task.id}`}
-      onPress={onPress ? () => onPress(task) : undefined}
+      onPress={onPress || actions ? handlePress : undefined}
+      onLongPress={actions ? () => setMenuVisible(true) : undefined}
       style={({ pressed }) => [styles.card, { borderLeftColor: TIER_COLOR[tier], opacity: pressed ? 0.7 : 1 }]}
     >
       <View style={styles.headerRow}>
@@ -47,6 +101,8 @@ function TaskCardComponent({ task, onPress }: TaskCardProps) {
       ) : null}
 
       <View style={styles.metaRow}>
+        {task.teamName ? <Text style={styles.teamChip}>👥 {task.teamName}</Text> : null}
+        {!task.assignedUserId ? <Text style={styles.metaText}>👤 Unassigned</Text> : null}
         {deadline ? <Text style={styles.metaText}>📅 {deadline}</Text> : null}
         {task.blockedByTaskId ? <Text style={[styles.metaText, styles.blockedText]}>⛔ Blocked</Text> : null}
         {task.manualUrgencyOverride !== null ? <Text style={styles.metaText}>✋ Manual override</Text> : null}
@@ -57,6 +113,36 @@ function TaskCardComponent({ task, onPress }: TaskCardProps) {
       </Text>
     </Pressable>
   );
+
+  if (!actions) {
+    return <View style={styles.item}>{card}</View>;
+  }
+
+  return (
+    <View style={styles.item}>
+      {/* Swipe right = delete. Swipe left follows the task: nobody owns it yet -> "Take over",
+          otherwise "Edit". Editing an unassigned task is still one tap away in the long-press menu. */}
+      <SwipeableRow
+        onSwipeRight={() => actions.remove(task)}
+        onSwipeLeft={() => (isUnassigned ? actions.claim(task) : actions.edit(task))}
+        leftLabel={isUnassigned ? 'Take over' : 'Edit'}
+      >
+        {card}
+      </SwipeableRow>
+      <TaskActionMenu
+        visible={menuVisible}
+        title={task.title}
+        onClose={() => setMenuVisible(false)}
+        onOpen={() => onPress?.(task)}
+        onClaim={isUnassigned ? () => actions.claim(task) : undefined}
+        onAbandon={isMine ? () => actions.abandon(task) : undefined}
+        onEdit={() => actions.edit(task)}
+        onComplete={isDone ? undefined : () => actions.complete(task)}
+        onReopen={isDone ? () => actions.reopen(task) : undefined}
+        onDelete={() => actions.remove(task)}
+      />
+    </View>
+  );
 }
 
 // Real-time TaskHub events will patch individual tasks in place (see DashboardScreen); memoizing
@@ -64,13 +150,13 @@ function TaskCardComponent({ task, onPress }: TaskCardProps) {
 export const TaskCard = memo(TaskCardComponent);
 
 const styles = StyleSheet.create({
+  // Outer spacing lives here (not on the card) so the swipe backgrounds line up with the card edges.
+  item: { marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderLeftWidth: 4,
     padding: spacing.md,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
     gap: spacing.xs,
   },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm },
@@ -81,5 +167,15 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   metaText: { ...typography.body, color: colors.textMuted, fontSize: 12 },
   blockedText: { color: colors.danger },
+  teamChip: {
+    ...typography.body,
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
+    backgroundColor: colors.primaryMuted,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
   tierLabel: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
 });

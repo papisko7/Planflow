@@ -17,7 +17,7 @@ export interface TaskDto {
   description: string | null;
   status: TaskStatus;
   deadlineUtc: string | null;
-  impactScore: number;
+  impactScore: number | null;
   blockedByTaskId: string | null;
   manualUrgencyOverride: number | null;
   manualUrgencyOverrideExpiresAtUtc: string | null;
@@ -29,12 +29,11 @@ export interface TaskDto {
 // Mirrors PlanFlow.Application.Tasks.Common.UrgencyScoreBreakdownDto
 export interface UrgencyScoreBreakdownDto {
   deadlineComponent: number;
-  aiComponent: number;
   blockingComponent: number;
-  impactComponent: number;
+  impactComponent: number | null; // null = task not rated, its weight is shared by the other factors
   userOverrideComponent: number;
   finalScore: number;
-  aiFallbackUsed: boolean;
+  isBlocked: boolean; // true = waiting on an unfinished blocker, score is halved
   createdAtUtc: string;
 }
 
@@ -50,7 +49,7 @@ export interface CreateTaskRequest {
   description: string | null;
   assignedUserId: string | null;
   deadlineUtc: string | null;
-  impactScore: number;
+  impactScore: number | null;
   blockedByTaskId: string | null;
 }
 
@@ -61,8 +60,11 @@ export interface UpdateTaskRequest {
   status: TaskStatus;
   assignedUserId: string | null;
   deadlineUtc: string | null;
-  impactScore: number;
+  impactScore: number | null;
   blockedByTaskId: string | null;
   manualUrgencyOverride: number | null;
   manualUrgencyOverrideExpiresAtUtc: string | null;
 }
+
+// A task plus the name of its team (resolved client-side from the teams list) for display.
+export type TaskWithTeam = TaskDto & { teamName: string };
