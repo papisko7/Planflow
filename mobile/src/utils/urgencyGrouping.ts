@@ -18,18 +18,18 @@ export function getUrgencyTier(score: number): UrgencyTier {
   return 'low';
 }
 
-export interface UrgencySection {
+export interface UrgencySection<T extends TaskDto = TaskDto> {
   tier: UrgencyTier;
   title: string;
-  data: TaskDto[];
+  data: T[];
 }
 
 const TIER_ORDER: UrgencyTier[] = ['critical', 'high', 'medium', 'low'];
 
 // Groups tasks into the four urgency tiers, sorted by score descending within each tier,
 // and drops any tier that has no tasks so the SectionList doesn't render empty headers.
-export function groupTasksByUrgency(tasks: TaskDto[]): UrgencySection[] {
-  const buckets: Record<UrgencyTier, TaskDto[]> = { critical: [], high: [], medium: [], low: [] };
+export function groupTasksByUrgency<T extends TaskDto>(tasks: T[]): UrgencySection<T>[] {
+  const buckets: Record<UrgencyTier, T[]> = { critical: [], high: [], medium: [], low: [] };
 
   for (const task of tasks) {
     buckets[getUrgencyTier(task.currentUrgencyScore)].push(task);
