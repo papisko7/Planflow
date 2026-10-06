@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, act } from '@testing-library/react-native';
 import ChatScreen from '../ChatScreen';
-import { createChatConnection, getChatMessages } from '../../services/chatService';
+import { createChatConnection, getChatMessages, startChatConnection } from '../../services/chatService';
 import { getCurrentUserId } from '../../services/authService';
 
 jest.mock('../../services/chatService');
@@ -32,6 +32,9 @@ describe('ChatScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedGetCurrentUserId.mockReturnValue('user-1');
+    (startChatConnection as jest.MockedFunction<typeof startChatConnection>).mockImplementation((connection) =>
+      connection.start(),
+    );
   });
 
   it('loads history and renders it, then applies a live ReceiveMessage event', async () => {

@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import type { HubConnection } from '@microsoft/signalr';
-import { createChatConnection, getChatMessages } from '../services/chatService';
+import { createChatConnection, getChatMessages, startChatConnection } from '../services/chatService';
 import { getCurrentUserId } from '../services/authService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import type { RootStackParamList } from '../navigation/types';
@@ -69,10 +69,11 @@ export default function ChatScreen() {
           }
         });
 
-        await connection.start();
-      } catch {
+        await startChatConnection(connection, teamId);
+      } catch (err) {
         if (!cancelled) {
-          setErrorMessage("Couldn't load chat.");
+          const reason = (err as { message?: string }).message;
+          setErrorMessage(reason ? `Couldn't load chat: ${reason}` : "Couldn't load chat.");
           setState('error');
         }
       }
