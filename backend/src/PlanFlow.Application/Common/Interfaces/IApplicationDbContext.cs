@@ -11,6 +11,7 @@ namespace PlanFlow.Application.Common.Interfaces;
 public interface IApplicationDbContext
 {
     DbSet<User> Users { get; }
+    DbSet<RefreshSession> RefreshSessions { get; }
     DbSet<Team> Teams { get; }
     DbSet<TeamMember> TeamMembers { get; }
     DbSet<TaskItem> Tasks { get; }
@@ -19,6 +20,12 @@ public interface IApplicationDbContext
     DbSet<Alert> Alerts { get; }
     DbSet<ChatMessage> ChatMessages { get; }
     DbSet<CalendarIntegration> CalendarIntegrations { get; }
+    DbSet<NotificationPreference> NotificationPreferences { get; }
+    DbSet<EmailOutboxMessage> EmailOutbox { get; }
+    DbSet<OneTimeCode> OneTimeCodes { get; }
+    DbSet<Notification> Notifications { get; }
+    DbSet<PushToken> PushTokens { get; }
+    DbSet<UserDevice> UserDevices { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

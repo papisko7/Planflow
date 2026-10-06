@@ -6,10 +6,14 @@ using Microsoft.Extensions.Hosting;
 using PlanFlow.Application.Common.Interfaces;
 using PlanFlow.Infrastructure.BackgroundJobs;
 using PlanFlow.Infrastructure.Caching;
+using PlanFlow.Infrastructure.Email;
 using PlanFlow.Infrastructure.ExternalServices.Google;
 using PlanFlow.Infrastructure.Persistence;
+using PlanFlow.Infrastructure.Presence;
+using PlanFlow.Infrastructure.Push;
 using PlanFlow.Infrastructure.Security;
 using Quartz;
+using StackExchange.Redis;
 
 namespace PlanFlow.Infrastructure;
 
@@ -31,6 +35,7 @@ public static class DependencyInjection
                 options.UseInMemoryDatabase(testingDatabaseName));
             services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<PlanFlowDbContext>());
             services.AddDistributedMemoryCache();
+            services.AddSingleton<IChatPresence, InMemoryChatPresence>();
         }
         else if (environment.IsEnvironment("PostgresIntegrationTesting"))
         {
@@ -46,6 +51,7 @@ public static class DependencyInjection
                 options.UseNpgsql(configuration.GetConnectionString("PlanFlowDb")));
             services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<PlanFlowDbContext>());
             services.AddDistributedMemoryCache();
+            services.AddSingleton<IChatPresence, InMemoryChatPresence>();
         }
         else
         {
@@ -64,6 +70,8 @@ public static class DependencyInjection
                 options.Configuration = redisConnectionString;
                 options.InstanceName = "planflow:";
             });
+
+            AddChatPresence(services, redisConnectionString);
         }
 
         services.AddSingleton<ICacheService, RedisCacheService>();
@@ -79,6 +87,31 @@ public static class DependencyInjection
             .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(AppContext.BaseDirectory, "dataprotection-keys")));
         services.AddSingleton<ITokenEncryptionService, DataProtectionTokenEncryptionService>();
 
+        // E-mail: SMTP in normal runs (Mailpit locally, a real provider via user-secrets); under the test environments
+        // mail is kept in memory so tests can read it and nothing leaves the machine.
+        services.Configure<EmailOptions>(configuration.GetSection("Email"));
+        if (environment.IsEnvironment("Testing") || environment.IsEnvironment("PostgresIntegrationTesting"))
+        {
+            services.AddSingleton<InMemoryEmailSender>();
+            services.AddSingleton<IEmailSender>(sp => sp.GetRequiredService<InMemoryEmailSender>());
+        }
+        else
+        {
+            services.AddSingleton<IEmailSender, SmtpEmailSender>();
+        }
+
+        // Push: Expo push service in normal runs; kept in memory under the test environments so nothing leaves the machine.
+        services.Configure<PushOptions>(configuration.GetSection("Push"));
+        if (environment.IsEnvironment("Testing") || environment.IsEnvironment("PostgresIntegrationTesting"))
+        {
+            services.AddSingleton<InMemoryPushSender>();
+            services.AddSingleton<IPushSender>(sp => sp.GetRequiredService<InMemoryPushSender>());
+        }
+        else
+        {
+            services.AddHttpClient<IPushSender, ExpoPushSender>(client => client.Timeout = TimeSpan.FromSeconds(15));
+        }
+
         services.Configure<GoogleOAuthOptions>(configuration.GetSection("GoogleOAuth"));
         services.AddHttpClient<IGoogleOAuthClient, GoogleOAuthClient>();
         services.AddHttpClient<IGoogleCalendarClient, GoogleCalendarClient>().AddGoogleCalendarRetry();
@@ -90,6 +123,9 @@ public static class DependencyInjection
             AddIntervalJob<SyncCalendarJob>(quartz, "SyncCalendarJob", TimeSpan.FromMinutes(5));
             AddIntervalJob<PrioritizationJob>(quartz, "PrioritizationJob", TimeSpan.FromHours(1));
             AddIntervalJob<AlertingJob>(quartz, "AlertingJob", TimeSpan.FromMinutes(1));
+            AddIntervalJob<EmailOutboxJob>(quartz, "EmailOutboxJob", TimeSpan.FromSeconds(30));
+            AddIntervalJob<PushDeliveryJob>(quartz, "PushDeliveryJob", TimeSpan.FromSeconds(10));
+            AddIntervalJob<ChatDigestJob>(quartz, "ChatDigestJob", TimeSpan.FromMinutes(15));
 
             var cleanupJobKey = new JobKey("CleanupJob");
             quartz.AddJob<CleanupJob>(opts => opts.WithIdentity(cleanupJobKey));
@@ -102,6 +138,32 @@ public static class DependencyInjection
         services.AddQuartzHostedService(options => options.WaitForJobsToComplete = true);
 
         return services;
+    }
+
+    /// <summary>
+    /// "Who is online" must be visible to every server instance, so it lives in Redis. Without a Redis connection string the
+    /// in-memory version is used, which is correct for a single instance.
+    /// </summary>
+    private static void AddChatPresence(IServiceCollection services, string? redisConnectionString)
+    {
+        if (string.IsNullOrWhiteSpace(redisConnectionString))
+        {
+            services.AddSingleton<IChatPresence, InMemoryChatPresence>();
+            return;
+        }
+
+        // AbortOnConnectFail=false: the app starts even when Redis is down and keeps retrying in the background.
+        services.AddSingleton<IConnectionMultiplexer>(_ =>
+        {
+            var options = ConfigurationOptions.Parse(redisConnectionString);
+            options.AbortOnConnectFail = false;
+            options.ConnectTimeout = 2000;
+            options.AsyncTimeout = 2000;
+            return ConnectionMultiplexer.Connect(options);
+        });
+        services.AddSingleton<RedisChatPresence>();
+        services.AddSingleton<IChatPresence>(sp => sp.GetRequiredService<RedisChatPresence>());
+        services.AddHostedService<ChatPresenceHeartbeat>();
     }
 
     private static void AddIntervalJob<TJob>(IServiceCollectionQuartzConfigurator quartz, string name, TimeSpan interval)

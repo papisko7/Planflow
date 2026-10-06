@@ -16,7 +16,16 @@ builder.Services.AddSwaggerDocumentation();
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddRbacPolicies();
 builder.Services.AddApiRateLimiting();
-builder.Services.AddSignalR();
+var signalR = builder.Services.AddSignalR();
+
+// With several server instances a chat message sent through instance A must also reach people connected to instance B;
+// the Redis backplane forwards hub messages between instances. Off by default so a single instance (or a dev machine
+// without Redis) keeps working — enable it with "SignalR:RedisBackplane": true.
+if (builder.Configuration.GetValue<bool>("SignalR:RedisBackplane"))
+{
+    signalR.AddStackExchangeRedis(builder.Configuration.GetConnectionString("Redis")!,
+        options => options.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("planflow-signalr"));
+}
 
 var app = builder.Build();
 

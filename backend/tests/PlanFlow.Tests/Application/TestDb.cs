@@ -15,7 +15,7 @@ internal static class TestDb
 
     public static async Task<User> AddUserAsync(PlanFlowDbContext db, string name = "User")
     {
-        var user = new User { Email = $"{Guid.NewGuid()}@example.com", DisplayName = name, PasswordHash = "hash" };
+        var user = new User { Email = $"{Guid.NewGuid()}@example.com", DisplayName = name, PasswordHash = "hash", EmailVerifiedAtUtc = DateTime.UtcNow };
         db.Users.Add(user);
         await db.SaveChangesAsync();
         return user;

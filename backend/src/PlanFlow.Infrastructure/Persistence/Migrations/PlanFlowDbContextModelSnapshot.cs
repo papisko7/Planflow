@@ -146,6 +146,284 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.ToTable("chat_messages", (string)null);
                 });
 
+            modelBuilder.Entity("PlanFlow.Domain.Entities.EmailOutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Event")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("HtmlBody")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("NextAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("SentAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("TextBody")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ToEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SentAtUtc", "NextAttemptAtUtc");
+
+                    b.ToTable("email_outbox", (string)null);
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Event")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PushAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PushLastError")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("PushNextAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PushState")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ReadAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("TaskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PushState", "PushNextAttemptAtUtc");
+
+                    b.HasIndex("UserId", "CreatedAtUtc");
+
+                    b.ToTable("notifications", (string)null);
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.NotificationPreference", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("CalendarIssues")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ChatDigest")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ChatSeenUpToUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("EmailEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastChatDigestSentAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("LoginAlerts")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("PushEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("TaskAssignments")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("TaskChanges")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("TaskUrgency")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("TeamMembership")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("TeamTasks")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("notification_preferences", (string)null);
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.OneTimeCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("FailedAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("UsedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("one_time_codes", (string)null);
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.PushToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("LastSeenAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("push_tokens", (string)null);
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.RefreshSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("refresh_sessions", (string)null);
+                });
+
             modelBuilder.Entity("PlanFlow.Domain.Entities.TaskHistory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -191,12 +469,6 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime?>("AiAssessmentAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<double?>("AiAssessmentScore")
-                        .HasColumnType("double precision");
-
                     b.Property<Guid?>("AssignedUserId")
                         .HasColumnType("uuid");
 
@@ -219,7 +491,7 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
-                    b.Property<int>("ImpactScore")
+                    b.Property<int?>("ImpactScore")
                         .HasColumnType("integer");
 
                     b.Property<double?>("ManualUrgencyOverride")
@@ -275,6 +547,11 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
+                    b.Property<bool>("IsPersonal")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -299,6 +576,12 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTime>("JoinedAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("MuteChat")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("MuteNotifications")
+                        .HasColumnType("boolean");
 
                     b.Property<int>("Role")
                         .HasColumnType("integer");
@@ -328,12 +611,6 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<double>("AiComponent")
-                        .HasColumnType("double precision");
-
-                    b.Property<bool>("AiFallbackUsed")
-                        .HasColumnType("boolean");
-
                     b.Property<double>("BlockingComponent")
                         .HasColumnType("double precision");
 
@@ -346,8 +623,11 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Property<double>("FinalScore")
                         .HasColumnType("double precision");
 
-                    b.Property<double>("ImpactComponent")
+                    b.Property<double?>("ImpactComponent")
                         .HasColumnType("double precision");
+
+                    b.Property<bool>("IsBlocked")
+                        .HasColumnType("boolean");
 
                     b.Property<Guid>("TaskItemId")
                         .HasColumnType("uuid");
@@ -390,17 +670,14 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<DateTime?>("EmailVerifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("LastLoginAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("RefreshTokenExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("RefreshTokenHash")
                         .HasColumnType("text");
 
                     b.Property<DateTime?>("UpdatedAtUtc")
@@ -412,6 +689,42 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.UserDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeviceId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("LastSeenAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "DeviceId")
+                        .IsUnique();
+
+                    b.ToTable("user_devices", (string)null);
                 });
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.Alert", b =>
@@ -460,6 +773,61 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("SenderUser");
 
                     b.Navigation("Team");
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.Notification", b =>
+                {
+                    b.HasOne("PlanFlow.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.NotificationPreference", b =>
+                {
+                    b.HasOne("PlanFlow.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.OneTimeCode", b =>
+                {
+                    b.HasOne("PlanFlow.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.PushToken", b =>
+                {
+                    b.HasOne("PlanFlow.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.RefreshSession", b =>
+                {
+                    b.HasOne("PlanFlow.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.TaskHistory", b =>
@@ -540,6 +908,17 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("TaskItem");
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.UserDevice", b =>
+                {
+                    b.HasOne("PlanFlow.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.TaskItem", b =>

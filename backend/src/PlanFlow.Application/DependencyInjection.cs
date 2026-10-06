@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using PlanFlow.Application.Calendar.Common;
 using PlanFlow.Application.Common.Behaviors;
+using PlanFlow.Application.Notifications;
 
 namespace PlanFlow.Application;
 
@@ -20,6 +21,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(assembly);
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
         services.AddScoped<GoogleAccessTokenProvider>();
+        services.AddScoped<INotificationService, NotificationService>();
 
         return services;
     }

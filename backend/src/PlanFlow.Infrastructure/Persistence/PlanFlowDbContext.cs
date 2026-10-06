@@ -17,6 +17,7 @@ public class PlanFlowDbContext : DbContext, IApplicationDbContext
     }
 
     public DbSet<User> Users => Set<User>();
+    public DbSet<RefreshSession> RefreshSessions => Set<RefreshSession>();
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
@@ -25,6 +26,12 @@ public class PlanFlowDbContext : DbContext, IApplicationDbContext
     public DbSet<CalendarIntegration> CalendarIntegrations => Set<CalendarIntegration>();
     public DbSet<Alert> Alerts => Set<Alert>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+    public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
+    public DbSet<EmailOutboxMessage> EmailOutbox => Set<EmailOutboxMessage>();
+    public DbSet<OneTimeCode> OneTimeCodes => Set<OneTimeCode>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<PushToken> PushTokens => Set<PushToken>();
+    public DbSet<UserDevice> UserDevices => Set<UserDevice>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
