@@ -82,12 +82,13 @@ appId: com.planflow.mobile
     id: "create-task-title-input"
 - inputText: "Ship release"
 - tapOn:
-    id: "create-task-deadline-days-input"
-- inputText: "1" # not "0": the backend requires DeadlineUtc strictly in the future (CreateTaskCommandValidator), and by the
-                  # time a "0 days from now" timestamp reaches the server it has already elapsed, so the create silently
-                  # 400s (found by actually running this flow — the app also doesn't surface that error in the form, a
-                  # separate gap worth fixing later). 1 day out keeps the deadline component ~0.97, close enough to the
-                  # tier math below.
+    id: "deadline-picker-button"
+- tapOn:
+    id: "deadline-picker-quick-tomorrow" # tomorrow, all day: the backend requires the deadline strictly in the future
+                                         # (CreateTaskCommandValidator); ~1 day out keeps the deadline component ~0.97,
+                                         # close enough to the tier math below.
+- tapOn:
+    id: "deadline-picker-set"
 - tapOn:
     id: "create-task-impact-input"
 - inputText: "10"
