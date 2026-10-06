@@ -18,6 +18,17 @@ public class CleanupJob : IJob
     /// <summary>Read alerts older than this are pruned; unread alerts are never deleted by this job.</summary>
     private const int ReadAlertRetentionDays = 30;
 
+    /// <summary>Delivered mail rows are only kept briefly (debugging); rows that failed for good are kept a bit longer.</summary>
+    private const int SentEmailRetentionDays = 7;
+    private const int FailedEmailRetentionDays = 30;
+
+    /// <summary>Inbox entries: read ones are pruned after a month, unread ones after three (nobody scrolls back that far).</summary>
+    private const int ReadNotificationRetentionDays = 30;
+    private const int AnyNotificationRetentionDays = 90;
+
+    /// <summary>A phone that has not signed in for this long is dropped (a signed-out or abandoned device).</summary>
+    private const int PushTokenRetentionDays = 120;
+
     private readonly IApplicationDbContext _context;
     private readonly ILogger<CleanupJob> _logger;
 
@@ -44,7 +55,35 @@ public class CleanupJob : IJob
             .ToListAsync(cancellationToken);
         _context.Alerts.RemoveRange(staleAlerts);
 
-        if (staleHistory.Count > 0 || staleAlerts.Count > 0)
+        var sentCutoffUtc = nowUtc.AddDays(-SentEmailRetentionDays);
+        var failedCutoffUtc = nowUtc.AddDays(-FailedEmailRetentionDays);
+        var staleEmails = await _context.EmailOutbox
+            .Where(m => (m.SentAtUtc != null && m.SentAtUtc < sentCutoffUtc) || (m.SentAtUtc == null && m.CreatedAtUtc < failedCutoffUtc))
+            .ToListAsync(cancellationToken);
+        _context.EmailOutbox.RemoveRange(staleEmails);
+
+        // Reset codes are useless after they expire (15 minutes); keep them a day so a support question can still be answered.
+        var codeCutoffUtc = nowUtc.AddDays(-1);
+        var staleCodes = await _context.OneTimeCodes
+            .Where(c => c.ExpiresAtUtc < codeCutoffUtc)
+            .ToListAsync(cancellationToken);
+        _context.OneTimeCodes.RemoveRange(staleCodes);
+
+        var readCutoffUtc = nowUtc.AddDays(-ReadNotificationRetentionDays);
+        var anyCutoffUtc = nowUtc.AddDays(-AnyNotificationRetentionDays);
+        var staleNotifications = await _context.Notifications
+            .Where(n => (n.ReadAtUtc != null && n.ReadAtUtc < readCutoffUtc) || n.CreatedAtUtc < anyCutoffUtc)
+            .ToListAsync(cancellationToken);
+        _context.Notifications.RemoveRange(staleNotifications);
+
+        var tokenCutoffUtc = nowUtc.AddDays(-PushTokenRetentionDays);
+        var staleTokens = await _context.PushTokens
+            .Where(t => t.LastSeenAtUtc < tokenCutoffUtc)
+            .ToListAsync(cancellationToken);
+        _context.PushTokens.RemoveRange(staleTokens);
+
+        if (staleHistory.Count > 0 || staleAlerts.Count > 0 || staleEmails.Count > 0 || staleCodes.Count > 0
+            || staleNotifications.Count > 0 || staleTokens.Count > 0)
         {
             await _context.SaveChangesAsync(cancellationToken);
         }

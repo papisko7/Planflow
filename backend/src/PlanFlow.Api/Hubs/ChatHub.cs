@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using PlanFlow.Api.Common;
 using PlanFlow.Application.Chat.Commands.SendChatMessage;
+using PlanFlow.Application.Common.Interfaces;
 
 namespace PlanFlow.Api.Hubs;
 
@@ -11,14 +12,17 @@ namespace PlanFlow.Api.Hubs;
 public class ChatHub : Hub
 {
     private readonly ISender _sender;
+    private readonly IChatPresence _presence;
 
-    public ChatHub(ISender sender)
+    public ChatHub(ISender sender, IChatPresence presence)
     {
         _sender = sender;
+        _presence = presence;
     }
 
     public override async Task OnConnectedAsync()
     {
+        await _presence.ConnectedAsync(Context.User!.GetUserId(), Context.ConnectionId);
         var teamId = Context.User!.GetTeamId();
         if (teamId is not null)
         {
@@ -26,6 +30,12 @@ public class ChatHub : Hub
         }
 
         await base.OnConnectedAsync();
+    }
+
+    public override async Task OnDisconnectedAsync(Exception? exception)
+    {
+        await _presence.DisconnectedAsync(Context.User!.GetUserId(), Context.ConnectionId);
+        await base.OnDisconnectedAsync(exception);
     }
 
     public async Task SendMessage(Guid teamId, string content)
