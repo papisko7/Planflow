@@ -1,5 +1,6 @@
 import { ActivityIndicator, View } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { createNavigationContainerRef, NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import DashboardScreen from '../screens/DashboardScreen';
@@ -9,25 +10,40 @@ import CalendarScreen from '../screens/CalendarScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import TaskDetailScreen from '../screens/TaskDetailScreen';
 import ChatScreen from '../screens/ChatScreen';
-import OneNextActionScreen from '../screens/OneNextActionScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 import AuthNavigator from './AuthNavigator';
 import { useSession } from '../context/SessionContext';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 import { colors } from '../theme/theme';
 import type { RootStackParamList, RootTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
+const TAB_ICONS: Record<keyof RootTabParamList, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> = {
+  Dashboard: { active: 'speedometer', inactive: 'speedometer-outline' },
+  Tasks: { active: 'checkbox', inactive: 'checkbox-outline' },
+  Teams: { active: 'people', inactive: 'people-outline' },
+  Calendar: { active: 'calendar', inactive: 'calendar-outline' },
+  Settings: { active: 'settings', inactive: 'settings-outline' },
+};
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+// Lets code outside a screen (a tap on a push notification) navigate.
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 function Tabs() {
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => (
+          <Ionicons name={focused ? TAB_ICONS[route.name].active : TAB_ICONS[route.name].inactive} size={size} color={color} />
+        ),
         headerStyle: { backgroundColor: colors.surface },
         headerTitleStyle: { color: colors.text },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
-      }}
+      })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
       <Tab.Screen name="Tasks" component={TasksScreen} />
@@ -40,6 +56,7 @@ function Tabs() {
 
 export default function RootNavigator() {
   const { status } = useSession();
+  usePushNotifications(status === 'signedIn', navigationRef);
 
   if (status === 'checking') {
     return (
@@ -50,7 +67,7 @@ export default function RootNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       {status === 'signedOut' ? (
         <AuthNavigator />
       ) : (
@@ -59,16 +76,19 @@ export default function RootNavigator() {
             headerStyle: { backgroundColor: colors.surface },
             headerTitleStyle: { color: colors.text },
             headerTintColor: colors.primary,
+            // Swipe right anywhere on the screen to go back (iOS; Android uses the system back gesture).
+            gestureEnabled: true,
+            fullScreenGestureEnabled: true,
           }}
         >
           <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
           <Stack.Screen name="TaskDetail" component={TaskDetailScreen} options={{ title: 'Task Details' }} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
           <Stack.Screen
             name="Chat"
             component={ChatScreen}
             options={({ route }) => ({ title: route.params.teamName })}
           />
-          <Stack.Screen name="OneNextAction" component={OneNextActionScreen} options={{ title: 'Focus Mode' }} />
         </Stack.Navigator>
       )}
     </NavigationContainer>
