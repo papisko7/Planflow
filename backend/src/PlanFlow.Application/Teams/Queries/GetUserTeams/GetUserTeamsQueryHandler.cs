@@ -26,10 +26,13 @@ public class GetUserTeamsQueryHandler : IRequestHandler<GetUserTeamsQuery, IRead
                 m.Team.Id,
                 m.Team.Name,
                 m.Team.Description,
-                MemberCount = m.Team.Members.Count
+                m.Team.IsPersonal,
+                MemberCount = m.Team.Members.Count,
+                m.MuteNotifications,
+                m.MuteChat
             })
             .ToListAsync(cancellationToken);
 
-        return teams.Select(t => new TeamDto(t.Id, t.Name, t.Description, t.MemberCount)).ToList();
+        return teams.Select(t => new TeamDto(t.Id, t.Name, t.Description, t.MemberCount, t.IsPersonal, t.MuteNotifications, t.MuteChat)).ToList();
     }
 }

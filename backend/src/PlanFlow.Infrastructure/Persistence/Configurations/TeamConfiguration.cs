@@ -12,5 +12,6 @@ public class TeamConfiguration : IEntityTypeConfiguration<Team>
         builder.HasKey(t => t.Id);
 
         builder.Property(t => t.Name).IsRequired().HasMaxLength(128);
+        builder.Property(t => t.IsPersonal).HasDefaultValue(false);
     }
 }

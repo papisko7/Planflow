@@ -16,4 +16,10 @@ public class TeamMember : BaseEntity
 
     public TeamRole Role { get; set; } = TeamRole.Member;
     public DateTime JoinedAtUtc { get; set; } = DateTime.UtcNow;
+
+    /// <summary>The member silenced task e-mails coming from this team (per-team override of their notification settings).</summary>
+    public bool MuteNotifications { get; set; }
+
+    /// <summary>The member silenced chat e-mails coming from this team.</summary>
+    public bool MuteChat { get; set; }
 }

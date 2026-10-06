@@ -11,7 +11,9 @@ public enum Permission
     EditOwnTask,
     EditAnyTask,
     DeleteTask,
+    DeleteOwnTask,
     ManageMembers,
     ManageTaskPolicies,
+    EditTeam,
     DeleteTeam
 }

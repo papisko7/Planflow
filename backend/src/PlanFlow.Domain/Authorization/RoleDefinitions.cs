@@ -18,8 +18,10 @@ public static class RoleDefinitions
             Permission.EditOwnTask,
             Permission.EditAnyTask,
             Permission.DeleteTask,
+            Permission.DeleteOwnTask,
             Permission.ManageMembers,
             Permission.ManageTaskPolicies,
+            Permission.EditTeam,
             Permission.DeleteTeam
         },
         [TeamRole.Admin] = new()
@@ -29,18 +31,19 @@ public static class RoleDefinitions
             Permission.EditOwnTask,
             Permission.EditAnyTask,
             Permission.DeleteTask,
+            Permission.DeleteOwnTask,
             Permission.ManageMembers,
-            Permission.ManageTaskPolicies
+            Permission.ManageTaskPolicies,
+            Permission.EditTeam
         },
+        // "Own" = assigned to the member. Members work on their own tasks; assigning work to others,
+        // touching other people's tasks and managing the team stay with Owner/Admin.
         [TeamRole.Member] = new()
         {
             Permission.ViewTasks,
             Permission.CreateTask,
-            Permission.EditOwnTask
-        },
-        [TeamRole.Guest] = new()
-        {
-            Permission.ViewTasks
+            Permission.EditOwnTask,
+            Permission.DeleteOwnTask
         }
     };
 

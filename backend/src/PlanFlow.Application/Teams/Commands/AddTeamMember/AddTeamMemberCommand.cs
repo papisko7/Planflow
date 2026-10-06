@@ -3,9 +3,9 @@ using PlanFlow.Application.Teams.Common;
 
 namespace PlanFlow.Application.Teams.Commands.AddTeamMember;
 
-/// <summary>Adds a user to a team with a given role; only a member with ManageMembers permission may do this.</summary>
+/// <summary>Adds the registered user with the given e-mail to a team; only a member with ManageMembers permission may do this.</summary>
 public record AddTeamMemberCommand(
     Guid TeamId,
     Guid RequestingUserId,
-    Guid NewMemberUserId,
+    string NewMemberEmail,
     Domain.Enums.TeamRole Role) : IRequest<TeamMemberDto>;
