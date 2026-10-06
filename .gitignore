@@ -69,3 +69,6 @@ logs/
 CLAUDE.md
 Memory.md
 Documents/
+
+# Demo startup script state/logs
+scripts/.demo/
