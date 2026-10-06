@@ -1,9 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useScrollToTop } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { restoreSession } from '../services/authService';
-import { createTeam, getMyTeams } from '../services/teamService';
+import { CreateTaskModal } from '../components/CreateTaskModal';
+import { Fab } from '../components/Fab';
+import { TaskCard } from '../components/TaskCard';
+import { TeamMembersCard } from '../components/TeamMembersCard';
+import { TeamSettingsCard } from '../components/TeamSettingsCard';
+import { useTaskActions } from '../hooks/useTaskActions';
+import { createTeam, getMyTeams, getTeamMembers } from '../services/teamService';
 import { getTeamTasks } from '../services/taskService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { getUrgencyTier, URGENCY_TIER_META } from '../utils/urgencyGrouping';
@@ -21,10 +27,8 @@ interface WorkloadRow {
   avgScore: number;
 }
 
-// The backend has no GET /api/teams/{id}/members endpoint and no user-lookup endpoint, so a
-// member's display name can't be resolved from their id — workload is grouped by assignedUserId
-// and labeled with a short id fragment instead of a real name. See PROGRESS.md for the gap.
-function buildWorkload(tasks: TaskDto[]): WorkloadRow[] {
+// Workload is grouped by assignedUserId; names come from the team's member list.
+function buildWorkload(tasks: TaskDto[], names: Map<string, string>): WorkloadRow[] {
   const buckets = new Map<string, TaskDto[]>();
   for (const task of tasks) {
     const key = task.assignedUserId ?? 'unassigned';
@@ -35,7 +39,7 @@ function buildWorkload(tasks: TaskDto[]): WorkloadRow[] {
   return [...buckets.entries()]
     .map(([key, group]) => ({
       key,
-      label: key === 'unassigned' ? 'Unassigned' : `Member ${key.slice(0, 8)}`,
+      label: key === 'unassigned' ? 'Unassigned' : (names.get(key) ?? 'Former member'),
       count: group.length,
       avgScore: group.reduce((sum, t) => sum + t.currentUrgencyScore, 0) / group.length,
     }))
@@ -52,6 +56,7 @@ export default function TeamsScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [creatingTeam, setCreatingTeam] = useState(false);
+  const [creatingTask, setCreatingTask] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
   const [createSubmitting, setCreateSubmitting] = useState(false);
 
@@ -61,12 +66,12 @@ export default function TeamsScreen() {
       setState('signedOut');
       return;
     }
-    const data = await getMyTeams();
+    // The personal workspace is managed from the Tasks tab; this screen is only for shared teams.
+    const data = (await getMyTeams()).filter((t) => !t.isPersonal);
     setTeams(data);
     setState('ready');
-    if (data.length > 0) {
-      setSelectedTeamId((current) => current ?? data[0].id);
-    }
+    // Keep the current selection only while the user is still in that team (they may have just left it).
+    setSelectedTeamId((current) => (data.some((t) => t.id === current) ? current : (data[0]?.id ?? null)));
   }, []);
 
   const load = useCallback(async () => {
@@ -79,11 +84,24 @@ export default function TeamsScreen() {
     }
   }, [loadTeams]);
 
-  useEffect(() => {
-    setState('loading');
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Tabs stay mounted: reload teams on every focus so changes made elsewhere show up without an app reload.
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
+
+  const [reloadTick, setReloadTick] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      setReloadTick((n) => n + 1);
+    }, []),
+  );
+
+  // Swipe / long-press actions on the team's task cards; reloading = refetching this team's tasks.
+  const taskActions = useTaskActions(useCallback(() => setReloadTick((n) => n + 1), []));
+  const listRef = useRef<FlatList<TeamDto>>(null);
+  useScrollToTop(listRef);
 
   useEffect(() => {
     if (!selectedTeamId) return;
@@ -102,7 +120,7 @@ export default function TeamsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [selectedTeamId]);
+  }, [selectedTeamId, reloadTick]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -138,7 +156,23 @@ export default function TeamsScreen() {
     }
   }, [newTeamName]);
 
-  const workload = useMemo(() => buildWorkload(teamTasks), [teamTasks]);
+  const [memberNames, setMemberNames] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    if (!selectedTeamId) return;
+    let cancelled = false;
+    getTeamMembers(selectedTeamId)
+      .then((members) => {
+        if (!cancelled) setMemberNames(new Map(members.map((m) => [m.userId, m.userDisplayName])));
+      })
+      .catch(() => {
+        if (!cancelled) setMemberNames(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTeamId, reloadTick]);
+
+  const workload = useMemo(() => buildWorkload(teamTasks, memberNames), [teamTasks, memberNames]);
   const selectedTeam = teams.find((t) => t.id === selectedTeamId) ?? null;
 
   if (state === 'loading') {
@@ -168,7 +202,9 @@ export default function TeamsScreen() {
   }
 
   return (
+    <View style={styles.screen}>
     <FlatList
+      ref={listRef}
       style={styles.list}
       data={teams}
       keyExtractor={(item) => item.id}
@@ -242,9 +278,16 @@ export default function TeamsScreen() {
       }}
       ListFooterComponent={
         selectedTeam ? (
+          <>
+          <TeamSettingsCard team={selectedTeam} onChanged={load} onDeleted={load} />
+          <TeamMembersCard teamId={selectedTeam.id} onChanged={load} />
           <View style={styles.workloadCard}>
             <View style={styles.headerRow}>
-              <Text style={styles.sectionLabel}>Task distribution — {selectedTeam.name}</Text>
+              <Text style={styles.sectionLabel}>Tasks — {selectedTeam.name}</Text>
+              <View style={styles.headerButtons}>
+              <Pressable testID="team-new-task-button" style={styles.smallButton} onPress={() => setCreatingTask(true)}>
+                <Text style={styles.smallButtonText}>+ Task</Text>
+              </Pressable>
               <Pressable
                 testID="open-team-chat-button"
                 style={styles.smallButton}
@@ -252,6 +295,7 @@ export default function TeamsScreen() {
               >
                 <Text style={styles.smallButtonText}>Chat</Text>
               </Pressable>
+              </View>
             </View>
             {tasksLoading ? (
               <ActivityIndicator color={colors.primary} style={styles.workloadSpinner} />
@@ -272,7 +316,19 @@ export default function TeamsScreen() {
                 </View>
               ))
             )}
+            {!tasksLoading
+              ? teamTasks.map((task) => (
+                  <View key={task.id} style={styles.teamTaskWrap}>
+                    <TaskCard
+                      task={{ ...task, teamName: undefined }}
+                      onPress={() => navigation.navigate('TaskDetail', { taskId: task.id, teamId: task.teamId })}
+                      actions={taskActions}
+                    />
+                  </View>
+                ))
+              : null}
           </View>
+          </>
         ) : null
       }
       ListEmptyComponent={
@@ -283,12 +339,24 @@ export default function TeamsScreen() {
       }
       contentContainerStyle={teams.length === 0 ? styles.emptyContainer : styles.listContent}
     />
+    {teams.length > 0 ? <Fab onPress={() => setCreatingTask(true)} /> : null}
+    <CreateTaskModal
+      visible={creatingTask}
+      teams={teams}
+      tasks={teamTasks}
+      defaultTeamId={selectedTeamId}
+      onClose={() => setCreatingTask(false)}
+      onCreated={() => setReloadTick((n) => n + 1)}
+    />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
   list: { flex: 1, backgroundColor: colors.background },
-  listContent: { padding: spacing.lg, gap: spacing.sm },
+  listContent: { padding: spacing.lg, gap: spacing.sm, paddingBottom: 96 },
+  headerButtons: { flexDirection: 'row', gap: spacing.sm },
   emptyContainer: { flexGrow: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, gap: spacing.xs },
   title: { ...typography.title, color: colors.text },
@@ -335,6 +403,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     gap: spacing.xs,
   },
+  teamTaskWrap: { marginHorizontal: -spacing.lg, marginTop: spacing.xs },
   workloadSpinner: { marginVertical: spacing.md },
   workloadRow: {
     flexDirection: 'row',
