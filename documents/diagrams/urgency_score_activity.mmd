@@ -1,0 +1,82 @@
+---
+title: Urgency Score Algorithm — Activity Diagram
+---
+flowchart TD
+    START([▶ BuildTeamScoreLogs\ncalled with activeTasks + nowUtc]):::terminal
+    START --> LOAD[Index tasks by ID\nbuild blockedBy lookup]
+
+    LOAD --> FOREACH[For each task in activeTasks]
+
+    FOREACH --> CACHED{Effective score\ncached?}
+    CACHED -- Yes --> USE_CACHE[Use cached value]
+    CACHED -- No --> CYCLE{Task in\nvisiting set?}
+
+    CYCLE -- Yes --> RETURN0[Return 0.0\ncycle guard]
+    CYCLE -- No --> MARK[Add task to visiting set]
+
+    MARK --> DOWNSTREAM[For each task this one blocks]
+    DOWNSTREAM --> RECURSE[Recursively call\nEffective on downstream]
+    RECURSE --> INHERIT["blockingComponent =\n0.9 × max(downstream scores)"]
+
+    INHERIT --> DDECAY
+
+    subgraph DDECAY [Deadline Component]
+        direction TB
+        HAS_DL{Has deadline?}
+        HAS_DL -- No --> D0[deadlineComp = 0.0]
+        HAS_DL -- Yes --> OVERDUE{daysRemaining ≤ 0?}
+        OVERDUE -- Yes --> D1[deadlineComp = 1.0]
+        OVERDUE -- No --> DEXP["deadlineComp = e^(−days/7)"]
+    end
+
+    DDECAY --> IMPACT
+
+    subgraph IMPACT [Impact Component]
+        direction TB
+        HAS_IMP{ImpactScore set?}
+        HAS_IMP -- Yes --> INORM["impactComp = score / 10"]
+        HAS_IMP -- No --> INULL["impactComp = null\n(unrated)"]
+    end
+
+    IMPACT --> OVERRIDE
+
+    subgraph OVERRIDE [Override Component]
+        direction TB
+        HAS_OV{ManualOverride\nset?}
+        HAS_OV -- No --> OV0[overrideComp = 0.0]
+        HAS_OV -- Yes --> EXPIRED{Override\nexpired?}
+        EXPIRED -- Yes --> OV0
+        EXPIRED -- No --> OVAL["overrideComp = clamp(override, 0, 1)"]
+    end
+
+    OVERRIDE --> WSUM["Weighted sum\n0.45×deadline + 0.20×blocking + 0.10×override"]
+
+    WSUM --> NULL_IMP{impactComp\nis null?}
+    NULL_IMP -- No --> ADDIMP["sum += 0.25 × impactComp"]
+    NULL_IMP -- Yes --> RENORM["sum /= 0.75\n(renormalize missing weight)"]
+
+    ADDIMP --> CLAMP1["score = clamp(sum, 0, 1)"]
+    RENORM --> CLAMP1
+
+    CLAMP1 --> IMMINENT{daysRemaining ≤ 1\nor overdue?}
+    IMMINENT -- Yes --> FLOOR["score = max(score, 0.85)\nimminent floor"]
+    IMMINENT -- No --> INHERIT_FLOOR
+    FLOOR --> INHERIT_FLOOR["score = max(score, blockingComp)\npriority inheritance"]
+
+    INHERIT_FLOOR --> CACHE[Store in effective cache\nRemove from visiting set]
+    USE_CACHE --> BLOCKED_CHECK
+    RETURN0 --> BLOCKED_CHECK
+    CACHE --> BLOCKED_CHECK
+
+    BLOCKED_CHECK{Task is blocked by\nunfinished task?}
+    BLOCKED_CHECK -- Yes --> PENALTY["finalScore = effectiveScore × 0.5"]
+    BLOCKED_CHECK -- No --> NOPEN["finalScore = effectiveScore"]
+
+    PENALTY --> BUILDLOG[Build UrgencyScoreLog\nwith all components + finalScore]
+    NOPEN --> BUILDLOG
+
+    BUILDLOG --> MORE{More tasks?}
+    MORE -- Yes --> FOREACH
+    MORE -- No --> END([◀ Return logs dictionary]):::terminal
+
+    classDef terminal fill:#1d4ed8,stroke:#1d4ed8,color:#fff
