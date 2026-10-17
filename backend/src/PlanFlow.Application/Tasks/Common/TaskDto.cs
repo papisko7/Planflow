@@ -3,7 +3,7 @@ using PlanFlow.Domain.Entities;
 namespace PlanFlow.Application.Tasks.Common;
 
 /// <summary>
-/// Flat projection of a <see cref="TaskItem"/> returned to callers outside the Application layer,
+/// Flat projection of a <see cref="CalendarItem"/> returned to callers outside the Application layer,
 /// so handlers never leak EF Core-tracked entities across the CQRS boundary.
 /// </summary>
 public record TaskDto(
@@ -20,9 +20,20 @@ public record TaskDto(
     DateTime? ManualUrgencyOverrideExpiresAtUtc,
     double CurrentUrgencyScore,
     DateTime CreatedAtUtc,
-    DateTime? UpdatedAtUtc)
+    DateTime? UpdatedAtUtc,
+    Domain.Enums.TaskType TaskType,
+    DateTime? StartUtc,
+    DateTime? EndUtc,
+    double? EstimatedEffortHours,
+    bool IsRecurring,
+    int? RecurrenceIntervalHours,
+    DateTime? RecurrenceEndsAtUtc,
+    bool UseAiEnhancement,
+    double? AiImpactScore,
+    string? AiImpactReasoning,
+    bool IsDataIncomplete)
 {
-    public static TaskDto FromEntity(TaskItem task) => new(
+    public static TaskDto FromEntity(CalendarItem task) => new(
         task.Id,
         task.TeamId,
         task.AssignedUserId,
@@ -36,5 +47,16 @@ public record TaskDto(
         task.ManualUrgencyOverrideExpiresAtUtc,
         task.CurrentUrgencyScore,
         task.CreatedAtUtc,
-        task.UpdatedAtUtc);
+        task.UpdatedAtUtc,
+        task.TaskType,
+        task.StartUtc,
+        task.EndUtc,
+        task.EstimatedEffortHours,
+        task.IsRecurring,
+        task.RecurrenceIntervalHours,
+        task.RecurrenceEndsAtUtc,
+        task.UseAiEnhancement,
+        task.AiImpactScore,
+        task.AiImpactReasoning,
+        task.IsDataIncomplete);
 }

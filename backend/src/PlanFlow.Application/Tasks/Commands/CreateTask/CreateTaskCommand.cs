@@ -12,4 +12,12 @@ public record CreateTaskCommand(
     DateTime? DeadlineUtc,
     int? ImpactScore,
     Guid? BlockedByTaskId,
-    Guid? CreatedByUserId) : IRequest<TaskDto>;
+    Guid? CreatedByUserId,
+    Domain.Enums.TaskType TaskType = Domain.Enums.TaskType.Task,
+    DateTime? StartUtc = null,
+    double? EstimatedEffortHours = null,
+    bool IsRecurring = false,
+    int? RecurrenceIntervalHours = null,
+    DateTime? RecurrenceEndsAtUtc = null,
+    bool UseAiEnhancement = false,
+    DateTime? EndUtc = null) : IRequest<TaskDto>, ITaskScheduleFields;

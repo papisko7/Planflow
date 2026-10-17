@@ -221,7 +221,7 @@ public class SecurityIntegrationTests : IClassFixture<CustomWebApplicationFactor
         using (var scope = _factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
-            context.UrgencyScoreLogs.Add(new UrgencyScoreLog { TaskItemId = taskId, FinalScore = 0.5, TriggerSource = ScoreTriggerSource.ManualCreate });
+            context.UrgencyScoreLogs.Add(new UrgencyScoreLog { CalendarItemId = taskId, FinalScore = 0.5, TriggerSource = ScoreTriggerSource.ManualCreate });
             await context.SaveChangesAsync(CancellationToken.None);
         }
         var client = await ClientForAsync(userId, teamId, TeamRole.Member);
@@ -314,7 +314,7 @@ public class SecurityIntegrationTests : IClassFixture<CustomWebApplicationFactor
         using var scope = _factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
 
-        var task = new TaskItem
+        var task = new CalendarItem
         {
             Id = Guid.NewGuid(),
             TeamId = teamId,
@@ -322,7 +322,7 @@ public class SecurityIntegrationTests : IClassFixture<CustomWebApplicationFactor
             Title = "Cross-team task",
             ImpactScore = 1
         };
-        context.Tasks.Add(task);
+        context.CalendarItems.Add(task);
         await context.SaveChangesAsync(CancellationToken.None);
 
         return task.Id;

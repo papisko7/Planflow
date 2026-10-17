@@ -15,8 +15,8 @@ namespace PlanFlow.Infrastructure.BackgroundJobs;
 
 /// <summary>
 /// Polls every active Google Calendar connection every 5 minutes and upserts Google events into
-/// <see cref="TaskItem"/> rows. Idempotency comes from the unique (SourceCalendarIntegrationId,
-/// ExternalCalendarEventId) pair enforced in <c>TaskItemConfiguration</c> — re-running the job
+/// <see cref="CalendarItem"/> rows. Idempotency comes from the unique (SourceCalendarIntegrationId,
+/// ExternalCalendarEventId) pair enforced in <c>CalendarItemConfiguration</c> — re-running the job
 /// never creates duplicates, it just finds and updates the same row.
 ///
 /// One user's Google account failing (revoked consent, Google outage) must not stop the other
@@ -163,7 +163,7 @@ public class SyncCalendarJob : IJob
 
         foreach (var calendarEvent in events)
         {
-            var task = await _context.Tasks.FirstOrDefaultAsync(
+            var task = await _context.CalendarItems.FirstOrDefaultAsync(
                 t => t.SourceCalendarIntegrationId == integration.Id && t.ExternalCalendarEventId == calendarEvent.Id,
                 cancellationToken);
 
@@ -185,7 +185,7 @@ public class SyncCalendarJob : IJob
 
             if (task is null)
             {
-                task = new TaskItem
+                task = new CalendarItem
                 {
                     TeamId = destinationTeamId.Value,
                     AssignedUserId = integration.UserId,
@@ -195,7 +195,7 @@ public class SyncCalendarJob : IJob
                     SourceCalendarIntegrationId = integration.Id,
                     ExternalCalendarEventId = calendarEvent.Id
                 };
-                _context.Tasks.Add(task);
+                _context.CalendarItems.Add(task);
                 created++;
             }
             else

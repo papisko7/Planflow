@@ -18,14 +18,14 @@ public class GetTaskScoreHistoryQueryHandler : IRequestHandler<GetTaskScoreHisto
 
     public async Task<IReadOnlyList<UrgencyScoreBreakdownDto>> Handle(GetTaskScoreHistoryQuery request, CancellationToken cancellationToken)
     {
-        if (!await _context.Tasks.AnyAsync(t => t.Id == request.TaskId, cancellationToken))
+        if (!await _context.CalendarItems.AnyAsync(t => t.Id == request.TaskId, cancellationToken))
         {
-            throw new NotFoundException(nameof(TaskItem), request.TaskId);
+            throw new NotFoundException(nameof(CalendarItem), request.TaskId);
         }
 
         var logs = await _context.UrgencyScoreLogs
             .AsNoTracking()
-            .Where(l => l.TaskItemId == request.TaskId)
+            .Where(l => l.CalendarItemId == request.TaskId)
             .OrderByDescending(l => l.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 

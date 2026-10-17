@@ -20,7 +20,7 @@ public class PlanFlowDbContext : DbContext, IApplicationDbContext
     public DbSet<RefreshSession> RefreshSessions => Set<RefreshSession>();
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
-    public DbSet<TaskItem> Tasks => Set<TaskItem>();
+    public DbSet<CalendarItem> CalendarItems => Set<CalendarItem>();
     public DbSet<TaskHistory> TaskHistories => Set<TaskHistory>();
     public DbSet<UrgencyScoreLog> UrgencyScoreLogs => Set<UrgencyScoreLog>();
     public DbSet<CalendarIntegration> CalendarIntegrations => Set<CalendarIntegration>();

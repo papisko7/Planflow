@@ -4,7 +4,7 @@ namespace PlanFlow.Application.Common.Interfaces;
 /// A single normalized Google Calendar event, decoupled from Google's wire format so
 /// SyncCalendarJob's mapping logic never touches JSON field names directly.
 /// </summary>
-/// <param name="Id">Google's event ID — the idempotency key SyncCalendarJob upserts <see cref="PlanFlow.Domain.Entities.TaskItem"/> rows on.</param>
+/// <param name="Id">Google's event ID — the idempotency key SyncCalendarJob upserts <see cref="PlanFlow.Domain.Entities.CalendarItem"/> rows on.</param>
 /// <param name="Title">Event summary/title; null for events with no title set.</param>
 /// <param name="StartUtc">Event start; null for an all-day event with no timed start.</param>
 /// <param name="EndUtc">Event end, used as the mapped task's deadline (falls back to <see cref="StartUtc"/> when absent).</param>

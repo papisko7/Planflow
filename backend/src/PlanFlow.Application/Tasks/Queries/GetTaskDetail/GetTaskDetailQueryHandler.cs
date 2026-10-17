@@ -21,10 +21,10 @@ public class GetTaskDetailQueryHandler : IRequestHandler<GetTaskDetailQuery, Tas
 
     public async Task<TaskDetailDto> Handle(GetTaskDetailQuery request, CancellationToken cancellationToken)
     {
-        var task = await _context.Tasks
+        var task = await _context.CalendarItems
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.Id == request.TaskId, cancellationToken)
-            ?? throw new NotFoundException(nameof(TaskItem), request.TaskId);
+            ?? throw new NotFoundException(nameof(CalendarItem), request.TaskId);
 
         // Only the urgency breakdown is cached: it's the expensive/recomputed-often piece,
         // while the task row itself is already a cheap primary-key lookup.
@@ -35,7 +35,7 @@ public class GetTaskDetailQueryHandler : IRequestHandler<GetTaskDetailQuery, Tas
         {
             var latestLog = await _context.UrgencyScoreLogs
                 .AsNoTracking()
-                .Where(l => l.TaskItemId == request.TaskId)
+                .Where(l => l.CalendarItemId == request.TaskId)
                 .OrderByDescending(l => l.CreatedAtUtc)
                 .FirstOrDefaultAsync(cancellationToken);
 

@@ -18,6 +18,6 @@ public class Team : BaseEntity
     public bool IsPersonal { get; set; }
 
     public ICollection<TeamMember> Members { get; set; } = new List<TeamMember>();
-    public ICollection<TaskItem> Tasks { get; set; } = new List<TaskItem>();
+    public ICollection<CalendarItem> CalendarItems { get; set; } = new List<CalendarItem>();
     public ICollection<ChatMessage> ChatMessages { get; set; } = new List<ChatMessage>();
 }

@@ -58,7 +58,7 @@ public static class Seeding
         for (var i = 0; i < count; i++)
         {
             var id = Guid.NewGuid();
-            var task = new TaskItem
+            var task = new CalendarItem
             {
                 Id = id,
                 TeamId = teamId,
@@ -74,7 +74,7 @@ public static class Seeding
                 CurrentUrgencyScore = 0.0
             };
 
-            context.Tasks.Add(task);
+            context.CalendarItems.Add(task);
             previousIds.Add(id);
 
             if ((i + 1) % batchSize == 0 || i == count - 1)

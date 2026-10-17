@@ -21,15 +21,15 @@ public class TeamUrgencyRecalculatorTests
         return (db, team.Id);
     }
 
-    private static TaskItem AddTask(PlanFlowDbContext db, Guid teamId, DateTime? deadline = null, int? impact = 5,
+    private static CalendarItem AddTask(PlanFlowDbContext db, Guid teamId, DateTime? deadline = null, int? impact = 5,
         Guid? blockedBy = null, TaskStatus status = TaskStatus.Todo)
     {
-        var task = new TaskItem
+        var task = new CalendarItem
         {
             TeamId = teamId, Title = "t", DeadlineUtc = deadline, ImpactScore = impact,
             BlockedByTaskId = blockedBy, Status = status
         };
-        db.Tasks.Add(task);
+        db.CalendarItems.Add(task);
         return task;
     }
 
@@ -46,7 +46,7 @@ public class TeamUrgencyRecalculatorTests
 
         Assert.Contains(task.Id, changed);
         Assert.True(task.CurrentUrgencyScore > 0.8);
-        Assert.Single(db.UrgencyScoreLogs, l => l.TaskItemId == task.Id);
+        Assert.Single(db.UrgencyScoreLogs, l => l.CalendarItemId == task.Id);
     }
 
     [Fact]
@@ -93,7 +93,7 @@ public class TeamUrgencyRecalculatorTests
         await db.SaveChangesAsync();
 
         Assert.Contains(created.Id, changed);
-        Assert.Equal(ScoreTriggerSource.ManualCreate, db.UrgencyScoreLogs.Single(l => l.TaskItemId == created.Id).TriggerSource);
+        Assert.Equal(ScoreTriggerSource.ManualCreate, db.UrgencyScoreLogs.Single(l => l.CalendarItemId == created.Id).TriggerSource);
     }
 
     [Fact]
@@ -125,7 +125,7 @@ public class TeamUrgencyRecalculatorTests
         await TeamUrgencyRecalculator.RecalculateTeamAsync(db, teamId, Now, ScoreTriggerSource.ManualUpdate, blocker, CancellationToken.None);
 
         Assert.True(dependent.CurrentUrgencyScore > whileBlocked);
-        Assert.False(db.UrgencyScoreLogs.Local.Last(l => l.TaskItemId == dependent.Id).IsBlocked);
+        Assert.False(db.UrgencyScoreLogs.Local.Last(l => l.CalendarItemId == dependent.Id).IsBlocked);
     }
 
     [Fact]

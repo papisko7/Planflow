@@ -28,6 +28,9 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("CalendarItemId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -41,9 +44,6 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("ReadAtUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("TaskItemId")
-                        .HasColumnType("uuid");
-
                     b.Property<int>("Type")
                         .HasColumnType("integer");
 
@@ -55,7 +55,7 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TaskItemId");
+                    b.HasIndex("CalendarItemId");
 
                     b.HasIndex("UserId");
 
@@ -113,6 +113,112 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("calendar_integrations", (string)null);
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.CalendarItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AiImpactReasoning")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<double?>("AiImpactScore")
+                        .HasColumnType("double precision");
+
+                    b.Property<Guid?>("AssignedUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BlockedByTaskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double>("CurrentUrgencyScore")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime?>("DeadlineUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("EndUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double?>("EstimatedEffortHours")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("ExternalCalendarEventId")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<int?>("ImpactScore")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDataIncomplete")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsRecurring")
+                        .HasColumnType("boolean");
+
+                    b.Property<double?>("ManualUrgencyOverride")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime?>("ManualUrgencyOverrideExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("RecurrenceEndsAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("RecurrenceIntervalHours")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("SourceCalendarIntegrationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("StartUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TaskType")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("UseAiEnhancement")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignedUserId");
+
+                    b.HasIndex("BlockedByTaskId");
+
+                    b.HasIndex("CurrentUrgencyScore")
+                        .IsDescending();
+
+                    b.HasIndex("TeamId");
+
+                    b.HasIndex("SourceCalendarIntegrationId", "ExternalCalendarEventId")
+                        .IsUnique()
+                        .HasFilter("\"SourceCalendarIntegrationId\" IS NOT NULL");
+
+                    b.ToTable("calendar_items", (string)null);
                 });
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.ChatMessage", b =>
@@ -430,6 +536,9 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("CalendarItemId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("ChangeType")
                         .HasColumnType("integer");
 
@@ -448,9 +557,6 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Property<string>("OldValue")
                         .HasColumnType("text");
 
-                    b.Property<Guid>("TaskItemId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -458,81 +564,9 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ChangedByUserId");
 
-                    b.HasIndex("TaskItemId", "CreatedAtUtc");
+                    b.HasIndex("CalendarItemId", "CreatedAtUtc");
 
                     b.ToTable("task_histories", (string)null);
-                });
-
-            modelBuilder.Entity("PlanFlow.Domain.Entities.TaskItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("AssignedUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("BlockedByTaskId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<double>("CurrentUrgencyScore")
-                        .HasColumnType("double precision");
-
-                    b.Property<DateTime?>("DeadlineUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ExternalCalendarEventId")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<int?>("ImpactScore")
-                        .HasColumnType("integer");
-
-                    b.Property<double?>("ManualUrgencyOverride")
-                        .HasColumnType("double precision");
-
-                    b.Property<DateTime?>("ManualUrgencyOverrideExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("SourceCalendarIntegrationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("TeamId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AssignedUserId");
-
-                    b.HasIndex("BlockedByTaskId");
-
-                    b.HasIndex("CurrentUrgencyScore")
-                        .IsDescending();
-
-                    b.HasIndex("TeamId");
-
-                    b.HasIndex("SourceCalendarIntegrationId", "ExternalCalendarEventId")
-                        .IsUnique()
-                        .HasFilter("\"SourceCalendarIntegrationId\" IS NOT NULL");
-
-                    b.ToTable("tasks", (string)null);
                 });
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.Team", b =>
@@ -614,6 +648,9 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Property<double>("BlockingComponent")
                         .HasColumnType("double precision");
 
+                    b.Property<Guid>("CalendarItemId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -629,8 +666,9 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsBlocked")
                         .HasColumnType("boolean");
 
-                    b.Property<Guid>("TaskItemId")
-                        .HasColumnType("uuid");
+                    b.Property<string>("ReasonText")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
 
                     b.Property<int>("TriggerSource")
                         .HasColumnType("integer");
@@ -643,7 +681,7 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TaskItemId", "CreatedAtUtc");
+                    b.HasIndex("CalendarItemId", "CreatedAtUtc");
 
                     b.ToTable("urgency_score_logs", (string)null);
                 });
@@ -729,9 +767,9 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.Alert", b =>
                 {
-                    b.HasOne("PlanFlow.Domain.Entities.TaskItem", "TaskItem")
+                    b.HasOne("PlanFlow.Domain.Entities.CalendarItem", "CalendarItem")
                         .WithMany("Alerts")
-                        .HasForeignKey("TaskItemId")
+                        .HasForeignKey("CalendarItemId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("PlanFlow.Domain.Entities.User", "User")
@@ -740,7 +778,7 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("TaskItem");
+                    b.Navigation("CalendarItem");
 
                     b.Navigation("User");
                 });
@@ -754,6 +792,38 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.CalendarItem", b =>
+                {
+                    b.HasOne("PlanFlow.Domain.Entities.User", "AssignedUser")
+                        .WithMany("AssignedTasks")
+                        .HasForeignKey("AssignedUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PlanFlow.Domain.Entities.CalendarItem", "BlockedByTask")
+                        .WithMany("BlockedTasks")
+                        .HasForeignKey("BlockedByTaskId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PlanFlow.Domain.Entities.CalendarIntegration", "SourceCalendarIntegration")
+                        .WithMany()
+                        .HasForeignKey("SourceCalendarIntegrationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PlanFlow.Domain.Entities.Team", "Team")
+                        .WithMany("CalendarItems")
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AssignedUser");
+
+                    b.Navigation("BlockedByTask");
+
+                    b.Navigation("SourceCalendarIntegration");
+
+                    b.Navigation("Team");
                 });
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.ChatMessage", b =>
@@ -832,52 +902,20 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.TaskHistory", b =>
                 {
+                    b.HasOne("PlanFlow.Domain.Entities.CalendarItem", "CalendarItem")
+                        .WithMany("History")
+                        .HasForeignKey("CalendarItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("PlanFlow.Domain.Entities.User", "ChangedByUser")
                         .WithMany()
                         .HasForeignKey("ChangedByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("PlanFlow.Domain.Entities.TaskItem", "TaskItem")
-                        .WithMany("History")
-                        .HasForeignKey("TaskItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.Navigation("CalendarItem");
 
                     b.Navigation("ChangedByUser");
-
-                    b.Navigation("TaskItem");
-                });
-
-            modelBuilder.Entity("PlanFlow.Domain.Entities.TaskItem", b =>
-                {
-                    b.HasOne("PlanFlow.Domain.Entities.User", "AssignedUser")
-                        .WithMany("AssignedTasks")
-                        .HasForeignKey("AssignedUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("PlanFlow.Domain.Entities.TaskItem", "BlockedByTask")
-                        .WithMany("BlockedTasks")
-                        .HasForeignKey("BlockedByTaskId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("PlanFlow.Domain.Entities.CalendarIntegration", "SourceCalendarIntegration")
-                        .WithMany()
-                        .HasForeignKey("SourceCalendarIntegrationId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("PlanFlow.Domain.Entities.Team", "Team")
-                        .WithMany("Tasks")
-                        .HasForeignKey("TeamId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("AssignedUser");
-
-                    b.Navigation("BlockedByTask");
-
-                    b.Navigation("SourceCalendarIntegration");
-
-                    b.Navigation("Team");
                 });
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.TeamMember", b =>
@@ -901,13 +939,13 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.UrgencyScoreLog", b =>
                 {
-                    b.HasOne("PlanFlow.Domain.Entities.TaskItem", "TaskItem")
+                    b.HasOne("PlanFlow.Domain.Entities.CalendarItem", "CalendarItem")
                         .WithMany("UrgencyScoreLogs")
-                        .HasForeignKey("TaskItemId")
+                        .HasForeignKey("CalendarItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("TaskItem");
+                    b.Navigation("CalendarItem");
                 });
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.UserDevice", b =>
@@ -921,7 +959,7 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("PlanFlow.Domain.Entities.TaskItem", b =>
+            modelBuilder.Entity("PlanFlow.Domain.Entities.CalendarItem", b =>
                 {
                     b.Navigation("Alerts");
 
@@ -934,11 +972,11 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.Team", b =>
                 {
+                    b.Navigation("CalendarItems");
+
                     b.Navigation("ChatMessages");
 
                     b.Navigation("Members");
-
-                    b.Navigation("Tasks");
                 });
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.User", b =>

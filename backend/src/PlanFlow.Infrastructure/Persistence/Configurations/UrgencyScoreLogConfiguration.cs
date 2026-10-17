@@ -11,12 +11,14 @@ public class UrgencyScoreLogConfiguration : IEntityTypeConfiguration<UrgencyScor
         builder.ToTable("urgency_score_logs");
         builder.HasKey(l => l.Id);
 
-        // Evaluation-chapter charts read "score history for task X over time".
-        builder.HasIndex(l => new { l.TaskItemId, l.CreatedAtUtc });
+        builder.Property(l => l.ReasonText).HasMaxLength(512);
 
-        builder.HasOne(l => l.TaskItem)
+        // Evaluation-chapter charts read "score history for task X over time".
+        builder.HasIndex(l => new { l.CalendarItemId, l.CreatedAtUtc });
+
+        builder.HasOne(l => l.CalendarItem)
             .WithMany(t => t.UrgencyScoreLogs)
-            .HasForeignKey(l => l.TaskItemId)
+            .HasForeignKey(l => l.CalendarItemId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

@@ -12,8 +12,8 @@ public record TaskSnapshot(
     string Title, string? Description, Domain.Enums.TaskStatus Status, Guid? AssignedUserId,
     DateTime? DeadlineUtc, int? ImpactScore, Guid? BlockedByTaskId)
 {
-    public static TaskSnapshot Of(TaskItem task) => new(
-        task.Title, task.Description, task.Status, task.AssignedUserId, task.DeadlineUtc, task.ImpactScore, task.BlockedByTaskId);
+    public static TaskSnapshot Of(CalendarItem task) => new(
+        task.Title, task.Description, task.Status, task.AssignedUserId, task.DueUtc, task.ImpactScore, task.BlockedByTaskId);
 }
 
 /// <summary>
@@ -23,7 +23,7 @@ public record TaskSnapshot(
 internal static class TaskNotifications
 {
     public static async Task OnCreatedAsync(
-        IApplicationDbContext context, INotificationService notifications, TaskItem task, Guid? actorUserId, CancellationToken cancellationToken)
+        IApplicationDbContext context, INotificationService notifications, CalendarItem task, Guid? actorUserId, CancellationToken cancellationToken)
     {
         var teamName = await NotificationLookups.TeamNameAsync(context, task.TeamId, cancellationToken);
         var actorName = await NotificationLookups.UserNameAsync(context, actorUserId, cancellationToken);
@@ -32,7 +32,7 @@ internal static class TaskNotifications
         {
             await notifications.NotifyAsync(
                 NotificationEvent.TaskAssignedToYou, new[] { assignee },
-                EmailTemplates.TaskAssigned(task.Title, teamName, actorName, task.DeadlineUtc),
+                EmailTemplates.TaskAssigned(task.Title, teamName, actorName, task.DueUtc),
                 task.TeamId, actorUserId, cancellationToken, task.Id);
         }
 
@@ -57,7 +57,7 @@ internal static class TaskNotifications
     }
 
     public static async Task OnUpdatedAsync(
-        IApplicationDbContext context, INotificationService notifications, TaskItem task, TaskSnapshot before,
+        IApplicationDbContext context, INotificationService notifications, CalendarItem task, TaskSnapshot before,
         Guid? actorUserId, CancellationToken cancellationToken)
     {
         var teamName = await NotificationLookups.TeamNameAsync(context, task.TeamId, cancellationToken);
@@ -69,7 +69,7 @@ internal static class TaskNotifications
             {
                 await notifications.NotifyAsync(
                     NotificationEvent.TaskAssignedToYou, new[] { newAssignee },
-                    EmailTemplates.TaskAssigned(task.Title, teamName, actorName, task.DeadlineUtc),
+                    EmailTemplates.TaskAssigned(task.Title, teamName, actorName, task.DueUtc),
                     task.TeamId, actorUserId, cancellationToken, task.Id);
             }
 
@@ -99,7 +99,7 @@ internal static class TaskNotifications
     }
 
     public static async Task OnDeletedAsync(
-        IApplicationDbContext context, INotificationService notifications, TaskItem task, Guid? actorUserId, CancellationToken cancellationToken)
+        IApplicationDbContext context, INotificationService notifications, CalendarItem task, Guid? actorUserId, CancellationToken cancellationToken)
     {
         if (task.AssignedUserId is not { } assignee)
         {
@@ -116,7 +116,7 @@ internal static class TaskNotifications
     }
 
     /// <summary>One short phrase per changed field; an empty list means nothing worth an e-mail changed.</summary>
-    internal static List<string> DescribeChanges(TaskSnapshot before, TaskItem after)
+    internal static List<string> DescribeChanges(TaskSnapshot before, CalendarItem after)
     {
         var changes = new List<string>();
 

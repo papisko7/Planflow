@@ -6,6 +6,6 @@ namespace PlanFlow.Application.Alerts.Commands.CreateAlert;
 /// <summary>Creates a user-facing notification, typically raised by AlertingJob (Phase 1.5).</summary>
 public record CreateAlertCommand(
     Guid UserId,
-    Guid? TaskItemId,
+    Guid? CalendarItemId,
     Domain.Enums.AlertType Type,
     string Message) : IRequest<AlertDto>;

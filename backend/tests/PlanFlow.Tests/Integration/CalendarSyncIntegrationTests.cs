@@ -149,7 +149,7 @@ public class CalendarSyncIntegrationTests
         var job = CreateJob(context, calendarClient, BuildOAuthClient(new StubHttpMessageHandler()));
         await job.Execute(CreateJobContext().Object);
 
-        var task = await context.Tasks.SingleAsync();
+        var task = await context.CalendarItems.SingleAsync();
         Assert.Equal(team.Id, task.TeamId);
         Assert.Equal("Thesis defense prep", task.Title);
         Assert.Equal(deadline, task.DeadlineUtc);
@@ -176,7 +176,7 @@ public class CalendarSyncIntegrationTests
         await job.Execute(CreateJobContext().Object);
         await job.Execute(CreateJobContext().Object);
 
-        Assert.Equal(1, await context.Tasks.CountAsync());
+        Assert.Equal(1, await context.CalendarItems.CountAsync());
     }
 
     // --- Scenario B: expired/invalid token (401) triggers a refresh-and-retry --------------
@@ -203,7 +203,7 @@ public class CalendarSyncIntegrationTests
         var job = CreateJob(context, calendarClient, oauthClient);
         await job.Execute(CreateJobContext().Object);
 
-        var task = await context.Tasks.SingleAsync();
+        var task = await context.CalendarItems.SingleAsync();
         Assert.Equal("Post-refresh event", task.Title);
         Assert.Equal(2, calendarHandler.Requests.Count); // initial 401 + retry after refresh
         Assert.Single(oauthHandler.Requests); // exactly one forced refresh call
@@ -235,8 +235,8 @@ public class CalendarSyncIntegrationTests
         var job = CreateJob(context, calendarClient, oauthClient);
         await job.Execute(CreateJobContext().Object);
 
-        Assert.Equal(1, await context.Tasks.CountAsync());
-        var task = await context.Tasks.SingleAsync();
+        Assert.Equal(1, await context.CalendarItems.CountAsync());
+        var task = await context.CalendarItems.SingleAsync();
         Assert.Equal(healthyTeam.Id, task.TeamId);
     }
 
@@ -266,8 +266,8 @@ public class CalendarSyncIntegrationTests
         var exception = await Record.ExceptionAsync(() => job.Execute(CreateJobContext().Object));
 
         Assert.Null(exception); // SyncCalendarJob must swallow the exhausted-retry failure, not propagate it
-        Assert.Equal(1, await context.Tasks.CountAsync());
-        var task = await context.Tasks.SingleAsync();
+        Assert.Equal(1, await context.CalendarItems.CountAsync());
+        var task = await context.CalendarItems.SingleAsync();
         Assert.Equal(healthyTeam.Id, task.TeamId);
     }
 
@@ -294,7 +294,7 @@ public class CalendarSyncIntegrationTests
         var exception = await Record.ExceptionAsync(() => job.Execute(CreateJobContext().Object));
 
         Assert.Null(exception);
-        Assert.Equal(0, await context.Tasks.CountAsync());
+        Assert.Equal(0, await context.CalendarItems.CountAsync());
         var integrations = await context.CalendarIntegrations.ToListAsync();
         Assert.All(integrations, i => Assert.True(i.IsActive)); // a transient failure must never deactivate the connection
     }
@@ -322,7 +322,7 @@ public class CalendarSyncIntegrationTests
         await job.Execute(CreateJobContext().Object);
         var elapsed = DateTime.UtcNow - startedAt;
 
-        var task = await context.Tasks.SingleAsync();
+        var task = await context.CalendarItems.SingleAsync();
         Assert.Equal("Synced after backoff", task.Title);
         Assert.Equal(team.Id, task.TeamId);
         Assert.Equal(3, calendarHandler.Requests.Count); // 2 rate-limited attempts + 1 successful retry
@@ -349,6 +349,6 @@ public class CalendarSyncIntegrationTests
         var exception = await Record.ExceptionAsync(() => job.Execute(CreateJobContext().Object));
 
         Assert.Null(exception);
-        Assert.Equal(0, await context.Tasks.CountAsync());
+        Assert.Equal(0, await context.CalendarItems.CountAsync());
     }
 }

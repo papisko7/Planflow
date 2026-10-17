@@ -26,9 +26,9 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
 
     public async Task<TaskDto> Handle(UpdateTaskCommand request, CancellationToken cancellationToken)
     {
-        var task = await _context.Tasks
+        var task = await _context.CalendarItems
             .FirstOrDefaultAsync(t => t.Id == request.TaskId, cancellationToken)
-            ?? throw new NotFoundException(nameof(TaskItem), request.TaskId);
+            ?? throw new NotFoundException(nameof(CalendarItem), request.TaskId);
 
         await TaskAssignment.EnsureAssigneeInTeamAsync(_context, task.TeamId, request.AssignedUserId, cancellationToken);
         await TaskDependencies.EnsureValidBlockerAsync(_context, task.TeamId, task.Id, request.BlockedByTaskId, cancellationToken);
@@ -41,7 +41,8 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
         task.Description = request.Description;
         task.Status = request.Status;
         task.AssignedUserId = request.AssignedUserId;
-        task.DeadlineUtc = request.DeadlineUtc;
+        TaskScheduleMapper.Apply(task, request);
+        task.UseAiEnhancement = request.UseAiEnhancement;
         task.ImpactScore = request.ImpactScore;
         task.BlockedByTaskId = request.BlockedByTaskId;
         task.ManualUrgencyOverride = request.ManualUrgencyOverride;
@@ -56,7 +57,7 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
 
         _context.TaskHistories.Add(new TaskHistory
         {
-            TaskItemId = task.Id,
+            CalendarItemId = task.Id,
             ChangedByUserId = request.UpdatedByUserId,
             ChangeType = previousStatus != task.Status
                 ? TaskChangeType.StatusChanged

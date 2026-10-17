@@ -27,7 +27,7 @@ public class AlertingJobEmailTests
         var db = TestDb.Create();
         var user = await TestDb.AddUserAsync(db, "Ann");
         var team = await TestDb.AddTeamAsync(db, (user, TeamRole.Owner));
-        db.Tasks.Add(new TaskItem
+        db.CalendarItems.Add(new CalendarItem
         {
             TeamId = team.Id, Title = "Submit thesis", AssignedUserId = user.Id,
             DeadlineUtc = DateTime.UtcNow.AddHours(5), CurrentUrgencyScore = 0.92

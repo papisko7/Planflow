@@ -18,7 +18,7 @@ public class User : BaseEntity
     public bool IsEmailVerified => EmailVerifiedAtUtc is not null;
 
     public ICollection<TeamMember> TeamMemberships { get; set; } = new List<TeamMember>();
-    public ICollection<TaskItem> AssignedTasks { get; set; } = new List<TaskItem>();
+    public ICollection<CalendarItem> AssignedTasks { get; set; } = new List<CalendarItem>();
     public ICollection<CalendarIntegration> CalendarIntegrations { get; set; } = new List<CalendarIntegration>();
     public ICollection<Alert> Alerts { get; set; } = new List<Alert>();
     public ICollection<ChatMessage> ChatMessages { get; set; } = new List<ChatMessage>();

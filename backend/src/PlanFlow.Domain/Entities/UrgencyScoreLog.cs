@@ -4,15 +4,15 @@ using PlanFlow.Domain.Enums;
 namespace PlanFlow.Domain.Entities;
 
 /// <summary>
-/// Snapshot of one Urgency Score computation for a <see cref="TaskItem"/>, capturing every
+/// Snapshot of one Urgency Score computation for a <see cref="CalendarItem"/>, capturing every
 /// weighted component so the result is explainable and reproducible for the thesis evaluation:
 /// weighted sum 0.45*Deadline + 0.20*Blocking + 0.25*Impact + 0.10*UserOverride, then the deadline and
 /// inheritance floors and, for blocked tasks, the blocked penalty (see UrgencyScoreCalculator).
 /// </summary>
 public class UrgencyScoreLog : BaseEntity
 {
-    public Guid TaskItemId { get; set; }
-    public TaskItem TaskItem { get; set; } = null!;
+    public Guid CalendarItemId { get; set; }
+    public CalendarItem CalendarItem { get; set; } = null!;
 
     public double DeadlineComponent { get; set; }
     public double BlockingComponent { get; set; }
@@ -28,4 +28,7 @@ public class UrgencyScoreLog : BaseEntity
 
     /// <summary>Describes the origin of this score calculation (manual edit, scheduled job, calendar sync, etc.).</summary>
     public ScoreTriggerSource TriggerSource { get; set; }
+
+    /// <summary>Deterministic one-line explanation of why the task scored this way (e.g. "Deadline in 6h, blocks 2 tasks"). Null on rows written before it existed.</summary>
+    public string? ReasonText { get; set; }
 }

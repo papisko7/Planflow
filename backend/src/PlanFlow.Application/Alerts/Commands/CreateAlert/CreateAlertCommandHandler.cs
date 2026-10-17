@@ -19,7 +19,7 @@ public class CreateAlertCommandHandler : IRequestHandler<CreateAlertCommand, Ale
         var alert = new Alert
         {
             UserId = request.UserId,
-            TaskItemId = request.TaskItemId,
+            CalendarItemId = request.CalendarItemId,
             Type = request.Type,
             Message = request.Message
         };

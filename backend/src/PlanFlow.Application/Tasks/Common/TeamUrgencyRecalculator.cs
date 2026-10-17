@@ -26,9 +26,9 @@ public static class TeamUrgencyRecalculator
     /// <returns>Ids of the tasks whose stored score changed, for cache invalidation.</returns>
     public static async Task<IReadOnlyCollection<Guid>> RecalculateTeamAsync(
         IApplicationDbContext context, Guid teamId, DateTime nowUtc, ScoreTriggerSource triggerSource,
-        TaskItem? subject, CancellationToken cancellationToken)
+        CalendarItem? subject, CancellationToken cancellationToken)
     {
-        var teamTasks = (await context.Tasks.Where(t => t.TeamId == teamId).ToListAsync(cancellationToken)).ToList();
+        var teamTasks = (await context.CalendarItems.Where(t => t.TeamId == teamId).ToListAsync(cancellationToken)).ToList();
         if (subject is not null && !teamTasks.Contains(subject))
         {
             teamTasks.Add(subject); // newly created, not yet in the database
@@ -39,15 +39,15 @@ public static class TeamUrgencyRecalculator
 
     /// <summary>Same as <see cref="RecalculateTeamAsync"/> for tasks the caller has already loaded (any teams).</summary>
     public static IReadOnlyCollection<Guid> Apply(
-        IApplicationDbContext context, IEnumerable<TaskItem> tasks, DateTime nowUtc, ScoreTriggerSource triggerSource,
-        TaskItem? subject = null)
+        IApplicationDbContext context, IEnumerable<CalendarItem> tasks, DateTime nowUtc, ScoreTriggerSource triggerSource,
+        CalendarItem? subject = null)
     {
         var changed = new List<Guid>();
 
         foreach (var teamTasks in tasks.GroupBy(t => t.TeamId))
         {
             var active = teamTasks.Where(IsActive).ToList();
-            var logs = TaskUrgencyScoreFactory.BuildTeamScoreLogs(active, nowUtc, triggerSource);
+            var logs = CalendarItemUrgencyScoreFactory.BuildTeamScoreLogs(active, nowUtc, triggerSource);
 
             foreach (var task in active)
             {
@@ -62,7 +62,7 @@ public static class TeamUrgencyRecalculator
             // A finished subject isn't part of the active graph (it blocks nobody), but an edit still records its score.
             if (subject is not null && subject.TeamId == teamTasks.Key && !IsActive(subject))
             {
-                var log = TaskUrgencyScoreFactory.BuildScoreLog(subject, 0.0, false, nowUtc, triggerSource);
+                var log = CalendarItemUrgencyScoreFactory.BuildScoreLog(subject, 0.0, false, nowUtc, triggerSource);
                 Stage(context, subject, log, nowUtc, changed);
             }
         }
@@ -81,10 +81,10 @@ public static class TeamUrgencyRecalculator
         }
     }
 
-    private static bool IsActive(TaskItem task) => task.Status is not (TaskStatus.Done or TaskStatus.Cancelled);
+    private static bool IsActive(CalendarItem task) => task.Status is not (TaskStatus.Done or TaskStatus.Cancelled);
 
     private static void Stage(
-        IApplicationDbContext context, TaskItem task, UrgencyScoreLog log, DateTime nowUtc, List<Guid> changed)
+        IApplicationDbContext context, CalendarItem task, UrgencyScoreLog log, DateTime nowUtc, List<Guid> changed)
     {
         task.CurrentUrgencyScore = log.FinalScore;
         task.UpdatedAtUtc = nowUtc;

@@ -10,7 +10,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Infrastructure.BackgroundJobs;
 
 /// <summary>
-/// Recomputes <see cref="PlanFlow.Domain.Entities.TaskItem.CurrentUrgencyScore"/> for every
+/// Recomputes <see cref="PlanFlow.Domain.Entities.CalendarItem.CurrentUrgencyScore"/> for every
 /// non-terminal task, since deadline pressure (the heaviest-weighted component, see
 /// <see cref="PlanFlow.Domain.Services.UrgencyScoreCalculator"/>) changes purely with the
 /// passage of time even when nobody touches the task. It uses the same team-wide rescoring as the
@@ -34,7 +34,7 @@ public class PrioritizationJob : IJob
         var cancellationToken = context.CancellationToken;
         var nowUtc = DateTime.UtcNow;
 
-        var activeTasks = await _context.Tasks
+        var activeTasks = await _context.CalendarItems
             .Where(t => t.Status != TaskStatus.Done && t.Status != TaskStatus.Cancelled)
             .ToListAsync(cancellationToken);
 

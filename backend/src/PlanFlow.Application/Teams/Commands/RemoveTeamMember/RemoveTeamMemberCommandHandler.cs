@@ -56,7 +56,7 @@ public class RemoveTeamMemberCommandHandler : IRequestHandler<RemoveTeamMemberCo
 
         // Tasks stay with the team but lose their assignee — otherwise they would point at someone
         // who can no longer see them.
-        var assignedTasks = await _context.Tasks
+        var assignedTasks = await _context.CalendarItems
             .Where(t => t.TeamId == request.TeamId && t.AssignedUserId == request.MemberUserId)
             .ToListAsync(cancellationToken);
 

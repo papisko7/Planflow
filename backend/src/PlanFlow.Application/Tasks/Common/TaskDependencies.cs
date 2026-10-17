@@ -25,7 +25,7 @@ public static class TaskDependencies
             throw Invalid("A task cannot be blocked by itself.");
         }
 
-        var blocker = await context.Tasks
+        var blocker = await context.CalendarItems
             .AsNoTracking()
             .Where(t => t.Id == blockerId && t.TeamId == teamId)
             .Select(t => new { t.BlockedByTaskId })
@@ -42,7 +42,7 @@ public static class TaskDependencies
                 throw Invalid("This dependency would create a cycle of blocking tasks.");
             }
 
-            next = await context.Tasks
+            next = await context.CalendarItems
                 .AsNoTracking()
                 .Where(t => t.Id == currentId)
                 .Select(t => t.BlockedByTaskId)

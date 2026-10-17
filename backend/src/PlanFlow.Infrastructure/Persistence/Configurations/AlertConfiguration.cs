@@ -17,9 +17,9 @@ public class AlertConfiguration : IEntityTypeConfiguration<Alert>
             .OnDelete(DeleteBehavior.Cascade);
 
         // Keep the alert (e.g. "task X was deleted") even after the task itself is gone.
-        builder.HasOne(a => a.TaskItem)
+        builder.HasOne(a => a.CalendarItem)
             .WithMany(t => t.Alerts)
-            .HasForeignKey(a => a.TaskItemId)
+            .HasForeignKey(a => a.CalendarItemId)
             .OnDelete(DeleteBehavior.SetNull);
     }
 }

@@ -58,14 +58,14 @@ public class TaskConcurrencyPostgresTests
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
 
-        var finalTask = await context.Tasks.AsNoTracking().SingleAsync(t => t.Id == created!.Id);
+        var finalTask = await context.CalendarItems.AsNoTracking().SingleAsync(t => t.Id == created!.Id);
         statuses.Should().Contain(finalTask.Status);
 
         // Every request must have landed as its own audit row: no writes silently dropped.
-        var historyCount = await context.TaskHistories.AsNoTracking().CountAsync(h => h.TaskItemId == created!.Id);
+        var historyCount = await context.TaskHistories.AsNoTracking().CountAsync(h => h.CalendarItemId == created!.Id);
         historyCount.Should().Be(concurrentRequests + 1); // +1 for the initial Created entry.
 
-        var scoreLogCount = await context.UrgencyScoreLogs.AsNoTracking().CountAsync(l => l.TaskItemId == created!.Id);
+        var scoreLogCount = await context.UrgencyScoreLogs.AsNoTracking().CountAsync(l => l.CalendarItemId == created!.Id);
         scoreLogCount.Should().Be(concurrentRequests + 1); // +1 for the initial ManualCreate log.
     }
 
@@ -87,7 +87,7 @@ public class TaskConcurrencyPostgresTests
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
-        var count = await context.Tasks.AsNoTracking().CountAsync(t => t.TeamId == teamId);
+        var count = await context.CalendarItems.AsNoTracking().CountAsync(t => t.TeamId == teamId);
 
         count.Should().Be(concurrentRequests);
     }

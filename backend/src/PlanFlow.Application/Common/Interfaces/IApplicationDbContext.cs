@@ -14,7 +14,7 @@ public interface IApplicationDbContext
     DbSet<RefreshSession> RefreshSessions { get; }
     DbSet<Team> Teams { get; }
     DbSet<TeamMember> TeamMembers { get; }
-    DbSet<TaskItem> Tasks { get; }
+    DbSet<CalendarItem> CalendarItems { get; }
     DbSet<TaskHistory> TaskHistories { get; }
     DbSet<UrgencyScoreLog> UrgencyScoreLogs { get; }
     DbSet<Alert> Alerts { get; }

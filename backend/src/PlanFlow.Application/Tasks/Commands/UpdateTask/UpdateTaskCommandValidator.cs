@@ -1,8 +1,9 @@
 using FluentValidation;
+using PlanFlow.Application.Tasks.Common;
 
 namespace PlanFlow.Application.Tasks.Commands.UpdateTask;
 
-public class UpdateTaskCommandValidator : AbstractValidator<UpdateTaskCommand>
+public class UpdateTaskCommandValidator : TaskScheduleValidator<UpdateTaskCommand>
 {
     public UpdateTaskCommandValidator()
     {

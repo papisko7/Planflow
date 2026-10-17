@@ -22,7 +22,7 @@ public class TaskNotificationTests
             new CreateTaskCommand(teamId, title, null, assignee, null, 5, null, actorId), CancellationToken.None);
 
     private static Task Update(
-        PlanFlowDbContext db, TaskItem task, Guid actorId,
+        PlanFlowDbContext db, CalendarItem task, Guid actorId,
         string? title = null, TaskStatus? status = null, Guid? assignee = null, bool keepAssignee = true, DateTime? deadline = null, int? impact = 5) =>
         new UpdateTaskCommandHandler(db, Cache, new NotificationService(db)).Handle(
             new UpdateTaskCommand(
@@ -133,7 +133,7 @@ public class TaskNotificationTests
         var (db, owner, _, member, team) = await TeamOfThree();
         await Create(db, team.Id, owner.Id, member.Id);
         ClearOutbox(db);
-        var task = db.Tasks.Single();
+        var task = db.CalendarItems.Single();
 
         await Update(db, task, owner.Id, title: "Write final report", status: TaskStatus.InProgress, deadline: DateTime.UtcNow.AddDays(3));
 
@@ -153,7 +153,7 @@ public class TaskNotificationTests
         ClearOutbox(db);
         await db.SaveChangesAsync();
 
-        await Update(db, db.Tasks.Single(), member.Id, status: TaskStatus.Done);
+        await Update(db, db.CalendarItems.Single(), member.Id, status: TaskStatus.Done);
 
         Assert.Empty(db.EmailOutbox);
     }
@@ -166,7 +166,7 @@ public class TaskNotificationTests
         ClearOutbox(db);
         await db.SaveChangesAsync();
 
-        await Update(db, db.Tasks.Single(), owner.Id); // identical values
+        await Update(db, db.CalendarItems.Single(), owner.Id); // identical values
 
         Assert.Empty(db.EmailOutbox);
     }
@@ -177,7 +177,7 @@ public class TaskNotificationTests
         var (db, owner, _, _, team) = await TeamOfThree();
         await Create(db, team.Id, owner.Id, null);
 
-        await Update(db, db.Tasks.Single(), owner.Id, title: "Renamed");
+        await Update(db, db.CalendarItems.Single(), owner.Id, title: "Renamed");
 
         Assert.Empty(db.EmailOutbox);
     }
@@ -190,7 +190,7 @@ public class TaskNotificationTests
         ClearOutbox(db);
         await db.SaveChangesAsync();
 
-        await Update(db, db.Tasks.Single(), owner.Id, assignee: admin.Id, keepAssignee: false);
+        await Update(db, db.CalendarItems.Single(), owner.Id, assignee: admin.Id, keepAssignee: false);
 
         Assert.Equal(2, db.EmailOutbox.Count());
         Assert.Single(db.EmailOutbox, m => m.Event == NotificationEvent.TaskAssignedToYou && m.ToEmail == admin.Email);
@@ -205,7 +205,7 @@ public class TaskNotificationTests
         ClearOutbox(db);
         await db.SaveChangesAsync();
 
-        await Update(db, db.Tasks.Single(), member.Id, assignee: null, keepAssignee: false);
+        await Update(db, db.CalendarItems.Single(), member.Id, assignee: null, keepAssignee: false);
 
         Assert.Empty(db.EmailOutbox); // Mia unassigned herself; no new assignee
     }
@@ -219,7 +219,7 @@ public class TaskNotificationTests
         db.NotificationPreferences.Add(new NotificationPreference { UserId = member.Id, TaskChanges = false });
         await db.SaveChangesAsync();
 
-        await Update(db, db.Tasks.Single(), owner.Id, title: "Renamed");
+        await Update(db, db.CalendarItems.Single(), owner.Id, title: "Renamed");
 
         Assert.Empty(db.EmailOutbox);
     }
@@ -233,7 +233,7 @@ public class TaskNotificationTests
         await Create(db, team.Id, owner.Id, member.Id);
         ClearOutbox(db);
         await db.SaveChangesAsync();
-        var task = db.Tasks.Single();
+        var task = db.CalendarItems.Single();
 
         await new DeleteTaskCommandHandler(db, Cache, new NotificationService(db))
             .Handle(new DeleteTaskCommand(task.Id, owner.Id), CancellationToken.None);
@@ -242,7 +242,7 @@ public class TaskNotificationTests
         Assert.Equal(NotificationEvent.TaskDeleted, mail.Event);
         Assert.Equal(member.Email, mail.ToEmail);
         Assert.Contains("Olga", mail.TextBody);
-        Assert.Empty(db.Tasks);
+        Assert.Empty(db.CalendarItems);
     }
 
     [Fact]
@@ -252,7 +252,7 @@ public class TaskNotificationTests
         await Create(db, team.Id, owner.Id, member.Id);
         ClearOutbox(db);
         await db.SaveChangesAsync();
-        var task = db.Tasks.Single();
+        var task = db.CalendarItems.Single();
 
         await new DeleteTaskCommandHandler(db, Cache, new NotificationService(db))
             .Handle(new DeleteTaskCommand(task.Id, member.Id), CancellationToken.None);
@@ -267,7 +267,7 @@ public class TaskNotificationTests
         await Create(db, team.Id, owner.Id, null);
 
         await new DeleteTaskCommandHandler(db, Cache, new NotificationService(db))
-            .Handle(new DeleteTaskCommand(db.Tasks.Single().Id, owner.Id), CancellationToken.None);
+            .Handle(new DeleteTaskCommand(db.CalendarItems.Single().Id, owner.Id), CancellationToken.None);
 
         Assert.Empty(db.EmailOutbox);
     }

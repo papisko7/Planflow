@@ -27,18 +27,19 @@ public class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, TaskD
         await TaskAssignment.EnsureAssigneeInTeamAsync(_context, request.TeamId, request.AssignedUserId, cancellationToken);
         await TaskDependencies.EnsureValidBlockerAsync(_context, request.TeamId, null, request.BlockedByTaskId, cancellationToken);
 
-        var task = new TaskItem
+        var task = new CalendarItem
         {
             TeamId = request.TeamId,
             AssignedUserId = request.AssignedUserId,
             Title = request.Title,
             Description = request.Description,
-            DeadlineUtc = request.DeadlineUtc,
             ImpactScore = request.ImpactScore,
-            BlockedByTaskId = request.BlockedByTaskId
+            BlockedByTaskId = request.BlockedByTaskId,
+            UseAiEnhancement = request.UseAiEnhancement
         };
+        TaskScheduleMapper.Apply(task, request);
 
-        _context.Tasks.Add(task);
+        _context.CalendarItems.Add(task);
 
         // A new task can already be blocked by an existing one, and that blocker may now inherit urgency from it.
         var changedTaskIds = await TeamUrgencyRecalculator.RecalculateTeamAsync(
@@ -46,7 +47,7 @@ public class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, TaskD
 
         _context.TaskHistories.Add(new TaskHistory
         {
-            TaskItemId = task.Id,
+            CalendarItemId = task.Id,
             ChangedByUserId = request.CreatedByUserId,
             ChangeType = TaskChangeType.Created
         });

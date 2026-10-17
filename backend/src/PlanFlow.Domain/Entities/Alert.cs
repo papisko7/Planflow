@@ -11,8 +11,8 @@ public class Alert : BaseEntity
     public Guid UserId { get; set; }
     public User User { get; set; } = null!;
 
-    public Guid? TaskItemId { get; set; }
-    public TaskItem? TaskItem { get; set; }
+    public Guid? CalendarItemId { get; set; }
+    public CalendarItem? CalendarItem { get; set; }
 
     public AlertType Type { get; set; }
     public string Message { get; set; } = string.Empty;

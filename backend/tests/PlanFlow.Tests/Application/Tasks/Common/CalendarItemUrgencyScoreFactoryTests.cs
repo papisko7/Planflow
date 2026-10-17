@@ -7,15 +7,15 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Application.Tasks.Common;
 
 /// <summary>
-/// Unit tests for <see cref="TaskUrgencyScoreFactory"/>.
-/// Verifies normalization of TaskItem fields to [0,1], the deadline curve, and how the dependency chain
+/// Unit tests for <see cref="CalendarItemUrgencyScoreFactory"/>.
+/// Verifies normalization of CalendarItem fields to [0,1], the deadline curve, and how the dependency chain
 /// (blockers inherit urgency, blocked tasks are lowered) shapes the final scores of a team.
 /// </summary>
-public class TaskUrgencyScoreFactoryTests
+public class CalendarItemUrgencyScoreFactoryTests
 {
     private static readonly DateTime ReferenceTime = new(2026, 8, 29, 12, 0, 0, DateTimeKind.Utc);
 
-    private static TaskItem CreateTaskItem(
+    private static CalendarItem CreateTaskItem(
         Guid? id = null,
         DateTime? deadline = null,
         int? impactScore = 5,
@@ -24,7 +24,7 @@ public class TaskUrgencyScoreFactoryTests
         DateTime? overrideExpiresAt = null,
         TaskStatus status = TaskStatus.Todo)
     {
-        return new TaskItem
+        return new CalendarItem
         {
             Id = id ?? Guid.NewGuid(),
             TeamId = Guid.NewGuid(),
@@ -38,8 +38,8 @@ public class TaskUrgencyScoreFactoryTests
         };
     }
 
-    private static UrgencyScoreLog Build(TaskItem task, DateTime? now = null, double blocking = 0.0, bool isBlocked = false) =>
-        TaskUrgencyScoreFactory.BuildScoreLog(task, blocking, isBlocked, now ?? ReferenceTime);
+    private static UrgencyScoreLog Build(CalendarItem task, DateTime? now = null, double blocking = 0.0, bool isBlocked = false) =>
+        CalendarItemUrgencyScoreFactory.BuildScoreLog(task, blocking, isBlocked, now ?? ReferenceTime);
 
     // ---- Deadline curve ----
 
@@ -229,7 +229,7 @@ public class TaskUrgencyScoreFactoryTests
     {
         var task = CreateTaskItem();
 
-        Assert.Equal(task.Id, Build(task).TaskItemId);
+        Assert.Equal(task.Id, Build(task).CalendarItemId);
     }
 
     [Fact]
@@ -255,8 +255,8 @@ public class TaskUrgencyScoreFactoryTests
 
     // ---- Team-wide dependency resolution ----
 
-    private static IReadOnlyDictionary<Guid, UrgencyScoreLog> ScoreTeam(params TaskItem[] tasks) =>
-        TaskUrgencyScoreFactory.BuildTeamScoreLogs(tasks, ReferenceTime, ScoreTriggerSource.ScheduledRecalculation);
+    private static IReadOnlyDictionary<Guid, UrgencyScoreLog> ScoreTeam(params CalendarItem[] tasks) =>
+        CalendarItemUrgencyScoreFactory.BuildTeamScoreLogs(tasks, ReferenceTime, ScoreTriggerSource.ScheduledRecalculation);
 
     [Fact]
     public void BuildTeamScoreLogs_TaskWithoutDependencies_MatchesSingleScore()

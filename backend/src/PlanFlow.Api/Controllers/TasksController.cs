@@ -63,7 +63,15 @@ public class TasksController : ControllerBase
                 request.DeadlineUtc,
                 request.ImpactScore,
                 request.BlockedByTaskId,
-                User.GetUserId()),
+                User.GetUserId(),
+                request.TaskType,
+                request.StartUtc,
+                request.EstimatedEffortHours,
+                request.IsRecurring,
+                request.RecurrenceIntervalHours,
+                request.RecurrenceEndsAtUtc,
+                request.UseAiEnhancement,
+                request.EndUtc),
             cancellationToken);
 
         return CreatedAtAction(nameof(GetTask), new { taskId = task.Id }, task);
@@ -132,6 +140,11 @@ public class TasksController : ControllerBase
             }
         }
 
+        // A client that predates the scheduling fields sends no TaskType: keep what is stored, otherwise an edit
+        // of the title would silently turn an Event into a plain Task and wipe its effort and recurrence.
+        var stored = existing.Task;
+        var keepStored = request.TaskType is null;
+
         var task = await _sender.Send(
             new UpdateTaskCommand(
                 taskId,
@@ -144,7 +157,15 @@ public class TasksController : ControllerBase
                 request.BlockedByTaskId,
                 request.ManualUrgencyOverride,
                 request.ManualUrgencyOverrideExpiresAtUtc,
-                User.GetUserId()),
+                User.GetUserId(),
+                keepStored ? stored.TaskType : request.TaskType!.Value,
+                keepStored ? stored.StartUtc : request.StartUtc,
+                keepStored ? stored.EstimatedEffortHours : request.EstimatedEffortHours,
+                keepStored ? stored.IsRecurring : request.IsRecurring,
+                keepStored ? stored.RecurrenceIntervalHours : request.RecurrenceIntervalHours,
+                keepStored ? stored.RecurrenceEndsAtUtc : request.RecurrenceEndsAtUtc,
+                keepStored ? stored.UseAiEnhancement : request.UseAiEnhancement,
+                keepStored ? stored.EndUtc : request.EndUtc),
             cancellationToken);
 
         return Ok(task);

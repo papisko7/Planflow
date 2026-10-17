@@ -42,11 +42,11 @@ public class AlertingJob : IJob
         var nowUtc = DateTime.UtcNow;
         var dedupeCutoffUtc = nowUtc - DedupeWindow;
 
-        var candidateTasks = await _context.Tasks
+        var candidateTasks = await _context.CalendarItems
             .Where(t => t.Status != TaskStatus.Done && t.Status != TaskStatus.Cancelled)
             .Where(t => t.AssignedUserId != null)
             .Where(t => t.CurrentUrgencyScore >= UrgencyThreshold)
-            .Select(t => new { t.Id, t.TeamId, t.AssignedUserId, t.Title, t.DeadlineUtc, t.CurrentUrgencyScore })
+            .Select(t => new { t.Id, t.TeamId, t.AssignedUserId, t.Title, DeadlineUtc = t.DeadlineUtc ?? t.StartUtc, t.CurrentUrgencyScore })
             .ToListAsync(cancellationToken);
 
         if (candidateTasks.Count == 0)
@@ -58,9 +58,9 @@ public class AlertingJob : IJob
         var emailCutoffUtc = nowUtc - EmailDedupeWindow;
         var recentAlerts = await _context.Alerts
             .Where(a => a.Type == AlertType.UrgencySpike)
-            .Where(a => a.TaskItemId != null && candidateTaskIds.Contains(a.TaskItemId.Value))
+            .Where(a => a.CalendarItemId != null && candidateTaskIds.Contains(a.CalendarItemId.Value))
             .Where(a => a.CreatedAtUtc >= emailCutoffUtc)
-            .Select(a => new { TaskId = a.TaskItemId!.Value, a.CreatedAtUtc })
+            .Select(a => new { TaskId = a.CalendarItemId!.Value, a.CreatedAtUtc })
             .ToListAsync(cancellationToken);
 
         var recentlyAlertedSet = recentAlerts.Where(a => a.CreatedAtUtc >= dedupeCutoffUtc).Select(a => a.TaskId).ToHashSet();
@@ -77,7 +77,7 @@ public class AlertingJob : IJob
             _context.Alerts.Add(new Alert
             {
                 UserId = task.AssignedUserId!.Value,
-                TaskItemId = task.Id,
+                CalendarItemId = task.Id,
                 Type = AlertType.UrgencySpike,
                 Message = $"Task \"{task.Title}\" urgency reached {task.CurrentUrgencyScore:P0}."
             });

@@ -51,14 +51,14 @@ public class TaskCrudPostgresTests
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
 
-        var stored = await context.Tasks.AsNoTracking().SingleAsync(t => t.Id == created.Id);
+        var stored = await context.CalendarItems.AsNoTracking().SingleAsync(t => t.Id == created.Id);
         stored.Title.Should().Be("Ship the report");
         stored.CurrentUrgencyScore.Should().Be(created.CurrentUrgencyScore);
 
-        var history = await context.TaskHistories.AsNoTracking().Where(h => h.TaskItemId == created.Id).ToListAsync();
+        var history = await context.TaskHistories.AsNoTracking().Where(h => h.CalendarItemId == created.Id).ToListAsync();
         history.Should().ContainSingle(h => h.ChangeType == TaskChangeType.Created);
 
-        var scoreLogs = await context.UrgencyScoreLogs.AsNoTracking().Where(l => l.TaskItemId == created.Id).ToListAsync();
+        var scoreLogs = await context.UrgencyScoreLogs.AsNoTracking().Where(l => l.CalendarItemId == created.Id).ToListAsync();
         scoreLogs.Should().ContainSingle(l => l.TriggerSource == ScoreTriggerSource.ManualCreate);
     }
 
@@ -126,7 +126,7 @@ public class TaskCrudPostgresTests
         var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
 
         var history = await context.TaskHistories.AsNoTracking()
-            .Where(h => h.TaskItemId == created.Id)
+            .Where(h => h.CalendarItemId == created.Id)
             .OrderBy(h => h.CreatedAtUtc)
             .ToListAsync();
 
@@ -154,7 +154,7 @@ public class TaskCrudPostgresTests
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
         var history = await context.TaskHistories.AsNoTracking()
-            .Where(h => h.TaskItemId == created.Id)
+            .Where(h => h.CalendarItemId == created.Id)
             .OrderBy(h => h.CreatedAtUtc)
             .ToListAsync();
 
@@ -286,9 +286,9 @@ public class TaskCrudPostgresTests
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
 
-        (await context.Tasks.AsNoTracking().AnyAsync(t => t.Id == created.Id)).Should().BeFalse();
-        (await context.TaskHistories.AsNoTracking().AnyAsync(h => h.TaskItemId == created.Id)).Should().BeFalse();
-        (await context.UrgencyScoreLogs.AsNoTracking().AnyAsync(l => l.TaskItemId == created.Id)).Should().BeFalse();
+        (await context.CalendarItems.AsNoTracking().AnyAsync(t => t.Id == created.Id)).Should().BeFalse();
+        (await context.TaskHistories.AsNoTracking().AnyAsync(h => h.CalendarItemId == created.Id)).Should().BeFalse();
+        (await context.UrgencyScoreLogs.AsNoTracking().AnyAsync(l => l.CalendarItemId == created.Id)).Should().BeFalse();
     }
 
     [Fact]

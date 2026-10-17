@@ -49,8 +49,8 @@ public class TaskAssignmentTests
         var owner = await TestDb.AddUserAsync(db);
         var stranger = await TestDb.AddUserAsync(db);
         var team = await TestDb.AddTeamAsync(db, (owner, TeamRole.Owner));
-        var task = new TaskItem { TeamId = team.Id, Title = "T", AssignedUserId = owner.Id };
-        db.Tasks.Add(task);
+        var task = new CalendarItem { TeamId = team.Id, Title = "T", AssignedUserId = owner.Id };
+        db.CalendarItems.Add(task);
         await db.SaveChangesAsync();
 
         await Assert.ThrowsAsync<ValidationException>(() => new UpdateTaskCommandHandler(db, Cache, new PlanFlow.Application.Notifications.NotificationService(db)).Handle(

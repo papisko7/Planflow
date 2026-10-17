@@ -56,7 +56,7 @@ public class ScoreAuditIntegrationTests
 
         // Assert
         Assert.NotNull(result);
-        var scoreLogs = context.UrgencyScoreLogs.Where(l => l.TaskItemId == result.Id).ToList();
+        var scoreLogs = context.UrgencyScoreLogs.Where(l => l.CalendarItemId == result.Id).ToList();
         Assert.Single(scoreLogs);
         Assert.Equal(ScoreTriggerSource.ManualCreate, scoreLogs[0].TriggerSource);
         Assert.True(scoreLogs[0].FinalScore >= 0.0 && scoreLogs[0].FinalScore <= 1.0);
@@ -76,7 +76,7 @@ public class ScoreAuditIntegrationTests
         var updatedByUserId = Guid.NewGuid();
 
         var team = new Team { Id = teamId, Name = "Test Team", CreatedAtUtc = nowUtc };
-        var task = new TaskItem
+        var task = new CalendarItem
         {
             Id = taskId,
             TeamId = teamId,
@@ -111,7 +111,7 @@ public class ScoreAuditIntegrationTests
         // Assert
         Assert.NotNull(result);
         var scoreLogs = context.UrgencyScoreLogs
-            .Where(l => l.TaskItemId == taskId)
+            .Where(l => l.CalendarItemId == taskId)
             .OrderBy(l => l.CreatedAtUtc)
             .ToList();
 
@@ -134,7 +134,7 @@ public class ScoreAuditIntegrationTests
         var taskId = Guid.NewGuid();
 
         var team = new Team { Id = teamId, Name = "Test Team", CreatedAtUtc = nowUtc };
-        var task = new TaskItem
+        var task = new CalendarItem
         {
             Id = taskId,
             TeamId = teamId,
@@ -158,7 +158,7 @@ public class ScoreAuditIntegrationTests
 
         // Assert
         var scoreLogs = context.UrgencyScoreLogs
-            .Where(l => l.TaskItemId == taskId)
+            .Where(l => l.CalendarItemId == taskId)
             .OrderBy(l => l.CreatedAtUtc)
             .ToList();
 
@@ -217,7 +217,7 @@ public class ScoreAuditIntegrationTests
 
         // Act: Retrieve full score history
         var history = context.UrgencyScoreLogs
-            .Where(l => l.TaskItemId == taskResult.Id)
+            .Where(l => l.CalendarItemId == taskResult.Id)
             .OrderBy(l => l.CreatedAtUtc)
             .ToList();
 
@@ -269,8 +269,8 @@ public class ScoreAuditIntegrationTests
             userId2), CancellationToken.None);
 
         // Assert
-        var logs1 = context.UrgencyScoreLogs.Where(l => l.TaskItemId == task1.Id).ToList();
-        var logs2 = context.UrgencyScoreLogs.Where(l => l.TaskItemId == task2.Id).ToList();
+        var logs1 = context.UrgencyScoreLogs.Where(l => l.CalendarItemId == task1.Id).ToList();
+        var logs2 = context.UrgencyScoreLogs.Where(l => l.CalendarItemId == task2.Id).ToList();
 
         Assert.Single(logs1);
         Assert.Single(logs2);

@@ -3,7 +3,8 @@ namespace PlanFlow.Domain.Services;
 /// <summary>
 /// Pure, deterministic implementation of the Urgency Score formula. In plain words:
 /// 1) a weighted sum of four factors: 0.45*Deadline + 0.20*Blocking + 0.25*Impact + 0.10*UserOverride;
-/// 2) two floors so important things cannot sink: a deadline within 24h (or overdue) keeps the score
+/// 2) two floors so important things cannot sink: an imminent deadline (overdue, or inside a window that
+///    depends on the item's type and effort estimate, 24h by default for a task) keeps the score
 ///    at 0.85 or more, and a task never scores below the urgency it inherits from the work it blocks;
 /// 3) a blocked task (its blocker is not finished yet) is halved, because it cannot be started now
 ///    and so should drop down the "what do I do next" list.
@@ -25,7 +26,7 @@ public static class UrgencyScoreCalculator
     /// <summary>Manual user override; kept lowest so users can nudge but not fully hijack the algorithm.</summary>
     private const double UserOverrideWeight = 0.10;
 
-    /// <summary>Minimum score of a task that is overdue or due within 24 hours, so nothing else can outrank it.</summary>
+    /// <summary>Minimum score of an item that is overdue or inside its imminent window, so nothing else can outrank it.</summary>
     public const double ImminentDeadlineFloor = 0.85;
 
     /// <summary>A blocked task keeps this share of its score while its blocker is unfinished.</summary>
@@ -39,7 +40,7 @@ public static class UrgencyScoreCalculator
     /// <param name="blockingComponent">Urgency inherited from the (transitively) blocked tasks.</param>
     /// <param name="impactComponent">Normalized impact, or null when the task has not been rated.</param>
     /// <param name="userOverrideComponent">Normalized manual override supplied by the user.</param>
-    /// <param name="deadlineImminent">True when the deadline is overdue or within 24 hours.</param>
+    /// <param name="deadlineImminent">True when the deadline is overdue or inside its imminent window (decided by the caller).</param>
     public static double Calculate(
         double deadlineComponent,
         double blockingComponent,

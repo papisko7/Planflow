@@ -11,7 +11,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(o =>
+{
+    o.JsonSerializerOptions.Converters.Add(new PlanFlow.Api.Common.UtcDateTimeConverter());
+    o.JsonSerializerOptions.Converters.Add(new PlanFlow.Api.Common.NullableUtcDateTimeConverter());
+});
 builder.Services.AddSwaggerDocumentation();
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddRbacPolicies();

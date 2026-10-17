@@ -15,4 +15,12 @@ public record UpdateTaskCommand(
     Guid? BlockedByTaskId,
     double? ManualUrgencyOverride,
     DateTime? ManualUrgencyOverrideExpiresAtUtc,
-    Guid? UpdatedByUserId) : IRequest<TaskDto>;
+    Guid? UpdatedByUserId,
+    Domain.Enums.TaskType TaskType = Domain.Enums.TaskType.Task,
+    DateTime? StartUtc = null,
+    double? EstimatedEffortHours = null,
+    bool IsRecurring = false,
+    int? RecurrenceIntervalHours = null,
+    DateTime? RecurrenceEndsAtUtc = null,
+    bool UseAiEnhancement = false,
+    DateTime? EndUtc = null) : IRequest<TaskDto>, ITaskScheduleFields;

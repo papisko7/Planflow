@@ -105,7 +105,7 @@ public class SyncCalendarJobTests
         var job = CreateJob(context, calendarClient);
         await job.Execute(CreateJobContext().Object);
 
-        var task = await context.Tasks.SingleAsync();
+        var task = await context.CalendarItems.SingleAsync();
         Assert.Equal(team.Id, task.TeamId);
         Assert.Equal(user.Id, task.AssignedUserId);
         Assert.Equal("Thesis defense prep", task.Title);
@@ -113,7 +113,7 @@ public class SyncCalendarJobTests
         Assert.Equal(deadline, task.DeadlineUtc);
         Assert.Equal(integration.Id, task.SourceCalendarIntegrationId);
         Assert.Equal("event-1", task.ExternalCalendarEventId);
-        Assert.True(context.UrgencyScoreLogs.Any(l => l.TaskItemId == task.Id && l.TriggerSource == ScoreTriggerSource.CalendarSync));
+        Assert.True(context.UrgencyScoreLogs.Any(l => l.CalendarItemId == task.Id && l.TriggerSource == ScoreTriggerSource.CalendarSync));
     }
 
     [Fact]
@@ -133,7 +133,7 @@ public class SyncCalendarJobTests
         await job.Execute(CreateJobContext().Object);
         await job.Execute(CreateJobContext().Object);
 
-        Assert.Equal(1, await context.Tasks.CountAsync());
+        Assert.Equal(1, await context.CalendarItems.CountAsync());
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public class SyncCalendarJobTests
         var (user, team) = SeedUserWithTeam(context);
         var integration = SeedActiveIntegration(context, user.Id);
 
-        var existingTask = new TaskItem
+        var existingTask = new CalendarItem
         {
             TeamId = team.Id,
             AssignedUserId = user.Id,
@@ -153,7 +153,7 @@ public class SyncCalendarJobTests
             SourceCalendarIntegrationId = integration.Id,
             ExternalCalendarEventId = "event-1"
         };
-        context.Tasks.Add(existingTask);
+        context.CalendarItems.Add(existingTask);
         await context.SaveChangesAsync();
 
         var newDeadline = DateTime.UtcNow.AddDays(5);
@@ -164,8 +164,8 @@ public class SyncCalendarJobTests
         var job = CreateJob(context, calendarClient);
         await job.Execute(CreateJobContext().Object);
 
-        Assert.Equal(1, await context.Tasks.CountAsync());
-        var task = await context.Tasks.SingleAsync();
+        Assert.Equal(1, await context.CalendarItems.CountAsync());
+        var task = await context.CalendarItems.SingleAsync();
         Assert.Equal("Updated title", task.Title);
         Assert.Equal(newDeadline, task.DeadlineUtc);
     }
@@ -177,7 +177,7 @@ public class SyncCalendarJobTests
         var (user, team) = SeedUserWithTeam(context);
         var integration = SeedActiveIntegration(context, user.Id);
 
-        context.Tasks.Add(new TaskItem
+        context.CalendarItems.Add(new CalendarItem
         {
             TeamId = team.Id,
             AssignedUserId = user.Id,
@@ -196,7 +196,7 @@ public class SyncCalendarJobTests
         var job = CreateJob(context, calendarClient);
         await job.Execute(CreateJobContext().Object);
 
-        var task = await context.Tasks.SingleAsync();
+        var task = await context.CalendarItems.SingleAsync();
         Assert.Equal(TaskStatus.Cancelled, task.Status);
     }
 
@@ -214,7 +214,7 @@ public class SyncCalendarJobTests
         var job = CreateJob(context, calendarClient);
         await job.Execute(CreateJobContext().Object);
 
-        Assert.Equal(0, await context.Tasks.CountAsync());
+        Assert.Equal(0, await context.CalendarItems.CountAsync());
     }
 
     [Fact]
@@ -264,8 +264,8 @@ public class SyncCalendarJobTests
         var job = CreateJob(context, calendarClient, oauthClient);
         await job.Execute(CreateJobContext().Object);
 
-        Assert.Equal(1, await context.Tasks.CountAsync());
-        var task = await context.Tasks.SingleAsync();
+        Assert.Equal(1, await context.CalendarItems.CountAsync());
+        var task = await context.CalendarItems.SingleAsync();
         Assert.Equal(healthyTeam.Id, task.TeamId);
     }
 
@@ -323,7 +323,7 @@ public class SyncCalendarJobTests
 
         await job.Execute(CreateJobContext().Object);
 
-        Assert.Equal(0, await context.Tasks.CountAsync());
+        Assert.Equal(0, await context.CalendarItems.CountAsync());
         calendarClient.Verify(c => c.ListEventsAsync(It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 

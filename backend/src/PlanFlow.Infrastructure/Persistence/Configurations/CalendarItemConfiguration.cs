@@ -4,15 +4,16 @@ using PlanFlow.Domain.Entities;
 
 namespace PlanFlow.Infrastructure.Persistence.Configurations;
 
-public class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
+public class CalendarItemConfiguration : IEntityTypeConfiguration<CalendarItem>
 {
-    public void Configure(EntityTypeBuilder<TaskItem> builder)
+    public void Configure(EntityTypeBuilder<CalendarItem> builder)
     {
-        builder.ToTable("tasks");
+        builder.ToTable("calendar_items");
         builder.HasKey(t => t.Id);
 
         builder.Property(t => t.Title).IsRequired().HasMaxLength(256);
         builder.Property(t => t.ExternalCalendarEventId).HasMaxLength(512);
+        builder.Property(t => t.AiImpactReasoning).HasMaxLength(2000);
 
         // Dashboard's main query is "give me this team's tasks sorted by urgency" — both filter
         // and sort columns are indexed so Postgres can serve it without a full table scan.
@@ -28,7 +29,7 @@ public class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
             .HasFilter("\"SourceCalendarIntegrationId\" IS NOT NULL");
 
         builder.HasOne(t => t.Team)
-            .WithMany(team => team.Tasks)
+            .WithMany(team => team.CalendarItems)
             .HasForeignKey(t => t.TeamId)
             .OnDelete(DeleteBehavior.Cascade);
 

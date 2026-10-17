@@ -12,11 +12,11 @@ public class TaskHistoryConfiguration : IEntityTypeConfiguration<TaskHistory>
         builder.HasKey(h => h.Id);
 
         // Audit trail is always read as "history for task X, newest first".
-        builder.HasIndex(h => new { h.TaskItemId, h.CreatedAtUtc });
+        builder.HasIndex(h => new { h.CalendarItemId, h.CreatedAtUtc });
 
-        builder.HasOne(h => h.TaskItem)
+        builder.HasOne(h => h.CalendarItem)
             .WithMany(t => t.History)
-            .HasForeignKey(h => h.TaskItemId)
+            .HasForeignKey(h => h.CalendarItemId)
             .OnDelete(DeleteBehavior.Cascade);
 
         // Preserve the audit trail even if the acting user is later removed.

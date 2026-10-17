@@ -25,7 +25,7 @@ public class ScoreAuditLoggingTests
         // Arrange
         var nowUtc = DateTime.UtcNow;
         var team = new Team { Id = Guid.NewGuid(), Name = "Test Team", CreatedAtUtc = nowUtc };
-        var task = new TaskItem
+        var task = new CalendarItem
         {
             Id = Guid.NewGuid(),
             TeamId = team.Id,
@@ -37,11 +37,11 @@ public class ScoreAuditLoggingTests
         };
 
         // Act
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockingComponent: 0.0, isBlocked: false, nowUtc, ScoreTriggerSource.ManualCreate);
+        var scoreLog = CalendarItemUrgencyScoreFactory.BuildScoreLog(task, blockingComponent: 0.0, isBlocked: false, nowUtc, ScoreTriggerSource.ManualCreate);
 
         // Assert
         Assert.NotNull(scoreLog);
-        Assert.Equal(task.Id, scoreLog.TaskItemId);
+        Assert.Equal(task.Id, scoreLog.CalendarItemId);
         Assert.Equal(ScoreTriggerSource.ManualCreate, scoreLog.TriggerSource);
         Assert.True(scoreLog.FinalScore >= 0.0 && scoreLog.FinalScore <= 1.0);
     }
@@ -53,7 +53,7 @@ public class ScoreAuditLoggingTests
         var nowUtc = new DateTime(2025, 08, 30, 12, 0, 0, DateTimeKind.Utc);
         var deadlineUtc = nowUtc.AddDays(5); // 5 days out
         var team = new Team { Id = Guid.NewGuid(), Name = "Test Team", CreatedAtUtc = nowUtc };
-        var task = new TaskItem
+        var task = new CalendarItem
         {
             Id = Guid.NewGuid(),
             TeamId = team.Id,
@@ -66,7 +66,7 @@ public class ScoreAuditLoggingTests
         };
 
         // Act
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockingComponent: 0.0, isBlocked: false, nowUtc, ScoreTriggerSource.ManualUpdate);
+        var scoreLog = CalendarItemUrgencyScoreFactory.BuildScoreLog(task, blockingComponent: 0.0, isBlocked: false, nowUtc, ScoreTriggerSource.ManualUpdate);
 
         // Assert
         Assert.True(scoreLog.DeadlineComponent > 0.0, "Deadline component should be > 0 for near-future deadline");
@@ -82,7 +82,7 @@ public class ScoreAuditLoggingTests
         // Arrange
         var nowUtc = DateTime.UtcNow;
         var team = new Team { Id = Guid.NewGuid(), Name = "Test Team", CreatedAtUtc = nowUtc };
-        var task = new TaskItem
+        var task = new CalendarItem
         {
             Id = Guid.NewGuid(),
             TeamId = team.Id,
@@ -93,7 +93,7 @@ public class ScoreAuditLoggingTests
         };
 
         // Act: This task blocks 3 others
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockingComponent: 0.6, isBlocked: false, nowUtc, ScoreTriggerSource.ScheduledRecalculation);
+        var scoreLog = CalendarItemUrgencyScoreFactory.BuildScoreLog(task, blockingComponent: 0.6, isBlocked: false, nowUtc, ScoreTriggerSource.ScheduledRecalculation);
 
         // Assert
         Assert.True(scoreLog.BlockingComponent > 0.0, "Blocking component should carry the inherited urgency");
@@ -108,7 +108,7 @@ public class ScoreAuditLoggingTests
         var context = CreateInMemoryContext();
         var nowUtc = DateTime.UtcNow;
         var team = new Team { Id = Guid.NewGuid(), Name = "Test Team", CreatedAtUtc = nowUtc };
-        var task = new TaskItem
+        var task = new CalendarItem
         {
             Id = Guid.NewGuid(),
             TeamId = team.Id,
@@ -134,7 +134,7 @@ public class ScoreAuditLoggingTests
         // Act
         foreach (var trigger in triggers)
         {
-            var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, 0.0, false, nowUtc, trigger);
+            var scoreLog = CalendarItemUrgencyScoreFactory.BuildScoreLog(task, 0.0, false, nowUtc, trigger);
             logs.Add(scoreLog);
             context.UrgencyScoreLogs.Add(scoreLog);
         }
@@ -146,11 +146,11 @@ public class ScoreAuditLoggingTests
         for (int i = 0; i < logs.Count; i++)
         {
             Assert.Equal(triggers[i], logs[i].TriggerSource);
-            Assert.Equal(task.Id, logs[i].TaskItemId);
+            Assert.Equal(task.Id, logs[i].CalendarItemId);
         }
 
         // Verify persistence
-        var retrievedLogs = context.UrgencyScoreLogs.Where(l => l.TaskItemId == task.Id).OrderBy(l => l.CreatedAtUtc).ToList();
+        var retrievedLogs = context.UrgencyScoreLogs.Where(l => l.CalendarItemId == task.Id).OrderBy(l => l.CreatedAtUtc).ToList();
         Assert.Equal(triggers.Length, retrievedLogs.Count);
         for (int i = 0; i < retrievedLogs.Count; i++)
         {
@@ -167,7 +167,7 @@ public class ScoreAuditLoggingTests
         var nowUtc = new DateTime(2025, 08, 30, 12, 0, 0, DateTimeKind.Utc);
         var expiryUtc = nowUtc.AddHours(1);
         var team = new Team { Id = Guid.NewGuid(), Name = "Test Team", CreatedAtUtc = nowUtc };
-        var task = new TaskItem
+        var task = new CalendarItem
         {
             Id = Guid.NewGuid(),
             TeamId = team.Id,
@@ -180,7 +180,7 @@ public class ScoreAuditLoggingTests
         };
 
         // Act
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, 0.0, false, nowUtc, ScoreTriggerSource.ManualUpdate);
+        var scoreLog = CalendarItemUrgencyScoreFactory.BuildScoreLog(task, 0.0, false, nowUtc, ScoreTriggerSource.ManualUpdate);
 
         // Assert
         Assert.Equal(0.8, scoreLog.UserOverrideComponent);
@@ -194,7 +194,7 @@ public class ScoreAuditLoggingTests
         var nowUtc = new DateTime(2025, 08, 30, 12, 0, 0, DateTimeKind.Utc);
         var expiryUtc = nowUtc.AddHours(-1); // Already expired
         var team = new Team { Id = Guid.NewGuid(), Name = "Test Team", CreatedAtUtc = nowUtc };
-        var task = new TaskItem
+        var task = new CalendarItem
         {
             Id = Guid.NewGuid(),
             TeamId = team.Id,
@@ -207,7 +207,7 @@ public class ScoreAuditLoggingTests
         };
 
         // Act
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, 0.0, false, nowUtc, ScoreTriggerSource.ManualUpdate);
+        var scoreLog = CalendarItemUrgencyScoreFactory.BuildScoreLog(task, 0.0, false, nowUtc, ScoreTriggerSource.ManualUpdate);
 
         // Assert
         Assert.Equal(0.0, scoreLog.UserOverrideComponent);
@@ -220,7 +220,7 @@ public class ScoreAuditLoggingTests
         var nowUtc = new DateTime(2025, 08, 30, 12, 0, 0, DateTimeKind.Utc);
         var deadlineUtc = nowUtc.AddDays(7.5);
         var team = new Team { Id = Guid.NewGuid(), Name = "Test Team", CreatedAtUtc = nowUtc };
-        var task = new TaskItem
+        var task = new CalendarItem
         {
             Id = Guid.NewGuid(),
             TeamId = team.Id,
@@ -232,7 +232,7 @@ public class ScoreAuditLoggingTests
         };
 
         // Act
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, blockingComponent: 0.4, isBlocked: false, nowUtc, ScoreTriggerSource.ManualUpdate);
+        var scoreLog = CalendarItemUrgencyScoreFactory.BuildScoreLog(task, blockingComponent: 0.4, isBlocked: false, nowUtc, ScoreTriggerSource.ManualUpdate);
 
         // Assert
         Assert.True(scoreLog.DeadlineComponent > 0.0 && scoreLog.DeadlineComponent < 1.0);
@@ -246,7 +246,7 @@ public class ScoreAuditLoggingTests
         // Arrange
         var nowUtc = DateTime.UtcNow;
         var team = new Team { Id = Guid.NewGuid(), Name = "Test Team", CreatedAtUtc = nowUtc };
-        var task = new TaskItem
+        var task = new CalendarItem
         {
             Id = Guid.NewGuid(),
             TeamId = team.Id,
@@ -257,7 +257,7 @@ public class ScoreAuditLoggingTests
         };
 
         // Act: Call without specifying trigger source (should default to ManualUpdate)
-        var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, 0.0, false, nowUtc);
+        var scoreLog = CalendarItemUrgencyScoreFactory.BuildScoreLog(task, 0.0, false, nowUtc);
 
         // Assert
         Assert.Equal(ScoreTriggerSource.ManualUpdate, scoreLog.TriggerSource);
@@ -270,7 +270,7 @@ public class ScoreAuditLoggingTests
         var context = CreateInMemoryContext();
         var nowUtc = new DateTime(2025, 08, 30, 12, 0, 0, DateTimeKind.Utc);
         var team = new Team { Id = Guid.NewGuid(), Name = "Test Team", CreatedAtUtc = nowUtc };
-        var task = new TaskItem
+        var task = new CalendarItem
         {
             Id = Guid.NewGuid(),
             TeamId = team.Id,
@@ -288,14 +288,14 @@ public class ScoreAuditLoggingTests
         for (int i = 0; i < 3; i++)
         {
             var timeOffset = nowUtc.AddMinutes(i);
-            var scoreLog = TaskUrgencyScoreFactory.BuildScoreLog(task, 0.0, false, timeOffset, ScoreTriggerSource.ScheduledRecalculation);
+            var scoreLog = CalendarItemUrgencyScoreFactory.BuildScoreLog(task, 0.0, false, timeOffset, ScoreTriggerSource.ScheduledRecalculation);
             context.UrgencyScoreLogs.Add(scoreLog);
             context.SaveChanges();
         }
 
         // Assert
         var logs = context.UrgencyScoreLogs
-            .Where(l => l.TaskItemId == task.Id)
+            .Where(l => l.CalendarItemId == task.Id)
             .OrderBy(l => l.CreatedAtUtc)
             .ToList();
 

@@ -174,14 +174,14 @@ public class TeamHandlerTests
         var owner = await TestDb.AddUserAsync(db);
         var member = await TestDb.AddUserAsync(db);
         var team = await TestDb.AddTeamAsync(db, (owner, TeamRole.Owner), (member, TeamRole.Member));
-        var task = new TaskItem { TeamId = team.Id, Title = "T", AssignedUserId = member.Id };
-        db.Tasks.Add(task);
+        var task = new CalendarItem { TeamId = team.Id, Title = "T", AssignedUserId = member.Id };
+        db.CalendarItems.Add(task);
         await db.SaveChangesAsync();
 
         await RemoveHandler(db).Handle(new RemoveTeamMemberCommand(team.Id, owner.Id, member.Id), CancellationToken.None);
 
         Assert.Single(db.TeamMembers);
-        Assert.Null(db.Tasks.Single().AssignedUserId);
+        Assert.Null(db.CalendarItems.Single().AssignedUserId);
     }
 
     [Fact]
