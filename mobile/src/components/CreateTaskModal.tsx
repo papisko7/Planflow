@@ -16,10 +16,11 @@ import { createTask } from '../services/taskService';
 import { getTeamMembers } from '../services/teamService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { AssigneePicker } from './AssigneePicker';
-import { DeadlinePicker } from './DeadlinePicker';
+import { ScheduleForm } from './ScheduleForm';
 import type { ApiError } from '../types/api';
 import { TeamRole, type TeamDto, type TeamMemberDto } from '../types/team';
-import { TaskStatus, type TaskDto } from '../types/task';
+import { TaskStatus, TaskType, type ScheduleFields, type TaskDto } from '../types/task';
+import { emptySchedule, normalizeSchedule, validateSchedule } from '../utils/schedule';
 
 type Props = {
   visible: boolean;
@@ -28,17 +29,20 @@ type Props = {
   tasks: TaskDto[];
   // Team preselected when the sheet opens (e.g. the team currently shown); falls back to the first team.
   defaultTeamId?: string | null;
+  // Type the form starts as (the Tasks screen opens it as Event while its Events tab is showing).
+  defaultType?: TaskType;
   onClose: () => void;
   onCreated: () => void;
 };
 
 // One "new task" sheet shared by every screen (Dashboard, Tasks, Calendar, Teams), so a task can be
 // added from wherever the user is without a trip to the Tasks tab.
-export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, onClose, onCreated }: Props) {
+export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultType = TaskType.Task, onClose, onCreated }: Props) {
   const myUserId = getCurrentUserId();
   const [teamId, setTeamId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
-  const [deadlineUtc, setDeadlineUtc] = useState<string | null>(null);
+  // Type, dates, effort and recurrence live together: they depend on each other (Task vs Event).
+  const [schedule, setSchedule] = useState<ScheduleFields>(() => emptySchedule(defaultType));
   const [impactScore, setImpactScore] = useState('');
   const [blockedByTaskId, setBlockedByTaskId] = useState<string | null>(null);
   const [assignedUserId, setAssignedUserId] = useState<string | null>(myUserId);
@@ -50,7 +54,7 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, onClose,
   useEffect(() => {
     if (!visible) return;
     setTitle('');
-    setDeadlineUtc(null);
+    setSchedule(emptySchedule(defaultType));
     setImpactScore('');
     setBlockedByTaskId(null);
     setAssignedUserId(myUserId);
@@ -91,6 +95,11 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, onClose,
       setError('Title is required.');
       return;
     }
+    const scheduleError = validateSchedule(schedule, true);
+    if (scheduleError) {
+      setError(scheduleError);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -100,36 +109,36 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, onClose,
         title: title.trim(),
         description: null,
         assignedUserId: canAssign ? assignedUserId : myUserId,
-        deadlineUtc,
+        ...normalizeSchedule(schedule),
         impactScore: impactScore.trim() && !Number.isNaN(impact) ? impact : null, // empty = not rated
         blockedByTaskId,
       });
       onCreated();
       onClose();
     } catch (err) {
-      setError((err as ApiError).message ?? 'Failed to create task.');
+      setError((err as ApiError).message ?? 'Failed to create.');
     } finally {
       setSubmitting(false);
     }
-  }, [teamId, title, deadlineUtc, impactScore, blockedByTaskId, canAssign, assignedUserId, myUserId, onCreated, onClose]);
+  }, [teamId, title, schedule, impactScore, blockedByTaskId, canAssign, assignedUserId, myUserId, onCreated, onClose]);
 
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
       <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Pressable style={styles.dismissArea} onPress={onClose} />
         <View style={styles.sheet}>
-          <Text style={styles.heading}>New task</Text>
+          <Text style={styles.heading}>{schedule.taskType === TaskType.Event ? 'New event' : 'New task'}</Text>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.form}>
             <TextInput
               testID="create-task-title-input"
               style={styles.input}
-              placeholder="Task title"
+              placeholder={schedule.taskType === TaskType.Event ? 'Event title' : 'Task title'}
               placeholderTextColor={colors.textMuted}
               value={title}
               onChangeText={setTitle}
               autoFocus
             />
-            <DeadlinePicker value={deadlineUtc} onChange={setDeadlineUtc} futureOnly />
+            <ScheduleForm value={schedule} onChange={setSchedule} isNew />
             <TextInput
               testID="create-task-impact-input"
               style={styles.input}

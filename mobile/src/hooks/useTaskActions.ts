@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { getCurrentUserId } from '../services/authService';
 import { deleteTask, updateTask } from '../services/taskService';
+import { toUpdateRequest } from '../utils/schedule';
 import type { RootStackParamList } from '../navigation/types';
 import type { ApiError } from '../types/api';
 import { TaskStatus, type TaskDto } from '../types/task';
@@ -55,18 +56,15 @@ export function useTaskActions(reload: () => unknown) {
   const saveChange = useCallback(
     async (task: TaskDto, change: { status?: TaskStatus; assignedUserId?: string | null }, errorTitle: string) => {
       try {
-        await updateTask(task.id, task.teamId, {
-          title: task.title,
-          description: task.description,
-          status: change.status ?? task.status,
-          // `null` is a real value here (abandon = clear the assignee), so only `undefined` means "unchanged".
-          assignedUserId: change.assignedUserId === undefined ? task.assignedUserId : change.assignedUserId,
-          deadlineUtc: task.deadlineUtc,
-          impactScore: task.impactScore,
-          blockedByTaskId: task.blockedByTaskId,
-          manualUrgencyOverride: task.manualUrgencyOverride,
-          manualUrgencyOverrideExpiresAtUtc: task.manualUrgencyOverrideExpiresAtUtc,
-        });
+        await updateTask(
+          task.id,
+          task.teamId,
+          toUpdateRequest(task, {
+            status: change.status ?? task.status,
+            // `null` is a real value here (abandon = clear the assignee), so only `undefined` means "unchanged".
+            assignedUserId: change.assignedUserId === undefined ? task.assignedUserId : change.assignedUserId,
+          }),
+        );
         await reload();
       } catch (err) {
         showError(errorTitle, err);

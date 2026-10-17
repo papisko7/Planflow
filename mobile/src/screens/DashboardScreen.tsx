@@ -13,6 +13,7 @@ import { useAllTasks } from '../hooks/useAllTasks';
 import { useTaskActions } from '../hooks/useTaskActions';
 import { useUnreadCount } from '../hooks/useUnreadCount';
 import { getProfile } from '../services/userService';
+import { isPastEvent } from '../utils/schedule';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { computeDashboardStats } from '../utils/dashboardStats';
 import { selectOneNextAction } from '../utils/oneNextAction';
@@ -48,9 +49,9 @@ export default function DashboardScreen() {
     }, []),
   );
 
-  // Finished / cancelled tasks are history, not "what needs attention" — they stay visible on the Tasks tab.
+  // Finished / cancelled tasks and events that already took place are history, not "what needs attention" — they stay visible on the Tasks tab.
   const openTasks = useMemo(
-    () => tasks.filter((t) => t.status !== TaskStatus.Done && t.status !== TaskStatus.Cancelled),
+    () => tasks.filter((t) => t.status !== TaskStatus.Done && t.status !== TaskStatus.Cancelled && !isPastEvent(t)),
     [tasks],
   );
   const stats = useMemo(() => computeDashboardStats(tasks), [tasks]);

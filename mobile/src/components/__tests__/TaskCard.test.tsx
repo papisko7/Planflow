@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import * as authService from '../../services/authService';
 import { TaskCard } from '../TaskCard';
 import { TaskStatus, type TaskDto } from '../../types/task';
+import { PLAIN_TASK_FIELDS } from '../../test-fixtures';
 
 const task: TaskDto = {
   id: 't1',
@@ -18,6 +19,7 @@ const task: TaskDto = {
   currentUrgencyScore: 0.5,
   createdAtUtc: '2026-01-01T00:00:00Z',
   updatedAtUtc: null,
+  ...PLAIN_TASK_FIELDS,
 };
 
 describe('TaskCard long-press menu', () => {

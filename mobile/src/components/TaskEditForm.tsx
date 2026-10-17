@@ -3,10 +3,11 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { updateTask } from '../services/taskService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { AssigneePicker } from './AssigneePicker';
-import { DeadlinePicker } from './DeadlinePicker';
+import { ScheduleForm } from './ScheduleForm';
 import type { ApiError } from '../types/api';
 import type { TeamMemberDto } from '../types/team';
-import { TaskStatus, type TaskDto } from '../types/task';
+import { TaskStatus, type ScheduleFields, type TaskDto } from '../types/task';
+import { normalizeSchedule, scheduleFromTask, toUpdateRequest, validateSchedule } from '../utils/schedule';
 
 type Props = {
   task: TaskDto;
@@ -28,7 +29,7 @@ const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
 export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Props) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
-  const [deadlineUtc, setDeadlineUtc] = useState<string | null>(task.deadlineUtc);
+  const [schedule, setSchedule] = useState<ScheduleFields>(() => scheduleFromTask(task));
   const [impact, setImpact] = useState(task.impactScore === null ? "" : String(task.impactScore));
   const [status, setStatus] = useState(task.status);
   const [assignedUserId, setAssignedUserId] = useState(task.assignedUserId);
@@ -48,20 +49,27 @@ export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Pr
       return;
     }
 
+    const scheduleError = validateSchedule(schedule, false);
+    if (scheduleError) {
+      setError(scheduleError);
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
-      await updateTask(task.id, task.teamId, {
-        title: trimmedTitle,
-        description: description.trim() || null,
-        status,
-        assignedUserId,
-        deadlineUtc,
-        impactScore: impactNumber,
-        blockedByTaskId: task.blockedByTaskId,
-        manualUrgencyOverride: task.manualUrgencyOverride,
-        manualUrgencyOverrideExpiresAtUtc: task.manualUrgencyOverrideExpiresAtUtc,
-      });
+      await updateTask(
+        task.id,
+        task.teamId,
+        toUpdateRequest(task, {
+          title: trimmedTitle,
+          description: description.trim() || null,
+          status,
+          assignedUserId,
+          impactScore: impactNumber,
+          ...normalizeSchedule(schedule),
+        }),
+      );
       onSaved();
     } catch (err) {
       const apiError = err as ApiError;
@@ -90,7 +98,7 @@ export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Pr
         value={description}
         onChangeText={setDescription}
       />
-      <DeadlinePicker value={deadlineUtc} onChange={setDeadlineUtc} />
+      <ScheduleForm value={schedule} onChange={setSchedule} isNew={false} />
       <TextInput
         testID="edit-task-impact-input"
         style={styles.input}

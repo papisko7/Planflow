@@ -1,5 +1,6 @@
 import { computeDashboardStats, formatAgo } from '../dashboardStats';
 import { TaskStatus, type TaskDto } from '../../types/task';
+import { PLAIN_TASK_FIELDS } from '../../test-fixtures';
 
 const NOW = new Date('2026-10-05T12:00:00');
 
@@ -19,6 +20,7 @@ function task(overrides: Partial<TaskDto>): TaskDto {
     currentUrgencyScore: 0.5,
     createdAtUtc: '2026-01-01T00:00:00Z',
     updatedAtUtc: null,
+    ...PLAIN_TASK_FIELDS,
     ...overrides,
   };
 }

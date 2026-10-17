@@ -15,7 +15,8 @@ public record UrgencyScoreBreakdownDto(
     double FinalScore,
     ScoreTriggerSource TriggerSource,
     DateTime CreatedAtUtc,
-    bool IsBlocked)
+    bool IsBlocked,
+    string? ReasonText = null)
 {
     public static UrgencyScoreBreakdownDto FromEntity(UrgencyScoreLog log) => new(
         log.DeadlineComponent,
@@ -25,7 +26,8 @@ public record UrgencyScoreBreakdownDto(
         log.FinalScore,
         log.TriggerSource,
         log.CreatedAtUtc,
-        log.IsBlocked);
+        log.IsBlocked,
+        log.ReasonText);
 }
 
 /// <summary>Full detail view for a single task: the task itself plus its latest urgency breakdown.</summary>

@@ -130,6 +130,24 @@ public class TaskSchedulingApiTests : IClassFixture<CustomWebApplicationFactory>
         Assert.True((await overdueTask.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("currentUrgencyScore").GetDouble() >= 0.85);
     }
 
+    [Fact]
+    public async Task ReasonText_IsExposedInTheTeamListAndTheDetail()
+    {
+        var (client, teamId) = await OwnerWithTeamAsync();
+        var created = await client.PostAsJsonAsync($"api/teams/{teamId}/tasks",
+            new { title = "Explain me", impactScore = 8, deadlineUtc = Iso(TimeSpan.FromDays(2)) });
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var list = await client.GetFromJsonAsync<JsonElement>($"api/teams/{teamId}/tasks");
+        var listed = list.EnumerateArray().Single(t => t.GetProperty("id").GetGuid() == id);
+        var detail = await client.GetFromJsonAsync<JsonElement>($"api/tasks/{id}");
+
+        var listReason = listed.GetProperty("reasonText").GetString();
+        Assert.StartsWith("[", listReason);
+        Assert.Contains("impact 8/10", listReason);
+        Assert.Equal(listReason, detail.GetProperty("latestScoreBreakdown").GetProperty("reasonText").GetString());
+    }
+
     [Theory]
     [InlineData(false)] // 2026-10-19T11:00:00      (no zone)
     [InlineData(true)]  // 2026-10-19T13:00:00+02:00 (offset)

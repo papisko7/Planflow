@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import type { UrgencyScoreBreakdownDto } from '../types/task';
+import { splitReason } from '../utils/itemDisplay';
 
 // Mirrors the weights hard-coded server-side (see UrgencyScoreCalculator.cs):
 // weighted sum 0.45*Deadline + 0.20*Blocking + 0.25*Impact + 0.10*UserOverride, then two floors
@@ -27,8 +28,16 @@ export interface UrgencyBreakdownProps {
 }
 
 export function UrgencyBreakdown({ breakdown }: UrgencyBreakdownProps) {
+  const reason = splitReason(breakdown.reasonText);
   return (
     <View style={styles.container}>
+      {reason ? (
+        <Text testID="urgency-reason" style={styles.reason}>
+          {reason.label ? <Text style={styles.reasonLabel}>{reason.label} </Text> : null}
+          {reason.rest}
+        </Text>
+      ) : null}
+
       <View style={styles.finalScoreRow}>
         <Text style={styles.finalScoreLabel}>Final Urgency Score</Text>
         <Text style={styles.finalScoreValue}>{breakdown.finalScore.toFixed(2)}</Text>
@@ -80,6 +89,8 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.sm,
   },
+  reason: { ...typography.body, color: colors.text },
+  reasonLabel: { fontWeight: '700', color: colors.primary },
   finalScoreRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

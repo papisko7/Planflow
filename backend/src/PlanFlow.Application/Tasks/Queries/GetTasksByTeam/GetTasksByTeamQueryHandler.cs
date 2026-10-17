@@ -28,13 +28,19 @@ public class GetTasksByTeamQueryHandler : IRequestHandler<GetTasksByTeamQuery, I
 
         // Materialize entities first, then map to TaskDto in memory: EF Core cannot translate
         // a call to a factory method (TaskDto.FromEntity) into SQL inside a Select projection.
-        var tasks = await _context.CalendarItems
+        // The latest ReasonText comes from the same query (indexed on item + time), so the list can show "why".
+        var rows = await _context.CalendarItems
             .AsNoTracking()
             .Where(t => t.TeamId == request.TeamId)
             .OrderByDescending(t => t.CurrentUrgencyScore)
+            .Select(t => new
+            {
+                Item = t,
+                Reason = t.UrgencyScoreLogs.OrderByDescending(l => l.CreatedAtUtc).Select(l => l.ReasonText).FirstOrDefault()
+            })
             .ToListAsync(cancellationToken);
 
-        var result = tasks.Select(TaskDto.FromEntity).ToList();
+        var result = rows.Select(r => TaskDto.FromEntity(r.Item) with { ReasonText = r.Reason }).ToList();
         await _cache.SetAsync(cacheKey, result, CacheKeys.TeamTasksTtl, cancellationToken);
         return result;
     }

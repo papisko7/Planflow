@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { addDays, composeDeadline, dayKey, formatDeadline, splitDeadline, startOfDay } from '../utils/dateUtils';
 import { MonthGrid } from './MonthGrid';
@@ -10,23 +10,46 @@ type Props = {
   onChange: (deadlineUtc: string | null) => void;
   // New tasks must be due in the future (the API rejects anything else); editing an old task may keep a past date.
   futureOnly?: boolean;
+  // What the moment is called: "Deadline" (default), "Start", "End", "Repeat until"...
+  label?: string;
+  // Optional fields read "<label> (optional)" and can be cleared; required ones (an event's start) cannot.
+  optional?: boolean;
+  // Offer the "All day" choice (stored as 23:59). Off for event times, which always have a clock time.
+  allowAllDay?: boolean;
+  // Earliest pickable day (e.g. an event's end cannot be before its start day).
+  minDate?: Date;
+  testIDPrefix?: string;
 };
 
 const TIME_CHOICES = ['09:00', '12:00', '15:00', '18:00'];
+// Any other clock time can be typed; it applies as soon as it is a valid H:MM / HH:MM.
+const CLOCK_TIME = /^([01]?\d|2[0-3]):[0-5]\d$/;
 
 // Replaces "type a number of days": tap the field, pick a day on a month grid (or a quick choice) and,
 // if it matters, a time. A task has ONE deadline - that is what the urgency score and the Google Calendar
-// sync work with - so there is deliberately no start-to-end range.
-export function DeadlinePicker({ value, onChange, futureOnly = false }: Props) {
+// sync work with - so a task has no start-to-end range. An Event does: the form uses two pickers (start, end).
+export function DeadlinePicker({
+  value,
+  onChange,
+  futureOnly = false,
+  label = 'Deadline',
+  optional = true,
+  allowAllDay = true,
+  minDate,
+  testIDPrefix = 'deadline-picker',
+}: Props) {
   const [open, setOpen] = useState(false);
   const [day, setDay] = useState<Date | null>(null);
   const [time, setTime] = useState<string | null>(null); // null = all day
+  const [customTime, setCustomTime] = useState('');
   const [month, setMonth] = useState(new Date());
 
   const openPicker = () => {
     const initial = value ? splitDeadline(value) : null;
     setDay(initial?.day ?? null);
-    setTime(initial?.time ?? null);
+    // Without an "All day" option a new value starts at 09:00; an existing 23:59 stays as a custom time.
+    setTime(initial ? (initial.time ?? (allowAllDay ? null : '23:59')) : allowAllDay ? null : '09:00');
+    setCustomTime('');
     setMonth(initial?.day ?? new Date());
     setOpen(true);
   };
@@ -50,9 +73,9 @@ export function DeadlinePicker({ value, onChange, futureOnly = false }: Props) {
 
   return (
     <>
-      <Pressable testID="deadline-picker-button" style={styles.field} onPress={openPicker}>
+      <Pressable testID={`${testIDPrefix}-button`} style={styles.field} onPress={openPicker}>
         <Text style={value ? styles.fieldText : styles.fieldPlaceholder}>
-          {value ? `Deadline: ${formatDeadline(value)}` : 'Deadline (optional)'}
+          {value ? `${label}: ${formatDeadline(value)}` : optional ? `${label} (optional)` : label}
         </Text>
       </Pressable>
 
@@ -60,13 +83,13 @@ export function DeadlinePicker({ value, onChange, futureOnly = false }: Props) {
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
           <Pressable style={styles.sheet} onPress={() => undefined}>
             <ScrollView keyboardShouldPersistTaps="handled">
-              <Text style={styles.heading}>Deadline</Text>
+              <Text style={styles.heading}>{label}</Text>
 
               <View style={styles.chipRow}>
                 {quick.map((q) => (
                   <Pressable
                     key={q.id}
-                    testID={`deadline-picker-quick-${q.id}`}
+                    testID={`${testIDPrefix}-quick-${q.id}`}
                     style={styles.chip}
                     onPress={() => pickDay(q.date)}
                   >
@@ -79,23 +102,25 @@ export function DeadlinePicker({ value, onChange, futureOnly = false }: Props) {
                 month={month}
                 onMonthChange={setMonth}
                 selectedKey={day ? dayKey(day) : null}
-                minDate={futureOnly ? today : undefined}
+                minDate={minDate ?? (futureOnly ? today : undefined)}
                 onSelectDay={pickDay}
               />
 
               <Text style={styles.label}>Time</Text>
               <View style={styles.chipRow}>
-                <Pressable
-                  testID="deadline-picker-time-allday"
-                  style={[styles.chip, time === null ? styles.chipActive : null]}
-                  onPress={() => setTime(null)}
-                >
-                  <Text style={time === null ? styles.chipTextActive : styles.chipText}>All day</Text>
-                </Pressable>
+                {allowAllDay ? (
+                  <Pressable
+                    testID={`${testIDPrefix}-time-allday`}
+                    style={[styles.chip, time === null ? styles.chipActive : null]}
+                    onPress={() => setTime(null)}
+                  >
+                    <Text style={time === null ? styles.chipTextActive : styles.chipText}>All day</Text>
+                  </Pressable>
+                ) : null}
                 {timeChoices.map((t) => (
                   <Pressable
                     key={t}
-                    testID={`deadline-picker-time-${t.replace(':', '')}`}
+                    testID={`${testIDPrefix}-time-${t.replace(':', '')}`}
                     style={[styles.chip, time === t ? styles.chipActive : null]}
                     onPress={() => setTime(t)}
                   >
@@ -103,12 +128,25 @@ export function DeadlinePicker({ value, onChange, futureOnly = false }: Props) {
                   </Pressable>
                 ))}
               </View>
+              <TextInput
+                testID={`${testIDPrefix}-time-input`}
+                style={styles.timeInput}
+                placeholder="Other time, e.g. 08:30"
+                placeholderTextColor={colors.textMuted}
+                value={customTime}
+                onChangeText={(text) => {
+                  setCustomTime(text);
+                  if (CLOCK_TIME.test(text.trim())) setTime(text.trim().padStart(5, '0'));
+                }}
+                keyboardType="numbers-and-punctuation"
+                maxLength={5}
+              />
 
               {inPast ? <Text style={styles.error}>That moment has already passed - pick a later time.</Text> : null}
 
               <View style={styles.actions}>
                 <Pressable
-                  testID="deadline-picker-set"
+                  testID={`${testIDPrefix}-set`}
                   style={[styles.button, !day || inPast ? styles.buttonDisabled : null]}
                   disabled={!day || inPast}
                   onPress={() => {
@@ -118,18 +156,18 @@ export function DeadlinePicker({ value, onChange, futureOnly = false }: Props) {
                 >
                   <Text style={styles.buttonText}>Set</Text>
                 </Pressable>
-                {value ? (
+                {value && optional ? (
                   <Pressable
-                    testID="deadline-picker-clear"
+                    testID={`${testIDPrefix}-clear`}
                     onPress={() => {
                       onChange(null);
                       setOpen(false);
                     }}
                   >
-                    <Text style={styles.clear}>Clear deadline</Text>
+                    <Text style={styles.clear}>Clear {label.toLowerCase()}</Text>
                   </Pressable>
                 ) : null}
-                <Pressable testID="deadline-picker-cancel" onPress={() => setOpen(false)}>
+                <Pressable testID={`${testIDPrefix}-cancel`} onPress={() => setOpen(false)}>
                   <Text style={styles.cancel}>Cancel</Text>
                 </Pressable>
               </View>
@@ -161,6 +199,14 @@ const styles = StyleSheet.create({
   },
   heading: { ...typography.title, color: colors.text, marginBottom: spacing.sm },
   label: { ...typography.body, color: colors.textMuted, marginTop: spacing.md },
+  timeInput: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    color: colors.text,
+  },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginVertical: spacing.sm },
   chip: {
     borderWidth: 1,

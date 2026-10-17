@@ -1,4 +1,5 @@
 import { TaskStatus, type TaskDto } from '../types/task';
+import { dueUtc, isPastEvent } from './schedule';
 
 export interface DashboardStats {
   open: number;
@@ -15,8 +16,9 @@ function sameLocalDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-// The four headline numbers on the dashboard. "Overdue" = open and past its deadline;
-// "due today" = open with a deadline later today (so the two never overlap).
+// The four headline numbers on the dashboard. "Overdue" = open and past its due moment (a Task's deadline,
+// an Event's start); "due today" = open and due later today (so the two never overlap). Finished events are
+// history, not open work, so they are skipped.
 export function computeDashboardStats(tasks: TaskDto[], now: Date = new Date()): DashboardStats {
   let open = 0;
   let overdue = 0;
@@ -28,10 +30,11 @@ export function computeDashboardStats(tasks: TaskDto[], now: Date = new Date()):
       done++;
       continue;
     }
-    if (!isOpen(task)) continue;
+    if (!isOpen(task) || isPastEvent(task, now)) continue;
     open++;
-    if (!task.deadlineUtc) continue;
-    const deadline = new Date(task.deadlineUtc);
+    const due = dueUtc(task);
+    if (!due) continue;
+    const deadline = new Date(due);
     if (deadline.getTime() < now.getTime()) overdue++;
     else if (sameLocalDay(deadline, now)) dueToday++;
   }

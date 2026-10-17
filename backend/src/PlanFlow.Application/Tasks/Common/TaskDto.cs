@@ -5,6 +5,7 @@ namespace PlanFlow.Application.Tasks.Common;
 /// <summary>
 /// Flat projection of a <see cref="CalendarItem"/> returned to callers outside the Application layer,
 /// so handlers never leak EF Core-tracked entities across the CQRS boundary.
+/// <see cref="ReasonText"/> is the latest urgency explanation; only the list query fills it (null elsewhere).
 /// </summary>
 public record TaskDto(
     Guid Id,
@@ -31,7 +32,8 @@ public record TaskDto(
     bool UseAiEnhancement,
     double? AiImpactScore,
     string? AiImpactReasoning,
-    bool IsDataIncomplete)
+    bool IsDataIncomplete,
+    string? ReasonText = null)
 {
     public static TaskDto FromEntity(CalendarItem task) => new(
         task.Id,

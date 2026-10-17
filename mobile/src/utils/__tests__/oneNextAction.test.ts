@@ -1,5 +1,6 @@
 import { selectOneNextAction } from '../oneNextAction';
 import { TaskStatus, type TaskDto } from '../../types/task';
+import { PLAIN_TASK_FIELDS } from '../../test-fixtures';
 
 let nextId = 0;
 
@@ -20,6 +21,7 @@ function buildTask(overrides: Partial<TaskDto> = {}): TaskDto {
     currentUrgencyScore: 0.5,
     createdAtUtc: '2026-01-01T00:00:00.000Z',
     updatedAtUtc: null,
+    ...PLAIN_TASK_FIELDS,
     ...overrides,
   };
 }

@@ -7,11 +7,14 @@ import { getCurrentUserId } from '../services/authService';
 import { deleteTask, getTask, getTeamTasks, updateTask } from '../services/taskService';
 import { getTeamMembers } from '../services/teamService';
 import { colors, radius, spacing, typography } from '../theme/theme';
+import { formatDuration } from '../utils/duration';
+import { formatRecurrence } from '../utils/itemDisplay';
+import { toUpdateRequest } from '../utils/schedule';
 import type { RootStackParamList } from '../navigation/types';
 import type { ApiError } from '../types/api';
 import { TeamRole, type TeamMemberDto } from '../types/team';
 import type { TaskDetailDto, TaskDto } from '../types/task';
-import { TaskStatus } from '../types/task';
+import { TaskStatus, TaskType } from '../types/task';
 
 type LoadState = 'loading' | 'ready' | 'error';
 
@@ -95,7 +98,12 @@ export default function TaskDetailScreen() {
   }
 
   const { task, latestScoreBreakdown } = detail;
+  const isEvent = task.taskType === TaskType.Event;
   const dueDate = formatDateTime(task.deadlineUtc);
+  const startDate = formatDateTime(task.startUtc);
+  const endDate = formatDateTime(task.endUtc);
+  const recurrence = formatRecurrence(task);
+  const recurrenceEnd = formatDateTime(task.recurrenceEndsAtUtc);
   const createdDate = formatDateTime(task.createdAtUtc);
 
   // Same rule as the API: Owner/Admin act on any task, a Member only on tasks assigned to them.
@@ -111,17 +119,11 @@ export default function TaskDetailScreen() {
   const toggleDone = async () => {
     setActionError(null);
     try {
-      await updateTask(task.id, task.teamId, {
-        title: task.title,
-        description: task.description,
-        status: task.status === TaskStatus.Done ? TaskStatus.Todo : TaskStatus.Done,
-        assignedUserId: task.assignedUserId,
-        deadlineUtc: task.deadlineUtc,
-        impactScore: task.impactScore,
-        blockedByTaskId: task.blockedByTaskId,
-        manualUrgencyOverride: task.manualUrgencyOverride,
-        manualUrgencyOverrideExpiresAtUtc: task.manualUrgencyOverrideExpiresAtUtc,
-      });
+      await updateTask(
+        task.id,
+        task.teamId,
+        toUpdateRequest(task, { status: task.status === TaskStatus.Done ? TaskStatus.Todo : TaskStatus.Done }),
+      );
       await load(true);
     } catch (err) {
       const apiError = err as ApiError;
@@ -134,17 +136,7 @@ export default function TaskDetailScreen() {
   const changeAssignee = async (assignedUserId: string | null, failureMessage: string) => {
     setActionError(null);
     try {
-      await updateTask(task.id, task.teamId, {
-        title: task.title,
-        description: task.description,
-        status: task.status,
-        assignedUserId,
-        deadlineUtc: task.deadlineUtc,
-        impactScore: task.impactScore,
-        blockedByTaskId: task.blockedByTaskId,
-        manualUrgencyOverride: task.manualUrgencyOverride,
-        manualUrgencyOverrideExpiresAtUtc: task.manualUrgencyOverrideExpiresAtUtc,
-      });
+      await updateTask(task.id, task.teamId, toUpdateRequest(task, { assignedUserId }));
       await load(true);
     } catch (err) {
       const apiError = err as ApiError;
@@ -198,13 +190,31 @@ export default function TaskDetailScreen() {
         <Text style={styles.taskTitle}>{task.title}</Text>
         <View style={styles.badgeRow}>
           <Text style={styles.statusBadge}>{STATUS_LABEL[task.status]}</Text>
+          <Text testID="task-type-badge" style={styles.overrideBadge}>
+            {isEvent ? 'Event' : 'Task'}
+          </Text>
           {task.manualUrgencyOverride !== null ? <Text style={styles.overrideBadge}>Manual override</Text> : null}
         </View>
         {task.description ? <Text style={styles.description}>{task.description}</Text> : null}
 
         <View style={styles.metaGrid}>
           {createdDate ? <MetaItem label="Created" value={createdDate} /> : null}
-          {dueDate ? <MetaItem label="Due" value={dueDate} /> : null}
+          {isEvent ? (
+            <>
+              {startDate ? <MetaItem label="Starts" value={startDate} /> : null}
+              {endDate ? <MetaItem label="Ends" value={endDate} /> : null}
+            </>
+          ) : (
+            <>
+              {dueDate ? <MetaItem label="Due" value={dueDate} /> : null}
+              {task.estimatedEffortHours !== null ? (
+                <MetaItem label="Estimated effort" value={formatDuration(task.estimatedEffortHours)} />
+              ) : null}
+            </>
+          )}
+          {recurrence ? (
+            <MetaItem label="Repeats" value={recurrenceEnd ? `${recurrence}, until ${recurrenceEnd}` : recurrence} />
+          ) : null}
           <MetaItem label="Impact score" value={task.impactScore === null ? "Not rated" : String(task.impactScore)} />
           <MetaItem label="Assigned to" value={assigneeName} />
         </View>
