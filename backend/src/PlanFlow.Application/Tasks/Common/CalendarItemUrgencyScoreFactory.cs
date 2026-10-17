@@ -99,6 +99,7 @@ public static class CalendarItemUrgencyScoreFactory
         ScoreTriggerSource triggerSource = ScoreTriggerSource.ManualUpdate)
     {
         var breakdown = Breakdown(task, blockingComponent, nowUtc);
+        var finalScore = UrgencyScoreCalculator.ApplyBlockedPenalty(breakdown.EffectiveScore, isBlocked);
 
         return new UrgencyScoreLog
         {
@@ -108,9 +109,89 @@ public static class CalendarItemUrgencyScoreFactory
             ImpactComponent = breakdown.Impact,
             UserOverrideComponent = breakdown.UserOverride,
             IsBlocked = isBlocked,
-            FinalScore = UrgencyScoreCalculator.ApplyBlockedPenalty(breakdown.EffectiveScore, isBlocked),
-            TriggerSource = triggerSource
+            FinalScore = finalScore,
+            TriggerSource = triggerSource,
+            ReasonText = BuildReasonText(task, breakdown, isBlocked, finalScore, nowUtc)
         };
+    }
+
+    /// <summary>Priority label shown in front of the reason; the thresholds are the same as the mobile app's urgency tiers.</summary>
+    public static string PriorityLabel(double score) => score switch
+    {
+        >= 0.8 => "[Critical]",
+        >= 0.6 => "[High]",
+        >= 0.4 => "[Medium]",
+        _ => "[Low]"
+    };
+
+    // One-line, fully deterministic explanation: "[Priority] timing, then the other factors that shaped the score".
+    // No randomness and no clock reads (only the nowUtc passed in), so the same input always gives the same text.
+    private static string BuildReasonText(CalendarItem task, ScoreBreakdown breakdown, bool isBlocked, double finalScore, DateTime nowUtc)
+    {
+        var label = PriorityLabel(finalScore);
+
+        if (IsPastEvent(task, nowUtc))
+        {
+            var end = ResolveEventEnd(task.StartUtc, task.EndUtc)!.Value;
+            return $"{label} Event ended {FormatSpan(nowUtc - end)} ago - history, no priority";
+        }
+
+        var parts = new List<string> { DescribeTiming(task, nowUtc) };
+
+        if (breakdown.Blocking > 0.0)
+        {
+            parts.Add($"holds up urgent work (inherits {(int)Math.Round(breakdown.Blocking * 100)}%)");
+        }
+        if (isBlocked)
+        {
+            parts.Add("blocked by an unfinished task (score halved)");
+        }
+        parts.Add(task.ImpactScore is { } impact ? $"impact {impact}/10" : "impact not rated");
+        if (breakdown.UserOverride > 0.0)
+        {
+            parts.Add("manual boost active");
+        }
+
+        return $"{label} {string.Join(", ", parts)}";
+    }
+
+    private static string DescribeTiming(CalendarItem task, DateTime nowUtc)
+    {
+        if (task.TaskType == TaskType.Event)
+        {
+            if (task.StartUtc is not { } start)
+            {
+                return "no start time";
+            }
+            return start <= nowUtc
+                ? $"in progress, started {FormatSpan(nowUtc - start)} ago"
+                : $"starts in {FormatSpan(start - nowUtc)}";
+        }
+
+        if (task.DeadlineUtc is not { } deadline)
+        {
+            return "no deadline";
+        }
+        if (deadline <= nowUtc)
+        {
+            return $"overdue by {FormatSpan(nowUtc - deadline)}";
+        }
+
+        var effort = task.EstimatedEffortHours ?? 0.0;
+        return effort > 0.0 && deadline.AddHours(-effort) <= nowUtc
+            ? $"not enough time: needs {FormatSpan(TimeSpan.FromHours(effort))}, only {FormatSpan(deadline - nowUtc)} left"
+            : $"due in {FormatSpan(deadline - nowUtc)}";
+    }
+
+    // Rounds down to the largest sensible unit: minutes below 1h, hours below 48h, days above.
+    private static string FormatSpan(TimeSpan span)
+    {
+        var abs = span.Duration();
+        if (abs.TotalHours < 1.0)
+        {
+            return $"{Math.Max(1, (int)abs.TotalMinutes)} min";
+        }
+        return abs.TotalHours < 48.0 ? $"{(int)abs.TotalHours}h" : $"{(int)abs.TotalDays}d";
     }
 
     private readonly record struct ScoreBreakdown(
