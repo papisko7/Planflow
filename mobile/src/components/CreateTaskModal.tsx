@@ -29,14 +29,14 @@ type Props = {
   tasks: TaskDto[];
   // Team preselected when the sheet opens (e.g. the team currently shown); falls back to the first team.
   defaultTeamId?: string | null;
-  // Type the form starts as (the Tasks screen opens it as Event while its Events tab is showing).
+  // Type the form starts as (the Items screen opens it as Event while its Events tab is showing).
   defaultType?: TaskType;
   onClose: () => void;
   onCreated: () => void;
 };
 
-// One "new task" sheet shared by every screen (Dashboard, Tasks, Calendar, Teams), so a task can be
-// added from wherever the user is without a trip to the Tasks tab.
+// One "new task" sheet shared by every screen (Dashboard, Items, Calendar, Teams), so a task can be
+// added from wherever the user is without a trip to the Items tab.
 export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultType = TaskType.Task, onClose, onCreated }: Props) {
   const myUserId = getCurrentUserId();
   const [teamId, setTeamId] = useState<string | null>(null);

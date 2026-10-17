@@ -66,7 +66,7 @@ export default function TeamsScreen() {
       setState('signedOut');
       return;
     }
-    // The personal workspace is managed from the Tasks tab; this screen is only for shared teams.
+    // The personal workspace is managed from the Items tab; this screen is only for shared teams.
     const data = (await getMyTeams()).filter((t) => !t.isPersonal);
     setTeams(data);
     setState('ready');
@@ -283,10 +283,10 @@ export default function TeamsScreen() {
           <TeamMembersCard teamId={selectedTeam.id} onChanged={load} />
           <View style={styles.workloadCard}>
             <View style={styles.headerRow}>
-              <Text style={styles.sectionLabel}>Tasks — {selectedTeam.name}</Text>
+              <Text style={styles.sectionLabel}>Items — {selectedTeam.name}</Text>
               <View style={styles.headerButtons}>
               <Pressable testID="team-new-task-button" style={styles.smallButton} onPress={() => setCreatingTask(true)}>
-                <Text style={styles.smallButtonText}>+ Task</Text>
+                <Text style={styles.smallButtonText}>+ Item</Text>
               </Pressable>
               <Pressable
                 testID="open-team-chat-button"
@@ -300,14 +300,14 @@ export default function TeamsScreen() {
             {tasksLoading ? (
               <ActivityIndicator color={colors.primary} style={styles.workloadSpinner} />
             ) : workload.length === 0 ? (
-              <Text style={styles.subtitle}>No tasks yet for this team.</Text>
+              <Text style={styles.subtitle}>No items yet for this team.</Text>
             ) : (
               workload.map((row) => (
                 <View key={row.key} style={styles.workloadRow}>
                   <Text style={styles.workloadLabel}>{row.label}</Text>
                   <View style={styles.workloadMeta}>
                     <Text style={styles.workloadCount}>
-                      {row.count} task{row.count === 1 ? '' : 's'}
+                      {row.count} item{row.count === 1 ? '' : 's'}
                     </Text>
                     <Text style={styles.workloadBadge}>
                       {URGENCY_TIER_META[getUrgencyTier(row.avgScore)].badge} avg {row.avgScore.toFixed(2)}

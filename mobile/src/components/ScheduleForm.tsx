@@ -1,9 +1,10 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { TaskType, type ScheduleFields } from '../types/task';
 import { INTERVAL_UNITS } from '../utils/duration';
 import { startOfDay } from '../utils/dateUtils';
-import { pairEventTimes } from '../utils/schedule';
+import { allDayToTimed, isAllDayRange, pairAllDayDates, pairEventTimes } from '../utils/schedule';
 import { DeadlinePicker } from './DeadlinePicker';
 import { DurationInput } from './DurationInput';
 
@@ -21,10 +22,18 @@ const TYPE_OPTIONS = [
 
 // The scheduling part of the create/edit forms, shared by both. A Task is work with ONE deadline and an effort
 // estimate; an Event occupies a time range (start - end). Whatever is not relevant for the chosen type is hidden
-// (and not sent, see normalizeSchedule). Recurrence applies to both.
+// (and not sent, see normalizeSchedule). An Event can also be all-day (whole days, no clock times). Recurrence applies to both.
 export function ScheduleForm({ value, onChange, isNew }: Props) {
   const isEvent = value.taskType === TaskType.Event;
+  // All-day is not an API field, it is the shape of the range (00:00 - 23:59), so it is local state that starts from
+  // the stored range when editing; the switch can be on before any day is picked.
+  const [allDay, setAllDay] = useState(() => isAllDayRange(value.startUtc, value.endUtc));
   const patch = (changes: Partial<ScheduleFields>) => onChange({ ...value, ...changes });
+
+  const toggleAllDay = (next: boolean) => {
+    setAllDay(next);
+    patch(next ? pairAllDayDates(value.startUtc, value.endUtc, value.startUtc ? 'start' : 'end') : allDayToTimed(value.startUtc));
+  };
 
   return (
     <View style={styles.wrapper}>
@@ -43,22 +52,28 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
 
       {isEvent ? (
         <>
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>All-day event</Text>
+            <Switch testID="schedule-allday-switch" value={allDay} onValueChange={toggleAllDay} trackColor={{ true: colors.primary }} />
+          </View>
           <DeadlinePicker
             testIDPrefix="event-start-picker"
             label="Start"
             optional={false}
             allowAllDay={false}
+            dateOnly={allDay}
             value={value.startUtc}
-            onChange={(startUtc) => patch(pairEventTimes(startUtc, value.endUtc, 'start'))}
+            onChange={(startUtc) => patch(allDay ? pairAllDayDates(startUtc, value.endUtc, 'start') : pairEventTimes(startUtc, value.endUtc, 'start'))}
           />
           <DeadlinePicker
             testIDPrefix="event-end-picker"
             label="End"
             optional={false}
             allowAllDay={false}
+            dateOnly={allDay}
             minDate={value.startUtc ? startOfDay(new Date(value.startUtc)) : undefined}
             value={value.endUtc}
-            onChange={(endUtc) => patch(pairEventTimes(value.startUtc, endUtc, 'end'))}
+            onChange={(endUtc) => patch(allDay ? pairAllDayDates(value.startUtc, endUtc, 'end') : pairEventTimes(value.startUtc, endUtc, 'end'))}
           />
         </>
       ) : (

@@ -1,10 +1,13 @@
 import { PLAIN_TASK_FIELDS } from '../../test-fixtures';
 import { TaskStatus, TaskType, type ScheduleFields, type TaskDto } from '../../types/task';
 import {
+  allDayToTimed,
   dueUtc,
   emptySchedule,
+  isAllDayRange,
   isPastEvent,
   normalizeSchedule,
+  pairAllDayDates,
   pairEventTimes,
   scheduleForEditing,
   toUpdateRequest,
@@ -145,5 +148,44 @@ describe('toUpdateRequest', () => {
     expect(req.startUtc).toBe(dto.startUtc);
     expect(req.endUtc).toBe(dto.endUtc);
     expect(req.title).toBe('Standup');
+  });
+});
+
+describe('all-day events', () => {
+  const at = (day: number, h: number, m = 0) => new Date(2026, 9, day, h, m).toISOString();
+  const local = (iso: string | null) => {
+    const d = new Date(iso!);
+    return [d.getDate(), d.getHours(), d.getMinutes()];
+  };
+
+  it('recognises the whole-day shape (00:00 -> 23:59) and nothing else', () => {
+    expect(isAllDayRange(at(19, 0), at(19, 23, 59))).toBe(true);
+    expect(isAllDayRange(at(19, 0), at(21, 23, 59))).toBe(true); // several days
+    expect(isAllDayRange(at(19, 9), at(19, 10))).toBe(false);
+    expect(isAllDayRange(at(19, 0), null)).toBe(false);
+  });
+
+  it('start is the base: picking a start day makes the event last that day', () => {
+    const range = pairAllDayDates(at(19, 14, 30), null, 'start');
+    expect(local(range.startUtc)).toEqual([19, 0, 0]);
+    expect(local(range.endUtc)).toEqual([19, 23, 59]);
+  });
+
+  it('keeps a later end day, but pulls an earlier one back to the start day', () => {
+    expect(local(pairAllDayDates(at(19, 0), at(22, 23, 59), 'start').endUtc)).toEqual([22, 23, 59]);
+    expect(local(pairAllDayDates(at(25, 0), at(22, 23, 59), 'start').endUtc)).toEqual([25, 23, 59]);
+  });
+
+  it('picking only an end day fills the start with the same day', () => {
+    const range = pairAllDayDates(null, at(19, 23, 59), 'end');
+    expect(local(range.startUtc)).toEqual([19, 0, 0]);
+    expect(local(range.endUtc)).toEqual([19, 23, 59]);
+  });
+
+  it('turning all-day off gives a 09:00-10:00 slot on the first day', () => {
+    const range = allDayToTimed(at(19, 0));
+    expect(local(range.startUtc)).toEqual([19, 9, 0]);
+    expect(local(range.endUtc)).toEqual([19, 10, 0]);
+    expect(allDayToTimed(null)).toEqual({ startUtc: null, endUtc: null });
   });
 });

@@ -54,15 +54,15 @@ appId: com.planflow.mobile
 - hideKeyboard
 - tapOn:
     id: "create-team-submit-button"
-- assertVisible: "Task distribution — QA Team Beta"
+- assertVisible: "Items — QA Team Beta"
 
 # Switch context back to Alpha and confirm the workload card follows the selection.
 - tapOn: "QA Team Alpha"
-- assertVisible: "Task distribution — QA Team Alpha"
+- assertVisible: "Items — QA Team Alpha"
 
 # --- Step C: Task creation (deadline, impact, blocking) ------------------------------------
-# TasksScreen always targets the caller's first team (creation order), i.e. QA Team Alpha.
-- tapOn: "Tasks"
+# ItemsScreen always targets the caller's first team (creation order), i.e. QA Team Alpha.
+- tapOn: "Items"
 - tapOn:
     id: "create-task-button"
 - tapOn:

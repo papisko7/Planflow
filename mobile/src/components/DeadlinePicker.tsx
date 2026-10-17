@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme/theme';
-import { addDays, composeDeadline, dayKey, formatDeadline, splitDeadline, startOfDay } from '../utils/dateUtils';
+import { addDays, composeDeadline, dayKey, formatDay, formatDeadline, splitDeadline, startOfDay } from '../utils/dateUtils';
 import { MonthGrid } from './MonthGrid';
 
 type Props = {
@@ -18,6 +18,8 @@ type Props = {
   allowAllDay?: boolean;
   // Earliest pickable day (e.g. an event's end cannot be before its start day).
   minDate?: Date;
+  // Pick only a day (no time choices): used for all-day events, where the caller turns the day into 00:00 / 23:59.
+  dateOnly?: boolean;
   testIDPrefix?: string;
 };
 
@@ -36,6 +38,7 @@ export function DeadlinePicker({
   optional = true,
   allowAllDay = true,
   minDate,
+  dateOnly = false,
   testIDPrefix = 'deadline-picker',
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -68,14 +71,14 @@ export function DeadlinePicker({
 
   // A time already on the task that is not one of the presets (e.g. synced from Google) stays selectable.
   const timeChoices = time && !TIME_CHOICES.includes(time) ? [...TIME_CHOICES, time] : TIME_CHOICES;
-  const candidate = day ? composeDeadline(day, time) : null;
+  const candidate = day ? composeDeadline(day, dateOnly ? null : time) : null;
   const inPast = futureOnly && candidate !== null && new Date(candidate).getTime() <= Date.now();
 
   return (
     <>
       <Pressable testID={`${testIDPrefix}-button`} style={styles.field} onPress={openPicker}>
         <Text style={value ? styles.fieldText : styles.fieldPlaceholder}>
-          {value ? `${label}: ${formatDeadline(value)}` : optional ? `${label} (optional)` : label}
+          {value ? `${label}: ${dateOnly ? formatDay(value) : formatDeadline(value)}` : optional ? `${label} (optional)` : label}
         </Text>
       </Pressable>
 
@@ -106,41 +109,45 @@ export function DeadlinePicker({
                 onSelectDay={pickDay}
               />
 
-              <Text style={styles.label}>Time</Text>
-              <View style={styles.chipRow}>
-                {allowAllDay ? (
-                  <Pressable
-                    testID={`${testIDPrefix}-time-allday`}
-                    style={[styles.chip, time === null ? styles.chipActive : null]}
-                    onPress={() => setTime(null)}
-                  >
-                    <Text style={time === null ? styles.chipTextActive : styles.chipText}>All day</Text>
-                  </Pressable>
-                ) : null}
-                {timeChoices.map((t) => (
-                  <Pressable
-                    key={t}
-                    testID={`${testIDPrefix}-time-${t.replace(':', '')}`}
-                    style={[styles.chip, time === t ? styles.chipActive : null]}
-                    onPress={() => setTime(t)}
-                  >
-                    <Text style={time === t ? styles.chipTextActive : styles.chipText}>{t}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              <TextInput
-                testID={`${testIDPrefix}-time-input`}
-                style={styles.timeInput}
-                placeholder="Other time, e.g. 08:30"
-                placeholderTextColor={colors.textMuted}
-                value={customTime}
-                onChangeText={(text) => {
-                  setCustomTime(text);
-                  if (CLOCK_TIME.test(text.trim())) setTime(text.trim().padStart(5, '0'));
-                }}
-                keyboardType="numbers-and-punctuation"
-                maxLength={5}
-              />
+              {dateOnly ? null : (
+                <>
+                  <Text style={styles.label}>Time</Text>
+                  <View style={styles.chipRow}>
+                    {allowAllDay ? (
+                      <Pressable
+                        testID={`${testIDPrefix}-time-allday`}
+                        style={[styles.chip, time === null ? styles.chipActive : null]}
+                        onPress={() => setTime(null)}
+                      >
+                        <Text style={time === null ? styles.chipTextActive : styles.chipText}>All day</Text>
+                      </Pressable>
+                    ) : null}
+                    {timeChoices.map((t) => (
+                      <Pressable
+                        key={t}
+                        testID={`${testIDPrefix}-time-${t.replace(':', '')}`}
+                        style={[styles.chip, time === t ? styles.chipActive : null]}
+                        onPress={() => setTime(t)}
+                      >
+                        <Text style={time === t ? styles.chipTextActive : styles.chipText}>{t}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <TextInput
+                    testID={`${testIDPrefix}-time-input`}
+                    style={styles.timeInput}
+                    placeholder="Other time, e.g. 08:30"
+                    placeholderTextColor={colors.textMuted}
+                    value={customTime}
+                    onChangeText={(text) => {
+                      setCustomTime(text);
+                      if (CLOCK_TIME.test(text.trim())) setTime(text.trim().padStart(5, '0'));
+                    }}
+                    keyboardType="numbers-and-punctuation"
+                    maxLength={5}
+                  />
+                </>
+              )}
 
               {inPast ? <Text style={styles.error}>That moment has already passed - pick a later time.</Text> : null}
 

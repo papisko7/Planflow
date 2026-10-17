@@ -1,3 +1,4 @@
+import { composeDeadline, startOfDay } from './dateUtils';
 import { TaskType, type ScheduleFields, type TaskDto, type UpdateTaskRequest } from '../types/task';
 
 // Same bound as the backend's TaskScheduleValidator: one year in hours.
@@ -59,6 +60,39 @@ export function pairEventTimes(
     return { startUtc: new Date(end - DEFAULT_EVENT_HOURS * HOUR_MS).toISOString(), endUtc };
   }
   return { startUtc, endUtc };
+}
+
+// An all-day event covers whole local days: it starts at 00:00 of the first day and ends at 23:59 of the last
+// (the same "end of day" an all-day deadline uses). There is no separate flag in the API - the shape IS the flag.
+export function isAllDayRange(startUtc: string | null, endUtc: string | null): boolean {
+  if (!startUtc || !endUtc) return false;
+  const start = new Date(startUtc);
+  const end = new Date(endUtc);
+  return start.getHours() === 0 && start.getMinutes() === 0 && end.getHours() === 23 && end.getMinutes() === 59 && end >= start;
+}
+
+// All-day twin of pairEventTimes, working on whole days. Start is the base value: picking a start day makes the
+// event last that one day (end = 23:59 of it), and an end that is still on or after the start day is kept, so a
+// multi-day event the user set up is not collapsed. Picking an end day first fills the start with that same day.
+export function pairAllDayDates(
+  startUtc: string | null,
+  endUtc: string | null,
+  changed: 'start' | 'end',
+): { startUtc: string | null; endUtc: string | null } {
+  let startDay = startUtc ? startOfDay(new Date(startUtc)) : null;
+  let endDay = endUtc ? startOfDay(new Date(endUtc)) : null;
+  if (changed === 'start' && startDay && (!endDay || endDay < startDay)) endDay = startDay;
+  if (changed === 'end' && endDay && (!startDay || startDay > endDay)) startDay = endDay;
+  return {
+    startUtc: startDay ? composeDeadline(startDay, '00:00') : null,
+    endUtc: endDay ? composeDeadline(endDay, null) : null,
+  };
+}
+
+// Leaving all-day mode: the first day becomes a normal 09:00-10:00 slot (the picker's default time) to adjust.
+export function allDayToTimed(startUtc: string | null): { startUtc: string | null; endUtc: string | null } {
+  if (!startUtc) return { startUtc: null, endUtc: null };
+  return pairEventTimes(composeDeadline(startOfDay(new Date(startUtc)), '09:00'), null, 'start');
 }
 
 // The moment a person plans around: a Task's deadline, an Event's start (mirrors CalendarItem.DueUtc).

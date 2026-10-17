@@ -12,7 +12,7 @@ import type { RootStackParamList } from '../navigation/types';
 import { TaskType, type TaskDto, type TaskWithTeam } from '../types/task';
 import { countByTab, filterByTab, type ItemTab } from '../utils/itemFilter';
 
-export default function TasksScreen() {
+export default function ItemsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { state, tasks, teams, errorMessage, refreshing, refresh, reload } = useAllTasks();
   const taskActions = useTaskActions(reload);
@@ -42,7 +42,7 @@ export default function TasksScreen() {
     return (
       <View style={styles.centered}>
         <Text style={styles.title}>Sign in required</Text>
-        <Text style={styles.subtitle}>Log in to see your team's tasks.</Text>
+        <Text style={styles.subtitle}>Log in to see your team's items.</Text>
       </View>
     );
   }
@@ -50,7 +50,7 @@ export default function TasksScreen() {
   if (state === 'error') {
     return (
       <View style={styles.centered}>
-        <Text style={styles.title}>Couldn't load tasks</Text>
+        <Text style={styles.title}>Couldn't load items</Text>
         <Text style={styles.subtitle}>{errorMessage}</Text>
       </View>
     );

@@ -96,6 +96,30 @@ describe('CreateTaskModal - Task vs Event', () => {
     expect(new Date(endUtc!).getTime() - new Date(startUtc!).getTime()).toBe(3_600_000);
   });
 
+  it('all-day: picking the start day fills the end with the end of that day, and no clock times are offered', async () => {
+    mockedCreateTask.mockResolvedValue({} as never);
+
+    await render(<CreateTaskModal visible teams={[personal]} tasks={[]} onClose={jest.fn()} onCreated={jest.fn()} />);
+    await fireEvent.press(screen.getByTestId('schedule-type-event'));
+    await fireEvent.changeText(screen.getByTestId('create-task-title-input'), 'Conference');
+    await fireEvent(screen.getByTestId('schedule-allday-switch'), 'valueChange', true);
+
+    await fireEvent.press(screen.getByTestId('event-start-picker-button'));
+    expect(screen.queryByTestId('event-start-picker-time-1500')).toBeNull();
+    await fireEvent.press(screen.getByTestId('event-start-picker-quick-week'));
+    await fireEvent.press(screen.getByTestId('event-start-picker-set'));
+
+    expect(screen.getByText(/End: /)).toBeTruthy(); // the end shows up by itself
+    await fireEvent.press(screen.getByTestId('create-task-submit-button'));
+    await waitFor(() => expect(mockedCreateTask).toHaveBeenCalled());
+    const { startUtc, endUtc } = mockedCreateTask.mock.calls[0][1];
+    const start = new Date(startUtc!);
+    const end = new Date(endUtc!);
+    expect([start.getHours(), start.getMinutes()]).toEqual([0, 0]);
+    expect([end.getHours(), end.getMinutes()]).toEqual([23, 59]);
+    expect(end.toDateString()).toBe(start.toDateString());
+  });
+
   it('creates an Event with its start and a recurrence interval in hours', async () => {
     mockedCreateTask.mockResolvedValue({} as never);
 

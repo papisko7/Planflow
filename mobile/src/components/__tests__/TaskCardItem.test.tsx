@@ -44,15 +44,29 @@ describe('TaskCard - CalendarItem fields', () => {
       endUtc: new Date(2026, 9, 20, 15, 30).toISOString(),
     };
     const { unmount } = await render(<TaskCard task={event} />);
-    expect(screen.getByText('Event')).toBeTruthy();
+    expect(screen.getByText('🗓 Event')).toBeTruthy();
+    expect(screen.queryByText('☑ Task')).toBeNull();
     expect(screen.getByText(/14:00-15:30/)).toBeTruthy();
     await unmount();
 
     await render(<TaskCard task={{ ...base, estimatedEffortHours: 48, isRecurring: true, recurrenceIntervalHours: 168 }} />);
-    expect(screen.queryByText('Event')).toBeNull();
+    expect(screen.getByText('☑ Task')).toBeTruthy(); // every item carries its type, not just events
+    expect(screen.queryByText('🗓 Event')).toBeNull();
     expect(screen.getByText(/2 d/)).toBeTruthy();
     expect(screen.getByText(/every 1 wk/)).toBeTruthy();
   });
+});
+
+it('shows an all-day event as a day, not as 00:00-23:59', async () => {
+  const allDay: TaskDto = {
+    ...base,
+    taskType: TaskType.Event,
+    startUtc: new Date(2026, 9, 20, 0, 0).toISOString(),
+    endUtc: new Date(2026, 9, 20, 23, 59).toISOString(),
+  };
+  await render(<TaskCard task={allDay} />);
+  expect(screen.getByText(/all day/)).toBeTruthy();
+  expect(screen.queryByText(/23:59/)).toBeNull();
 });
 
 describe('UrgencyBreakdown - reason text', () => {

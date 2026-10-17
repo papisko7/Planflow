@@ -9,12 +9,14 @@ import { getTeamMembers } from '../services/teamService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { formatDuration } from '../utils/duration';
 import { formatRecurrence } from '../utils/itemDisplay';
-import { toUpdateRequest } from '../utils/schedule';
+import { formatDay } from '../utils/dateUtils';
+import { isAllDayRange, toUpdateRequest } from '../utils/schedule';
 import type { RootStackParamList } from '../navigation/types';
 import type { ApiError } from '../types/api';
 import { TeamRole, type TeamMemberDto } from '../types/team';
 import type { TaskDetailDto, TaskDto } from '../types/task';
 import { TaskStatus, TaskType } from '../types/task';
+import { ItemTypeBadge } from '../components/ItemTypeBadge';
 
 type LoadState = 'loading' | 'ready' | 'error';
 
@@ -100,8 +102,10 @@ export default function TaskDetailScreen() {
   const { task, latestScoreBreakdown } = detail;
   const isEvent = task.taskType === TaskType.Event;
   const dueDate = formatDateTime(task.deadlineUtc);
-  const startDate = formatDateTime(task.startUtc);
-  const endDate = formatDateTime(task.endUtc);
+  // An all-day event reads "Oct 19, 2026 · all day" instead of 12:00 AM - 11:59 PM.
+  const allDay = isAllDayRange(task.startUtc, task.endUtc);
+  const startDate = allDay ? formatDay(task.startUtc!) : formatDateTime(task.startUtc);
+  const endDate = allDay ? formatDay(task.endUtc!) : formatDateTime(task.endUtc);
   const recurrence = formatRecurrence(task);
   const recurrenceEnd = formatDateTime(task.recurrenceEndsAtUtc);
   const createdDate = formatDateTime(task.createdAtUtc);
@@ -190,9 +194,7 @@ export default function TaskDetailScreen() {
         <Text style={styles.taskTitle}>{task.title}</Text>
         <View style={styles.badgeRow}>
           <Text style={styles.statusBadge}>{STATUS_LABEL[task.status]}</Text>
-          <Text testID="task-type-badge" style={styles.overrideBadge}>
-            {isEvent ? 'Event' : 'Task'}
-          </Text>
+          <ItemTypeBadge testID="task-type-badge" type={task.taskType} />
           {task.manualUrgencyOverride !== null ? <Text style={styles.overrideBadge}>Manual override</Text> : null}
         </View>
         {task.description ? <Text style={styles.description}>{task.description}</Text> : null}
@@ -203,6 +205,7 @@ export default function TaskDetailScreen() {
             <>
               {startDate ? <MetaItem label="Starts" value={startDate} /> : null}
               {endDate ? <MetaItem label="Ends" value={endDate} /> : null}
+              {allDay ? <MetaItem label="Duration" value="All day" /> : null}
             </>
           ) : (
             <>
@@ -256,7 +259,7 @@ export default function TaskDetailScreen() {
         )}
         {blockedTasks.length > 0 ? (
           <View style={styles.relationList}>
-            <Text style={styles.relationTextMuted}>Blocks {blockedTasks.length} downstream task(s):</Text>
+            <Text style={styles.relationTextMuted}>Blocks {blockedTasks.length} downstream item(s):</Text>
             {blockedTasks.map((t) => (
               <Text key={t.id} style={styles.relationText}>
                 • {t.title}

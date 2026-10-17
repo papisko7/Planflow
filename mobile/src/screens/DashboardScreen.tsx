@@ -49,7 +49,7 @@ export default function DashboardScreen() {
     }, []),
   );
 
-  // Finished / cancelled tasks and events that already took place are history, not "what needs attention" — they stay visible on the Tasks tab.
+  // Finished / cancelled tasks and events that already took place are history, not "what needs attention" — they stay visible on the Items tab.
   const openTasks = useMemo(
     () => tasks.filter((t) => t.status !== TaskStatus.Done && t.status !== TaskStatus.Cancelled && !isPastEvent(t)),
     [tasks],
@@ -69,7 +69,7 @@ export default function DashboardScreen() {
   );
 
   const shortcuts: Shortcut[] = [
-    { testID: 'shortcut-tasks', label: 'Tasks', icon: 'checkbox-outline', onPress: () => goToTab('Tasks') },
+    { testID: 'shortcut-items', label: 'Items', icon: 'list-outline', onPress: () => goToTab('Items') },
     { testID: 'shortcut-calendar', label: 'Calendar', icon: 'calendar-outline', onPress: () => goToTab('Calendar') },
     { testID: 'shortcut-teams', label: 'Teams', icon: 'people-outline', onPress: () => goToTab('Teams') },
   ];
@@ -190,14 +190,14 @@ export default function DashboardScreen() {
               <Text style={styles.title}>All clear</Text>
               <Text style={styles.subtitle}>No open tasks right now.</Text>
               <Pressable testID="dashboard-empty-add-task" onPress={() => setCreatingTask(true)} style={styles.emptyButton}>
-                <Text style={styles.emptyButtonText}>+ Add a task</Text>
+                <Text style={styles.emptyButtonText}>+ Add an item</Text>
               </Pressable>
             </View>
           )
         }
         contentContainerStyle={styles.listContent}
       />
-      <Fab onPress={() => setAddMenuVisible(true)} accessibilityLabel="Add task or team" />
+      <Fab onPress={() => setAddMenuVisible(true)} accessibilityLabel="Add item or team" />
       <AddMenu
         visible={addMenuVisible}
         onClose={() => setAddMenuVisible(false)}

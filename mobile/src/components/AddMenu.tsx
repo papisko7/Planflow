@@ -21,7 +21,7 @@ export function AddMenu({ visible, onClose, onNewTask, onNewTeam }: Props) {
       <Pressable style={styles.backdrop} onPress={onClose}>
         <View style={styles.sheet}>
           <Pressable testID="add-menu-task" style={styles.item} onPress={run(onNewTask)}>
-            <Text style={styles.itemText}>New task</Text>
+            <Text style={styles.itemText}>New item</Text>
           </Pressable>
           <Pressable testID="add-menu-team" style={styles.item} onPress={run(onNewTeam)}>
             <Text style={styles.itemText}>New team</Text>

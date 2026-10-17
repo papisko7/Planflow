@@ -6,6 +6,7 @@ import { formatDuration } from '../utils/duration';
 import { formatRecurrence, formatWhen, splitReason } from '../utils/itemDisplay';
 import { getUrgencyTier, URGENCY_TIER_META } from '../utils/urgencyGrouping';
 import { TaskStatus, TaskType, type TaskDto } from '../types/task';
+import { ItemTypeBadge } from './ItemTypeBadge';
 import { SwipeableRow } from './SwipeableRow';
 import { TaskActionMenu } from './TaskActionMenu';
 
@@ -101,9 +102,9 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
       ) : null}
 
       <View style={styles.metaRow}>
+        <ItemTypeBadge testID={`item-type-${task.id}`} type={task.taskType} />
         {task.teamName ? <Text style={styles.teamChip}>👥 {task.teamName}</Text> : null}
         {!task.assignedUserId ? <Text style={styles.metaText}>👤 Unassigned</Text> : null}
-        {isEvent ? <Text style={styles.eventChip}>Event</Text> : null}
         {when ? <Text style={styles.metaText}>{isEvent ? '🗓' : '📅'} {when}</Text> : null}
         {!isEvent && task.estimatedEffortHours !== null ? (
           <Text style={styles.metaText}>⏱ {formatDuration(task.estimatedEffortHours)}</Text>
@@ -186,17 +187,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.primary,
     backgroundColor: colors.primaryMuted,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  eventChip: {
-    ...typography.body,
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.urgencyHigh,
-    borderWidth: 1,
-    borderColor: colors.urgencyHigh,
     paddingHorizontal: spacing.sm,
     borderRadius: radius.sm,
     overflow: 'hidden',

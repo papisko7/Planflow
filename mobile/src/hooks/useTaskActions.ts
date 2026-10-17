@@ -20,7 +20,7 @@ export function useTaskActions(reload: () => unknown) {
     Alert.alert(
       title,
       apiError.status === 403
-        ? 'You can only change tasks assigned to you (take over an unassigned one first), unless you are the team owner or an admin.'
+        ? 'You can only change items assigned to you (take over an unassigned one first), unless you are the team owner or an admin.'
         : (apiError.message ?? 'Something went wrong.'),
     );
   }, []);
@@ -43,7 +43,7 @@ export function useTaskActions(reload: () => unknown) {
               await deleteTask(task.id, task.teamId);
               await reload();
             } catch (err) {
-              showError("Couldn't delete task", err);
+              showError("Couldn't delete item", err);
             }
           },
         },
@@ -74,19 +74,19 @@ export function useTaskActions(reload: () => unknown) {
   );
 
   const complete = useCallback(
-    (task: TaskDto) => saveChange(task, { status: TaskStatus.Done }, "Couldn't update task"),
+    (task: TaskDto) => saveChange(task, { status: TaskStatus.Done }, "Couldn't update item"),
     [saveChange],
   );
   // Undo for "done": the task goes back to the To Do list and the next urgency recalculation picks it up again.
   const reopen = useCallback(
-    (task: TaskDto) => saveChange(task, { status: TaskStatus.Todo }, "Couldn't update task"),
+    (task: TaskDto) => saveChange(task, { status: TaskStatus.Todo }, "Couldn't update item"),
     [saveChange],
   );
   // Claim: a member takes an unassigned task. From then on it is "theirs", so they may edit and delete it.
   const claim = useCallback(
     (task: TaskDto) => {
       const me = getCurrentUserId();
-      return me ? saveChange(task, { assignedUserId: me }, "Couldn't take over task") : undefined;
+      return me ? saveChange(task, { assignedUserId: me }, "Couldn't take over item") : undefined;
     },
     [saveChange],
   );
@@ -94,7 +94,7 @@ export function useTaskActions(reload: () => unknown) {
   // Abandon: the opposite of claim. The assignee is cleared and the task goes back to the unassigned pool,
   // where anyone in the team can take it over.
   const abandon = useCallback(
-    (task: TaskDto) => saveChange(task, { assignedUserId: null }, "Couldn't abandon task"),
+    (task: TaskDto) => saveChange(task, { assignedUserId: null }, "Couldn't abandon item"),
     [saveChange],
   );
 

@@ -44,10 +44,14 @@ export function splitDeadline(iso: string): { day: Date; time: string | null } {
   return { day: startOfDay(d), time: isAllDay ? ALL_DAY : `${pad(d.getHours())}:${pad(d.getMinutes())}` };
 }
 
+// The local day alone ("Mon, 19 Oct 2026"), for all-day values where a clock time means nothing.
+export function formatDay(iso: string): string {
+  return startOfDay(new Date(iso)).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 export function formatDeadline(iso: string): string {
-  const { day, time } = splitDeadline(iso);
-  const date = day.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-  return `${date} · ${time ?? 'all day'}`;
+  const { time } = splitDeadline(iso);
+  return `${formatDay(iso)} · ${time ?? 'all day'}`;
 }
 
 // Pinch = two fingers moving together or apart. Comparing the finger distance at the start and at the

@@ -4,7 +4,7 @@ import { createNavigationContainerRef, NavigationContainer } from '@react-naviga
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import DashboardScreen from '../screens/DashboardScreen';
-import TasksScreen from '../screens/TasksScreen';
+import ItemsScreen from '../screens/ItemsScreen';
 import TeamsScreen from '../screens/TeamsScreen';
 import CalendarScreen from '../screens/CalendarScreen';
 import SettingsScreen from '../screens/SettingsScreen';
@@ -20,7 +20,7 @@ import type { RootStackParamList, RootTabParamList } from './types';
 const Tab = createBottomTabNavigator<RootTabParamList>();
 const TAB_ICONS: Record<keyof RootTabParamList, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> = {
   Dashboard: { active: 'speedometer', inactive: 'speedometer-outline' },
-  Tasks: { active: 'checkbox', inactive: 'checkbox-outline' },
+  Items: { active: 'list', inactive: 'list-outline' },
   Teams: { active: 'people', inactive: 'people-outline' },
   Calendar: { active: 'calendar', inactive: 'calendar-outline' },
   Settings: { active: 'settings', inactive: 'settings-outline' },
@@ -46,7 +46,7 @@ function Tabs() {
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
-      <Tab.Screen name="Tasks" component={TasksScreen} />
+      <Tab.Screen name="Items" component={ItemsScreen} />
       <Tab.Screen name="Teams" component={TeamsScreen} />
       <Tab.Screen name="Calendar" component={CalendarScreen} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
@@ -82,7 +82,7 @@ export default function RootNavigator() {
           }}
         >
           <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
-          <Stack.Screen name="TaskDetail" component={TaskDetailScreen} options={{ title: 'Task Details' }} />
+          <Stack.Screen name="TaskDetail" component={TaskDetailScreen} options={{ title: 'Item Details' }} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
           <Stack.Screen
             name="Chat"

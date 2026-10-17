@@ -178,7 +178,7 @@ export default function CalendarScreen() {
               <Text style={styles.title}>Nothing scheduled</Text>
               <Text style={styles.subtitle}>No tasks with deadlines yet.</Text>
               <Pressable testID="calendar-empty-add-task" onPress={() => setCreatingTask(true)} style={styles.emptyButton}>
-                <Text style={styles.emptyButtonText}>+ Add a task</Text>
+                <Text style={styles.emptyButtonText}>+ Add an item</Text>
               </Pressable>
             </View>
           }
@@ -211,7 +211,7 @@ export default function CalendarScreen() {
               </View>
             </>
           }
-          ListEmptyComponent={<Text style={styles.noTasks}>No tasks due this day.</Text>}
+          ListEmptyComponent={<Text style={styles.noTasks}>Nothing due this day.</Text>}
           contentContainerStyle={styles.listContent}
         />
       )}

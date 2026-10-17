@@ -10,7 +10,7 @@ export type AuthStackParamList = {
 // Shared param list for the root bottom-tab navigator, kept next to the navigator that uses it.
 export type RootTabParamList = {
   Dashboard: undefined;
-  Tasks: undefined;
+  Items: undefined;
   Teams: undefined;
   Calendar: undefined;
   Settings: undefined;

@@ -1,5 +1,6 @@
 import { TaskType, type TaskDto } from '../types/task';
 import { formatDuration, INTERVAL_UNITS } from './duration';
+import { isAllDayRange } from './schedule';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const shortDate = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -7,7 +8,7 @@ const clock = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 
 // Where an item sits in time, for cards: a Task shows its deadline day, an Event shows its range
-// ("Oct 5 · 14:00-15:00", or "Oct 5 14:00 - Oct 6 10:00" when it spans days).
+// ("Oct 5 · 14:00-15:00", "Oct 5 · all day", or "Oct 5 14:00 - Oct 6 10:00" when it spans days).
 export function formatWhen(item: Pick<TaskDto, 'taskType' | 'deadlineUtc' | 'startUtc' | 'endUtc'>): string | null {
   if (item.taskType !== TaskType.Event) {
     return item.deadlineUtc ? shortDate(new Date(item.deadlineUtc)) : null;
@@ -16,6 +17,9 @@ export function formatWhen(item: Pick<TaskDto, 'taskType' | 'deadlineUtc' | 'sta
   const start = new Date(item.startUtc);
   if (!item.endUtc) return `${shortDate(start)} · ${clock(start)}`;
   const end = new Date(item.endUtc);
+  if (isAllDayRange(item.startUtc, item.endUtc)) {
+    return sameDay(start, end) ? `${shortDate(start)} · all day` : `${shortDate(start)} - ${shortDate(end)} · all day`;
+  }
   return sameDay(start, end)
     ? `${shortDate(start)} · ${clock(start)}-${clock(end)}`
     : `${shortDate(start)} ${clock(start)} - ${shortDate(end)} ${clock(end)}`;
