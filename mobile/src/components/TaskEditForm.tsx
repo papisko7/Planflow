@@ -7,7 +7,7 @@ import { ScheduleForm } from './ScheduleForm';
 import type { ApiError } from '../types/api';
 import type { TeamMemberDto } from '../types/team';
 import { TaskStatus, type ScheduleFields, type TaskDto } from '../types/task';
-import { normalizeSchedule, scheduleFromTask, toUpdateRequest, validateSchedule } from '../utils/schedule';
+import { normalizeSchedule, scheduleForEditing, toUpdateRequest, validateSchedule } from '../utils/schedule';
 
 type Props = {
   task: TaskDto;
@@ -29,7 +29,7 @@ const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
 export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Props) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
-  const [schedule, setSchedule] = useState<ScheduleFields>(() => scheduleFromTask(task));
+  const [schedule, setSchedule] = useState<ScheduleFields>(() => scheduleForEditing(task));
   const [impact, setImpact] = useState(task.impactScore === null ? "" : String(task.impactScore));
   const [status, setStatus] = useState(task.status);
   const [assignedUserId, setAssignedUserId] = useState(task.assignedUserId);

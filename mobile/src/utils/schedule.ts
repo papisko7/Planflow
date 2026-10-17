@@ -3,7 +3,8 @@ import { TaskType, type ScheduleFields, type TaskDto, type UpdateTaskRequest } f
 // Same bound as the backend's TaskScheduleValidator: one year in hours.
 const MAX_HOURS = 366 * 24;
 // An event with no end is assumed to last one hour (CalendarItemUrgencyScoreFactory.DefaultEventDurationHours).
-const DEFAULT_EVENT_HOURS = 1;
+export const DEFAULT_EVENT_HOURS = 1;
+const HOUR_MS = 3_600_000;
 
 export function emptySchedule(taskType: TaskType = TaskType.Task): ScheduleFields {
   return {
@@ -29,6 +30,35 @@ export function scheduleFromTask(task: TaskDto): ScheduleFields {
     recurrenceIntervalHours: task.recurrenceIntervalHours,
     recurrenceEndsAtUtc: task.recurrenceEndsAtUtc,
   };
+}
+
+// The form always shows both ends of an event, so an event stored without an end (e.g. imported) is opened with the
+// end the backend assumes anyway. Only the edit form uses this; quick actions resend the stored values untouched.
+export function scheduleForEditing(task: TaskDto): ScheduleFields {
+  const schedule = scheduleFromTask(task);
+  return task.taskType === TaskType.Event && schedule.startUtc && !schedule.endUtc
+    ? { ...schedule, ...pairEventTimes(schedule.startUtc, null, 'start') }
+    : schedule;
+}
+
+// Start and end fill each other in so the user always sees a complete range after touching either one:
+// a new start gives end = start + 1h, a new end gives start = end - 1h (the time of day of the picked one is kept,
+// so a day picked with the default 09:00 gives 09:00-10:00 / 08:00-09:00). The other side is left alone when it
+// is already consistent (start before end), so a range the user adjusted is not overwritten.
+export function pairEventTimes(
+  startUtc: string | null,
+  endUtc: string | null,
+  changed: 'start' | 'end',
+): { startUtc: string | null; endUtc: string | null } {
+  const start = startUtc ? new Date(startUtc).getTime() : null;
+  const end = endUtc ? new Date(endUtc).getTime() : null;
+  if (changed === 'start' && start !== null && (end === null || end <= start)) {
+    return { startUtc, endUtc: new Date(start + DEFAULT_EVENT_HOURS * HOUR_MS).toISOString() };
+  }
+  if (changed === 'end' && end !== null && (start === null || start >= end)) {
+    return { startUtc: new Date(end - DEFAULT_EVENT_HOURS * HOUR_MS).toISOString(), endUtc };
+  }
+  return { startUtc, endUtc };
 }
 
 // The moment a person plans around: a Task's deadline, an Event's start (mirrors CalendarItem.DueUtc).

@@ -1,6 +1,15 @@
 import { PLAIN_TASK_FIELDS } from '../../test-fixtures';
 import { TaskStatus, TaskType, type ScheduleFields, type TaskDto } from '../../types/task';
-import { dueUtc, emptySchedule, isPastEvent, normalizeSchedule, toUpdateRequest, validateSchedule } from '../schedule';
+import {
+  dueUtc,
+  emptySchedule,
+  isPastEvent,
+  normalizeSchedule,
+  pairEventTimes,
+  scheduleForEditing,
+  toUpdateRequest,
+  validateSchedule,
+} from '../schedule';
 
 const HOUR = 3_600_000;
 const inHours = (h: number) => new Date(Date.now() + h * HOUR).toISOString();
@@ -77,6 +86,48 @@ describe('dueUtc / isPastEvent', () => {
     expect(isPastEvent({ taskType: TaskType.Event, startUtc: inHours(-2), endUtc: null })).toBe(true);
     expect(isPastEvent({ taskType: TaskType.Event, startUtc: inHours(-0.5), endUtc: null })).toBe(false);
     expect(isPastEvent({ taskType: TaskType.Task, startUtc: null, endUtc: null })).toBe(false);
+  });
+});
+
+describe('pairEventTimes', () => {
+  const start = '2026-10-19T09:00:00.000Z';
+  const end = '2026-10-19T10:00:00.000Z';
+
+  it('fills the end with start + 1h when only the start is known', () => {
+    expect(pairEventTimes(start, null, 'start')).toEqual({ startUtc: start, endUtc: end });
+  });
+
+  it('fills the start with end - 1h when the end is picked first', () => {
+    expect(pairEventTimes(null, end, 'end')).toEqual({ startUtc: start, endUtc: end });
+  });
+
+  it('keeps a range that is already consistent', () => {
+    const later = '2026-10-19T15:30:00.000Z';
+    expect(pairEventTimes(start, later, 'start')).toEqual({ startUtc: start, endUtc: later });
+    expect(pairEventTimes(start, later, 'end')).toEqual({ startUtc: start, endUtc: later });
+  });
+
+  it('repairs the other side when the new value would invert the range', () => {
+    // start moved past the old end -> end follows
+    expect(pairEventTimes('2026-10-19T12:00:00.000Z', end, 'start').endUtc).toBe('2026-10-19T13:00:00.000Z');
+    // end moved before the old start -> start follows
+    expect(pairEventTimes(start, '2026-10-19T07:00:00.000Z', 'end').startUtc).toBe('2026-10-19T06:00:00.000Z');
+  });
+});
+
+describe('scheduleForEditing', () => {
+  const dto = {
+    ...PLAIN_TASK_FIELDS, taskType: TaskType.Event, startUtc: '2026-10-19T09:00:00.000Z', endUtc: null,
+  } as TaskDto;
+
+  it('opens an imported event without an end with the end the backend assumes (start + 1h)', () => {
+    expect(scheduleForEditing(dto).endUtc).toBe('2026-10-19T10:00:00.000Z');
+  });
+
+  it('leaves tasks and events with an end untouched', () => {
+    const withEnd = { ...dto, endUtc: '2026-10-19T11:00:00.000Z' } as TaskDto;
+    expect(scheduleForEditing(withEnd).endUtc).toBe('2026-10-19T11:00:00.000Z');
+    expect(scheduleForEditing({ ...dto, taskType: TaskType.Task } as TaskDto).endUtc).toBeNull();
   });
 });
 

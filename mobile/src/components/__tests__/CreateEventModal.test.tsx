@@ -56,6 +56,46 @@ describe('CreateTaskModal - Task vs Event', () => {
     expect(mockedCreateTask).not.toHaveBeenCalled();
   });
 
+  it('fills the end with start + 1h when only the day is picked (time defaults to 09:00)', async () => {
+    mockedCreateTask.mockResolvedValue({} as never);
+
+    await render(<CreateTaskModal visible teams={[personal]} tasks={[]} onClose={jest.fn()} onCreated={jest.fn()} />);
+    await fireEvent.press(screen.getByTestId('schedule-type-event'));
+    await fireEvent.changeText(screen.getByTestId('create-task-title-input'), 'Dentist');
+
+    await fireEvent.press(screen.getByTestId('event-start-picker-button'));
+    await fireEvent.press(screen.getByTestId('event-start-picker-quick-week'));
+    await fireEvent.press(screen.getByTestId('event-start-picker-set'));
+    await fireEvent.press(screen.getByTestId('create-task-submit-button'));
+
+    await waitFor(() => expect(mockedCreateTask).toHaveBeenCalled());
+    const { startUtc, endUtc } = mockedCreateTask.mock.calls[0][1];
+    expect(new Date(startUtc!).getHours()).toBe(9);
+    expect(new Date(endUtc!).getTime() - new Date(startUtc!).getTime()).toBe(3_600_000);
+  });
+
+  it('fills the start with end - 1h when the end is picked first, and the end reads as set (not optional)', async () => {
+    mockedCreateTask.mockResolvedValue({} as never);
+
+    await render(<CreateTaskModal visible teams={[personal]} tasks={[]} onClose={jest.fn()} onCreated={jest.fn()} />);
+    await fireEvent.press(screen.getByTestId('schedule-type-event'));
+    await fireEvent.changeText(screen.getByTestId('create-task-title-input'), 'Workshop');
+    expect(screen.queryByText(/optional/i)).toBeNull(); // only "Estimated effort (optional)" lives on the Task form
+
+    await fireEvent.press(screen.getByTestId('event-end-picker-button'));
+    await fireEvent.press(screen.getByTestId('event-end-picker-quick-week'));
+    await fireEvent.press(screen.getByTestId('event-end-picker-time-1500'));
+    await fireEvent.press(screen.getByTestId('event-end-picker-set'));
+
+    expect(screen.getByText(/Start: .*14:00/)).toBeTruthy();
+    expect(screen.getByText(/End: .*15:00/)).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('create-task-submit-button'));
+    await waitFor(() => expect(mockedCreateTask).toHaveBeenCalled());
+    const { startUtc, endUtc } = mockedCreateTask.mock.calls[0][1];
+    expect(new Date(endUtc!).getTime() - new Date(startUtc!).getTime()).toBe(3_600_000);
+  });
+
   it('creates an Event with its start and a recurrence interval in hours', async () => {
     mockedCreateTask.mockResolvedValue({} as never);
 

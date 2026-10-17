@@ -3,6 +3,7 @@ import { colors, radius, spacing, typography } from '../theme/theme';
 import { TaskType, type ScheduleFields } from '../types/task';
 import { INTERVAL_UNITS } from '../utils/duration';
 import { startOfDay } from '../utils/dateUtils';
+import { pairEventTimes } from '../utils/schedule';
 import { DeadlinePicker } from './DeadlinePicker';
 import { DurationInput } from './DurationInput';
 
@@ -48,15 +49,16 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
             optional={false}
             allowAllDay={false}
             value={value.startUtc}
-            onChange={(startUtc) => patch({ startUtc })}
+            onChange={(startUtc) => patch(pairEventTimes(startUtc, value.endUtc, 'start'))}
           />
           <DeadlinePicker
             testIDPrefix="event-end-picker"
             label="End"
+            optional={false}
             allowAllDay={false}
             minDate={value.startUtc ? startOfDay(new Date(value.startUtc)) : undefined}
             value={value.endUtc}
-            onChange={(endUtc) => patch({ endUtc })}
+            onChange={(endUtc) => patch(pairEventTimes(value.startUtc, endUtc, 'end'))}
           />
         </>
       ) : (
