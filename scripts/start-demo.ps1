@@ -133,13 +133,42 @@ function Show-Tail([string]$Path, [int]$Lines = 15, [string]$Filter = $null) {
 }
 
 # Runs a command through cmd.exe, captures stdout+stderr in logs\<name>.log, returns the exit code.
-function Invoke-Logged([string]$CommandLine, [string]$WorkDir, [string]$LogName) {
+# Why not "Start-Process -Wait": it also waits for every child the command leaves behind (MSBuild node, compiler server,
+# testhost), so a build that has long finished could keep the script frozen. Here only the command itself is awaited,
+# a heartbeat line shows that it is alive and -TimeoutSec kills a command that is really stuck.
+function Invoke-Logged([string]$CommandLine, [string]$WorkDir, [string]$LogName, [int]$TimeoutSec = 0, [string]$Label = $null) {
     $log = Join-Path $LogDir "$LogName.log"
     $err = Join-Path $LogDir "$LogName.err.log"
-    $p = Start-Process -FilePath 'cmd.exe' -ArgumentList "/c $CommandLine" -WorkingDirectory $WorkDir -NoNewWindow -Wait -PassThru `
+    $p = Start-Process -FilePath 'cmd.exe' -ArgumentList "/c $CommandLine" -WorkingDirectory $WorkDir -NoNewWindow -PassThru `
         -RedirectStandardOutput $log -RedirectStandardError $err
+    $null = $p.Handle   # keep the handle so ExitCode stays readable after exit
+
+    $clock = [System.Diagnostics.Stopwatch]::StartNew()
+    $nextBeat = 20
+    $timedOut = $false
+    while (-not $p.HasExited) {
+        Start-Sleep -Milliseconds 500
+        if ($TimeoutSec -gt 0 -and $clock.Elapsed.TotalSeconds -gt $TimeoutSec) { $timedOut = $true; Stop-Tree $p.Id; break }
+        if ($Label -and $clock.Elapsed.TotalSeconds -ge $nextBeat) {
+            $nextBeat += 20
+            $last = try { Get-Content -LiteralPath $log -Tail 1 -ErrorAction Stop } catch { '' }
+            if ($last -and $last.Length -gt 70) { $last = $last.Substring(0, 70) + '...' }
+            Write-Info ("{0}: trwa {1:n0} s {2}" -f $Label, $clock.Elapsed.TotalSeconds, $(if ($last) { "| $last" } else { '' }))
+        }
+    }
+    if ($timedOut) { Write-Warn "${LogName}: przekroczono limit $TimeoutSec s - polecenie zostało przerwane" }
+    $code = if ($timedOut) { 124 } else { $p.ExitCode }
+
     if (Test-Path $err) { Get-Content $err | Add-Content $log; Remove-Item $err -Force -ErrorAction SilentlyContinue }
-    return [pscustomobject]@{ ExitCode = $p.ExitCode; Log = $log }
+    return [pscustomobject]@{ ExitCode = $code; Log = $log; TimedOut = $timedOut }
+}
+
+# Leftovers of an earlier (aborted) build/test run keep files locked and can block the next "dotnet test".
+# Only test/compiler helpers are stopped - never plain dotnet.exe (the editor's language server and the backend use it).
+function Stop-StaleBuildProcesses {
+    $stale = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match '^(testhost.*|vstest\.console|VBCSCompiler|MSBuild)$' }
+    foreach ($p in $stale) { Write-Warn "kończę wiszący proces $($p.ProcessName) (PID $($p.Id))"; Stop-Tree $p.Id }
+    & dotnet build-server shutdown 2>&1 | Out-Null   # releases the MSBuild / Razor / compiler servers of the dotnet CLI
 }
 
 # ---- change detection ------------------------------------------------------------------------------------------------
@@ -395,8 +424,14 @@ function Step-Backend {
     $fp = Get-Fingerprint @("$BackendDir\src", "$BackendDir\tests") @('.cs', '.csproj', '.json', '.props', '.targets')
     $changed = ($fp -ne (Get-State).backend)
 
+    Stop-StaleBuildProcesses
+
+    # -nodeReuse:false and UseSharedCompilation=false: no MSBuild node / compiler server stays alive after the build,
+    # so nothing is left holding the output pipes or the next run's files.
+    $buildFlags = '--nologo -v minimal -nodeReuse:false -p:UseSharedCompilation=false'
+
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    $r = Invoke-Logged 'dotnet build src\PlanFlow.Api -c Debug --nologo -v minimal' $BackendDir 'backend-build'
+    $r = Invoke-Logged "dotnet build src\PlanFlow.Api -c Debug $buildFlags" $BackendDir 'backend-build' 600 'build backendu'
     if ($r.ExitCode -ne 0) {
         Show-Tail $r.Log 15 'error'
         Fail 'Build backendu NIE przeszedł - popraw błędy powyżej. Bez builda backend nie wystartuje.'
@@ -408,7 +443,8 @@ function Step-Backend {
     else {
         Write-Info 'zmiany w kodzie backendu - uruchamiam testy (Testcontainers, potrwa chwilę)...'
         $sw.Restart()
-        $t = Invoke-Logged 'dotnet test tests\PlanFlow.Tests --nologo -v minimal' $BackendDir 'backend-tests'
+        # --blame-hang-timeout: a single test that hangs is aborted (no dump file) instead of freezing the whole run.
+        $t = Invoke-Logged "dotnet test tests\PlanFlow.Tests $buildFlags --blame-hang-timeout 10m --blame-hang-dump-type none" $BackendDir 'backend-tests' 1500 'testy backendu'
         $summary = (Get-Content $t.Log -ErrorAction SilentlyContinue | Where-Object { $_ -match '(Passed|Failed)!' } | Select-Object -Last 1)
         if ($t.ExitCode -eq 0) {
             Write-Ok ("testy backendu zielone ({0:n0} s) {1}" -f $sw.Elapsed.TotalSeconds, $summary)
@@ -416,6 +452,7 @@ function Step-Backend {
         }
         else {
             Show-Tail $t.Log 12 'error|Failed|FAIL'
+            Stop-StaleBuildProcesses   # a failed/aborted run may leave testhost behind
             if (-not (Ask-YesNo 'Testy backendu NIE przeszły. Kontynuować mimo to?' $false)) { Fail 'Przerwano: testy backendu nie przeszły.' }
             Write-Warn 'kontynuuję mimo czerwonych testów backendu'
         }
@@ -460,12 +497,12 @@ function Step-Mobile {
 
     $ok = $true
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    $tsc = Invoke-Logged 'npx tsc --noEmit' $MobileDir 'mobile-tsc'
+    $tsc = Invoke-Logged 'npx tsc --noEmit' $MobileDir 'mobile-tsc' 600 'tsc'
     if ($tsc.ExitCode -eq 0) { Write-Ok ("TypeScript bez błędów ({0:n0} s)" -f $sw.Elapsed.TotalSeconds) }
     else { $ok = $false; Show-Tail $tsc.Log 12 'error'; Write-Warn 'TypeScript zgłasza błędy' }
 
     $sw.Restart()
-    $jest = Invoke-Logged 'npx jest --silent' $MobileDir 'mobile-jest'
+    $jest = Invoke-Logged 'npx jest --silent' $MobileDir 'mobile-jest' 600 'testy mobile'
     $line = (Get-Content $jest.Log -ErrorAction SilentlyContinue | Where-Object { $_ -match '^Tests:' } | Select-Object -Last 1)
     if ($jest.ExitCode -eq 0) { Write-Ok ("testy mobile zielone ({0:n0} s) {1}" -f $sw.Elapsed.TotalSeconds, $line) }
     else { $ok = $false; Show-Tail $jest.Log 14 'FAIL|●|Tests:'; Write-Warn 'testy mobile nie przeszły' }
