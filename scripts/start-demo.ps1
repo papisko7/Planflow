@@ -575,26 +575,37 @@ function Start-Ngrok([bool]$Required) {
 function Start-Cloudflare {
     $log = Join-Path $LogDir 'cloudflared.log'
     $err = Join-Path $LogDir 'cloudflared.err.log'
-    foreach ($f in $log, $err) { if (Test-Path $f) { Remove-Item $f -Force -ErrorAction SilentlyContinue } }
-    $proc = Start-Process $script:CloudflaredExe -ArgumentList "tunnel --url http://localhost:$MetroPort --no-autoupdate" `
-        -WindowStyle Hidden -PassThru -RedirectStandardOutput $log -RedirectStandardError $err
-    $script:Started += $proc
-
-    $pattern = 'https://[a-z0-9-]+\.trycloudflare\.com'
+    # 'api.trycloudflare.com' is Cloudflare's own API (it shows up in error lines) - it must never be taken for a tunnel address.
+    $pattern = 'https://(?!api\.)[a-z0-9-]+\.trycloudflare\.com'
     $script:CfUrl = $null
-    $found = Wait-Until {
-        foreach ($f in $log, $err) {
-            if (Test-Path $f) {
-                $m = Select-String -Path $f -Pattern $pattern -ErrorAction SilentlyContinue | Select-Object -First 1
-                if ($m) { $script:CfUrl = $m.Matches[0].Value; return $true }
-            }
-        }
-        return $false
-    } 45 { $proc.HasExited }
 
-    if (-not $found) {
-        Show-Tail $err 10
-        Fail 'Cloudflare nie podał adresu tunelu (brak internetu na hotspocie? limit trycloudflare?).'
+    # Creating a quick tunnel is one POST to Cloudflare that sometimes times out on a phone hotspot, so try a few times.
+    foreach ($attempt in 1..3) {
+        foreach ($f in $log, $err) { if (Test-Path $f) { Remove-Item $f -Force -ErrorAction SilentlyContinue } }
+        $proc = Start-Process $script:CloudflaredExe -ArgumentList "tunnel --url http://localhost:$MetroPort --no-autoupdate" `
+            -WindowStyle Hidden -PassThru -RedirectStandardOutput $log -RedirectStandardError $err
+        $script:Started += $proc
+
+        $found = Wait-Until {
+            foreach ($f in $log, $err) {
+                if (Test-Path $f) {
+                    $m = Select-String -Path $f -Pattern $pattern -ErrorAction SilentlyContinue | Select-Object -First 1
+                    if ($m) { $script:CfUrl = $m.Matches[0].Value; return $true }
+                }
+            }
+            return $false
+        } 45 {
+            $proc.HasExited -or [bool](Select-String -Path $err -Pattern 'failed to request quick Tunnel' -Quiet -ErrorAction SilentlyContinue)
+        }
+        if ($found) { break }
+
+        Show-Tail $err 5
+        if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+        if ($attempt -lt 3) { Write-Warn "Cloudflare nie utworzył tunelu (próba $attempt/3) - ponawiam."; Start-Sleep -Seconds 3 }
+    }
+
+    if (-not $script:CfUrl) {
+        Fail 'Cloudflare nie utworzył tunelu po 3 próbach (brak internetu na hotspocie? limit trycloudflare?). Sprawdź w przeglądarce telefonu/laptopa, czy działa internet, i uruchom skrypt ponownie.'
     }
     $host_ = ([Uri]$script:CfUrl).Host
     # The phone resolves the name with its own DNS, so ask a public resolver (the laptop's hotspot DNS often lags on new names).
@@ -639,7 +650,11 @@ function Step-Expo {
     Write-Host '    Ctrl+C w tym oknie zatrzymuje Expo, backend i tunele (Docker zostaje włączony).' -ForegroundColor Gray
     Write-Host ''
     Push-Location $MobileDir
-    try { & npx.cmd expo start -c } finally { Pop-Location }
+    # expo-dev-client is installed, which makes Expo default to a dev-build QR (planflow://...) that Expo Go cannot read.
+    # --go forces Expo Go; EXPO_NO_REDIRECT_PAGE makes the QR a plain exp:// link that Expo Go's scanner accepts
+    # (otherwise it is an http "choose an app" page meant for the system camera).
+    $env:EXPO_NO_REDIRECT_PAGE = '1'
+    try { & npx.cmd expo start -c --go } finally { Pop-Location }
 }
 
 # ----------------------------------------------------------------------------------------------------------------------
