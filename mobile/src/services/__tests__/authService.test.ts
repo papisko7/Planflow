@@ -23,7 +23,11 @@ jest.mock('../httpClient', () => {
 jest.mock('../tokenStorage', () => ({
   saveSession: jest.fn().mockResolvedValue(undefined),
   clearSession: jest.fn().mockResolvedValue(undefined),
+  clearAccessToken: jest.fn().mockResolvedValue(undefined),
   loadSession: jest.fn().mockResolvedValue({ accessToken: 'a', refreshToken: 'r', userId: 'u' }),
+  loadRefreshCredentials: jest.fn().mockResolvedValue({ refreshToken: 'r', userId: 'u' }),
+  loadRefreshCredentialsForUser: jest.fn().mockResolvedValue({ refreshToken: 'r', userId: 'u' }),
+  clearRefreshTokenForUser: jest.fn().mockResolvedValue(undefined),
   getDeviceId: jest.fn().mockResolvedValue('device-1'),
 }));
 

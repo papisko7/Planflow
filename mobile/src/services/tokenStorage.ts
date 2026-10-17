@@ -18,6 +18,7 @@ export async function saveSession(session: StoredSession): Promise<void> {
     SecureStore.setItemAsync(ACCESS_TOKEN_KEY, session.accessToken),
     SecureStore.setItemAsync(REFRESH_TOKEN_KEY, session.refreshToken),
     SecureStore.setItemAsync(USER_ID_KEY, session.userId),
+    SecureStore.setItemAsync(`${REFRESH_TOKEN_KEY}.${session.userId}`, session.refreshToken),
   ]);
 }
 
@@ -36,11 +37,46 @@ export async function loadSession(): Promise<StoredSession | null> {
 }
 
 export async function clearSession(): Promise<void> {
+  const userId = await SecureStore.getItemAsync(USER_ID_KEY);
   await Promise.all([
     SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
     SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
     SecureStore.deleteItemAsync(USER_ID_KEY),
+    userId ? SecureStore.deleteItemAsync(`${REFRESH_TOKEN_KEY}.${userId}`) : Promise.resolve(),
   ]);
+}
+
+// Removes only the access token — keeps refresh token + userId so PIN login can still call
+// refresh() after a soft logout. restoreSession() requires all three, so it will return
+// false and the user stays on the login screen until they authenticate again.
+export async function clearAccessToken(): Promise<void> {
+  await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+}
+
+export interface RefreshCredentials {
+  refreshToken: string;
+  userId: string;
+}
+
+// Used by refresh() — only the refresh token and userId are needed for a token exchange,
+// so this works even after a soft logout where the access token has been cleared.
+export async function loadRefreshCredentials(): Promise<RefreshCredentials | null> {
+  const [refreshToken, userId] = await Promise.all([
+    SecureStore.getItemAsync(REFRESH_TOKEN_KEY),
+    SecureStore.getItemAsync(USER_ID_KEY),
+  ]);
+  if (!refreshToken || !userId) return null;
+  return { refreshToken, userId };
+}
+
+export async function loadRefreshCredentialsForUser(userId: string): Promise<RefreshCredentials | null> {
+  const refreshToken = await SecureStore.getItemAsync(`${REFRESH_TOKEN_KEY}.${userId}`);
+  if (!refreshToken) return null;
+  return { refreshToken, userId };
+}
+
+export async function clearRefreshTokenForUser(userId: string): Promise<void> {
+  await SecureStore.deleteItemAsync(`${REFRESH_TOKEN_KEY}.${userId}`);
 }
 
 // A random id created once per installation (it survives logout on purpose). The server remembers which

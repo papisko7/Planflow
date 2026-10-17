@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { PinSettingsCard } from '../components/PinSettingsCard';
 import { ChangePasswordCard } from '../components/ChangePasswordCard';
 import { EmailVerificationCard } from '../components/EmailVerificationCard';
 import { NotificationSettingsCard } from '../components/NotificationSettingsCard';
@@ -126,6 +127,8 @@ export default function SettingsScreen() {
       {!loading && !emailVerified ? <EmailVerificationCard email={savedEmail} onVerified={() => setEmailVerified(true)} /> : null}
 
       <ChangePasswordCard />
+
+      <PinSettingsCard />
 
       <NotificationSettingsCard />
 

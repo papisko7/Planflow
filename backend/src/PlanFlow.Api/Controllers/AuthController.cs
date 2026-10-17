@@ -9,6 +9,7 @@ using PlanFlow.Application.Auth.Commands.Register;
 using PlanFlow.Application.Auth.Commands.RequestPasswordReset;
 using PlanFlow.Application.Auth.Commands.ResetPassword;
 using PlanFlow.Application.Auth.Common;
+using PlanFlow.Application.Auth.Queries.IdentifyUser;
 
 namespace PlanFlow.Api.Controllers;
 
@@ -25,6 +26,16 @@ public class AuthController : ControllerBase
     public AuthController(ISender sender)
     {
         _sender = sender;
+    }
+
+    // Returns the UserId for a given email so the mobile app can check per-user PIN state
+    // before presenting the credential step. Rate-limited like login to prevent enumeration at scale.
+    [HttpPost("identify")]
+    [EnableRateLimiting(RateLimitingConfig.AuthPolicy)]
+    public async Task<ActionResult<IdentifyResponse>> Identify(IdentifyRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(new IdentifyUserQuery(request.Email), cancellationToken);
+        return Ok(new IdentifyResponse(result.UserId));
     }
 
     [HttpPost("register")]

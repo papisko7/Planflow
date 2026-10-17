@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
 import { API_BASE_URL, getAccessToken, setAccessToken, setUnauthorizedHandler } from './httpClient';
-import { clearSession, getDeviceId, loadSession, saveSession } from './tokenStorage';
+import { clearAccessToken, clearSession, getDeviceId, loadRefreshCredentials, loadRefreshCredentialsForUser, loadSession, saveSession } from './tokenStorage';
 import type { AuthResultDto, LoginRequest, RegisterRequest, ResetPasswordRequest } from '../types/auth';
 
 // Bare instance for the login/register/refresh calls themselves: they must never carry a stale
@@ -44,6 +44,11 @@ function deviceName(): string {
   return `PlanFlow on ${platform}`;
 }
 
+export async function identifyByEmail(email: string): Promise<{ userId: string }> {
+  const { data } = await authHttp.post<{ userId: string }>('/api/auth/identify', { email });
+  return data;
+}
+
 export async function login(request: LoginRequest): Promise<AuthResultDto> {
   const body = { ...request, deviceId: await getDeviceId(), deviceName: deviceName() };
   const { data } = await authHttp.post<AuthResultDto>('/api/auth/login', body);
@@ -69,13 +74,29 @@ export async function resetPassword(request: ResetPasswordRequest): Promise<void
 }
 
 export async function refresh(teamId: string | null = currentTeamId): Promise<AuthResultDto> {
-  const session = await loadSession();
-  if (!session) {
+  // loadRefreshCredentials() only needs refreshToken + userId, so it works even after a soft
+  // logout where the access token has been cleared from SecureStore.
+  const creds = await loadRefreshCredentials();
+  if (!creds) {
     throw new Error('No stored session to refresh.');
   }
   const { data } = await authHttp.post<AuthResultDto>('/api/auth/refresh', {
-    userId: session.userId,
-    refreshToken: session.refreshToken,
+    userId: creds.userId,
+    refreshToken: creds.refreshToken,
+    teamId,
+  });
+  currentTeamId = teamId;
+  return persist(data);
+}
+
+export async function refreshAsUser(userId: string, teamId: string | null = null): Promise<AuthResultDto> {
+  const creds = await loadRefreshCredentialsForUser(userId);
+  if (!creds) {
+    throw new Error('No stored session for this user.');
+  }
+  const { data } = await authHttp.post<AuthResultDto>('/api/auth/refresh', {
+    userId: creds.userId,
+    refreshToken: creds.refreshToken,
     teamId,
   });
   currentTeamId = teamId;
@@ -111,6 +132,16 @@ export function runInTeamContext<T>(teamId: string, action: () => Promise<T>): P
 
 export async function logout(): Promise<void> {
   await clearSession();
+  setAccessToken(null);
+  accessExpiresAtMs = 0;
+  currentTeamId = null;
+}
+
+// Used when PIN login is enabled: wipes the in-memory session and the access token from
+// SecureStore, but keeps the refresh token + userId so PIN can exchange them for a new
+// access token on next login without requiring a password.
+export async function softLogout(): Promise<void> {
+  await clearAccessToken();
   setAccessToken(null);
   accessExpiresAtMs = 0;
   currentTeamId = null;

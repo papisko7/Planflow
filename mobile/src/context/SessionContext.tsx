@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { logout as authLogout, restoreSession, setSessionExpiredHandler } from '../services/authService';
+import { logout as authLogout, softLogout, restoreSession, setSessionExpiredHandler } from '../services/authService';
+import { isPinEnabled } from '../services/pinService';
 import { unregisterPush } from '../services/pushService';
 
 interface SessionState {
@@ -24,7 +25,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(() => setStatus('signedIn'), []);
   const signOut = useCallback(async () => {
     await unregisterPush(); // needs the session, so it goes first: this phone must stop getting the leaving user's pushes
-    await authLogout();
+    const pinOn = await isPinEnabled();
+    if (pinOn) {
+      // Keep the refresh token on disk so PIN login can exchange it for a new access token
+      // without asking for the password again.
+      await softLogout();
+    } else {
+      await authLogout();
+    }
     setStatus('signedOut');
   }, []);
 
