@@ -73,6 +73,7 @@ describe('TaskDetailScreen - imported Google event', () => {
     expect(screen.getByText('Room 4, Main St')).toBeTruthy();
     expect(screen.getByText('Free')).toBeTruthy();
     expect(screen.getByText('Cherry blossom')).toBeTruthy();
+    expect(screen.getByTestId('task-color-swatch')).toBeTruthy();
     expect(screen.getByText('Do not disturb')).toBeTruthy();
     expect(screen.queryByTestId('task-template-badge')).toBeNull(); // an ordinary event has no template badge
   });

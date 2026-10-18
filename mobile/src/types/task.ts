@@ -73,6 +73,9 @@ export interface TaskDto {
   // midnight after the last day. Items created in the app before 7.5.5 mark all-day by shape instead and have this false.
   isAllDay: boolean;
   externalSettings: string | null; // read-only note about Google-only settings of an imported Out of office / Focus time
+  // Imported from Google Calendar: Google owns its title, time, place, description, colour and template (the server ignores
+  // edits to them), so the edit form shows those read-only.
+  isExternal: boolean;
   // Latest "[Priority] why" sentence; only the team list endpoint fills it.
   reasonText?: string | null;
 }
@@ -96,9 +99,15 @@ export interface TaskDetailDto {
   reminders?: ReminderDto[]; // imported from Google for now; absent on older servers
 }
 
-// The scheduling fields shared by the create and update requests (type, dates, effort, recurrence).
+// The scheduling and template fields shared by the create and update requests (type, template, dates, effort, recurrence,
+// place, colour, busy/free). Which of them an item has depends on its type and template (utils/templateRules.ts).
 export interface ScheduleFields {
   taskType: TaskType;
+  eventTemplate: EventTemplate;
+  isAllDay: boolean; // Event only; the dates then are whole days (see utils/schedule.ts toWireSchedule)
+  location: string | null;
+  colorKey: string | null;
+  isBusy: boolean;
   deadlineUtc: string | null; // Task only
   startUtc: string | null; // Event only
   endUtc: string | null; // Event only

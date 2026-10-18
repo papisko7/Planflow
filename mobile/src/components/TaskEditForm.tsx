@@ -7,7 +7,9 @@ import { ScheduleForm } from './ScheduleForm';
 import type { ApiError } from '../types/api';
 import type { TeamMemberDto } from '../types/team';
 import type { ScheduleFields, TaskDto } from '../types/task';
-import { normalizeSchedule, scheduleForEditing, toUpdateRequest, validateSchedule } from '../utils/schedule';
+import { formatWhen } from '../utils/itemDisplay';
+import { scheduleForEditing, scheduleForRequest, toUpdateRequest, validateSchedule } from '../utils/schedule';
+import { rulesFor } from '../utils/templateRules';
 import { normalizeStatus, STATUS_LABEL, statusesFor } from '../utils/taskStatus';
 
 type Props = {
@@ -29,6 +31,10 @@ export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Pr
   const status = normalizeStatus(schedule.taskType, pickedStatus);
   const [assignedUserId, setAssignedUserId] = useState(task.assignedUserId);
   const [saving, setSaving] = useState(false);
+  const rules = rulesFor(schedule.taskType, schedule.eventTemplate);
+  // An item imported from Google: Google owns its title, time, place, description and colour (the next sync would overwrite
+  // them, and the server ignores edits), so they are shown read-only here; what PlanFlow adds stays editable.
+  const imported = task.isExternal;
   const [error, setError] = useState<string | null>(null);
 
   const save = async () => {
@@ -44,7 +50,7 @@ export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Pr
       return;
     }
 
-    const scheduleError = validateSchedule(schedule, false);
+    const scheduleError = imported ? null : validateSchedule(schedule, false);
     if (scheduleError) {
       setError(scheduleError);
       return;
@@ -56,14 +62,19 @@ export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Pr
       await updateTask(
         task.id,
         task.teamId,
-        toUpdateRequest(task, {
-          title: trimmedTitle,
-          description: description.trim() || null,
-          status,
-          assignedUserId,
-          impactScore: impactNumber,
-          ...normalizeSchedule(schedule),
-        }),
+        toUpdateRequest(
+          task,
+          imported
+            ? { status, assignedUserId, impactScore: rules.informational ? null : impactNumber }
+            : {
+                title: trimmedTitle,
+                description: rules.allowsDescription ? description.trim() || null : null,
+                status,
+                assignedUserId,
+                impactScore: rules.informational ? null : impactNumber,
+                ...scheduleForRequest(schedule),
+              },
+        ),
       );
       onSaved();
     } catch (err) {
@@ -76,33 +87,63 @@ export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Pr
 
   return (
     <View style={styles.form}>
-      <TextInput
-        testID="edit-task-title-input"
-        style={styles.input}
-        placeholder="Title"
-        placeholderTextColor={colors.textMuted}
-        value={title}
-        onChangeText={setTitle}
-      />
-      <TextInput
-        testID="edit-task-description-input"
-        style={[styles.input, styles.multiline]}
-        placeholder="Description (optional)"
-        placeholderTextColor={colors.textMuted}
-        multiline
-        value={description}
-        onChangeText={setDescription}
-      />
-      <ScheduleForm value={schedule} onChange={setSchedule} isNew={false} />
-      <TextInput
-        testID="edit-task-impact-input"
-        style={styles.input}
-        placeholder="Impact score (0-10, empty = not rated)"
-        placeholderTextColor={colors.textMuted}
-        keyboardType="numeric"
-        value={impact}
-        onChangeText={setImpact}
-      />
+      {task.isDataIncomplete ? (
+        <View testID="edit-task-verify-banner" style={styles.banner}>
+          <Text style={styles.bannerText}>
+            Please check this item: set its impact{rules.informational ? '' : ' and effort'}, then save to confirm it.
+          </Text>
+        </View>
+      ) : null}
+
+      {imported ? (
+        <>
+          <View testID="edit-task-imported-notice" style={styles.notice}>
+            <Text style={styles.noticeText}>
+              Imported from Google Calendar. Its title, time, place, description and colour are edited there; here you set what PlanFlow adds.
+            </Text>
+          </View>
+          <Text style={styles.readOnlyTitle}>{task.title}</Text>
+          {formatWhen(task) ? <Text style={styles.label}>{formatWhen(task)}</Text> : null}
+        </>
+      ) : (
+        <>
+          <TextInput
+            testID="edit-task-title-input"
+            style={styles.input}
+            placeholder={rules.titlePlaceholder}
+            placeholderTextColor={colors.textMuted}
+            value={title}
+            onChangeText={setTitle}
+          />
+          {rules.allowsDescription ? (
+            <TextInput
+              testID="edit-task-description-input"
+              style={[styles.input, styles.multiline]}
+              placeholder="Description (optional)"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              value={description}
+              onChangeText={setDescription}
+            />
+          ) : null}
+          <ScheduleForm value={schedule} onChange={setSchedule} isNew={false} />
+        </>
+      )}
+
+      {rules.informational ? null : (
+        <>
+          <Text style={styles.sectionTitle}>PlanFlow</Text>
+          <TextInput
+            testID="edit-task-impact-input"
+            style={styles.input}
+            placeholder="Impact score (0-10, empty = not rated)"
+            placeholderTextColor={colors.textMuted}
+            keyboardType="numeric"
+            value={impact}
+            onChangeText={setImpact}
+          />
+        </>
+      )}
 
       <View>
         <Text style={styles.label}>Status:</Text>
@@ -149,6 +190,12 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   multiline: { minHeight: 72, textAlignVertical: 'top' },
+  sectionTitle: { ...typography.subtitle, color: colors.text, marginTop: spacing.xs },
+  readOnlyTitle: { ...typography.subtitle, color: colors.text },
+  banner: { backgroundColor: colors.primaryMuted, borderRadius: radius.md, padding: spacing.md },
+  bannerText: { ...typography.body, color: colors.primary, fontWeight: '600' },
+  notice: { backgroundColor: colors.background, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
+  noticeText: { ...typography.body, color: colors.textMuted },
   label: { ...typography.body, color: colors.textMuted },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
   chip: {

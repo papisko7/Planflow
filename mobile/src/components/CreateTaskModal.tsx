@@ -21,7 +21,8 @@ import type { ApiError } from '../types/api';
 import { TeamRole, type TeamDto, type TeamMemberDto } from '../types/team';
 import { TaskType, type ScheduleFields, type TaskDto } from '../types/task';
 import { isFinishedStatus } from '../utils/taskStatus';
-import { emptySchedule, normalizeSchedule, validateSchedule } from '../utils/schedule';
+import { emptySchedule, scheduleForRequest, validateSchedule } from '../utils/schedule';
+import { rulesFor } from '../utils/templateRules';
 
 type Props = {
   visible: boolean;
@@ -42,7 +43,8 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
   const myUserId = getCurrentUserId();
   const [teamId, setTeamId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
-  // Type, dates, effort and recurrence live together: they depend on each other (Task vs Event).
+  const [description, setDescription] = useState('');
+  // Type, template, dates, effort and recurrence live together: they depend on each other (Task vs Event).
   const [schedule, setSchedule] = useState<ScheduleFields>(() => emptySchedule(defaultType));
   const [impactScore, setImpactScore] = useState('');
   const [blockedByTaskId, setBlockedByTaskId] = useState<string | null>(null);
@@ -55,6 +57,7 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
   useEffect(() => {
     if (!visible) return;
     setTitle('');
+    setDescription('');
     setSchedule(emptySchedule(defaultType));
     setImpactScore('');
     setBlockedByTaskId(null);
@@ -87,12 +90,16 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
   const team = teams.find((t) => t.id === teamId) ?? null;
   const myRole = members.find((m) => m.userId === myUserId)?.role;
   const canAssign = !team?.isPersonal && (myRole === TeamRole.Owner || myRole === TeamRole.Admin);
-  const blockerChoices = tasks.filter(
+  // What the chosen kind has: an Out of office / Focus time / Working location / Birthday item has no description (some),
+  // no Impact and no blocker - those are PlanFlow's scoring fields and these kinds are not ranked.
+  const rules = rulesFor(schedule.taskType, schedule.eventTemplate);
+  const blockerChoices = rules.informational ? [] : tasks.filter(
     (t) => t.teamId === teamId && !isFinishedStatus(t.status),
   );
 
   const submit = useCallback(async () => {
-    if (!teamId || !title.trim()) {
+    const finalTitle = title.trim() || rules.defaultTitle;
+    if (!teamId || !finalTitle) {
       setError('Title is required.');
       return;
     }
@@ -107,12 +114,12 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
       const impact = Number(impactScore);
 
       await createTask(teamId, {
-        title: title.trim(),
-        description: null,
+        title: finalTitle,
+        description: rules.allowsDescription ? description.trim() || null : null,
         assignedUserId: canAssign ? assignedUserId : myUserId,
-        ...normalizeSchedule(schedule),
-        impactScore: impactScore.trim() && !Number.isNaN(impact) ? impact : null, // empty = not rated
-        blockedByTaskId,
+        ...scheduleForRequest(schedule),
+        impactScore: !rules.informational && impactScore.trim() && !Number.isNaN(impact) ? impact : null, // empty = not rated
+        blockedByTaskId: rules.informational ? null : blockedByTaskId,
       });
       onCreated();
       onClose();
@@ -121,34 +128,50 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
     } finally {
       setSubmitting(false);
     }
-  }, [teamId, title, schedule, impactScore, blockedByTaskId, canAssign, assignedUserId, myUserId, onCreated, onClose]);
+  }, [teamId, title, description, schedule, rules, impactScore, blockedByTaskId, canAssign, assignedUserId, myUserId, onCreated, onClose]);
 
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
       <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Pressable style={styles.dismissArea} onPress={onClose} />
         <View style={styles.sheet}>
-          <Text style={styles.heading}>{schedule.taskType === TaskType.Event ? 'New event' : 'New task'}</Text>
+          <Text style={styles.heading}>{`New ${rules.label.toLowerCase()}`}</Text>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.form}>
             <TextInput
               testID="create-task-title-input"
               style={styles.input}
-              placeholder={schedule.taskType === TaskType.Event ? 'Event title' : 'Task title'}
+              placeholder={rules.titlePlaceholder}
               placeholderTextColor={colors.textMuted}
               value={title}
               onChangeText={setTitle}
               autoFocus
             />
+            {rules.allowsDescription ? (
+              <TextInput
+                testID="create-task-description-input"
+                style={[styles.input, styles.multiline]}
+                placeholder="Description"
+                placeholderTextColor={colors.textMuted}
+                multiline
+                value={description}
+                onChangeText={setDescription}
+              />
+            ) : null}
             <ScheduleForm value={schedule} onChange={setSchedule} isNew />
-            <TextInput
-              testID="create-task-impact-input"
-              style={styles.input}
-              placeholder="Impact score (0-10, empty = not rated)"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="numeric"
-              value={impactScore}
-              onChangeText={setImpactScore}
-            />
+            {rules.informational ? null : (
+              <>
+                <Text style={styles.sectionTitle}>PlanFlow</Text>
+                <TextInput
+                  testID="create-task-impact-input"
+                  style={styles.input}
+                  placeholder="Impact score (0-10, empty = not rated)"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="numeric"
+                  value={impactScore}
+                  onChangeText={setImpactScore}
+                />
+              </>
+            )}
 
             {teams.length > 1 ? (
               <View>
@@ -234,6 +257,8 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     color: colors.text,
   },
+  multiline: { minHeight: 72, textAlignVertical: 'top' },
+  sectionTitle: { ...typography.subtitle, color: colors.text, marginTop: spacing.xs },
   label: { ...typography.body, color: colors.textMuted },
   error: { ...typography.body, color: colors.danger },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },

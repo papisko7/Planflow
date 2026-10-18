@@ -23,4 +23,9 @@ public record UpdateTaskCommand(
     int? RecurrenceIntervalHours = null,
     DateTime? RecurrenceEndsAtUtc = null,
     bool UseAiEnhancement = false,
-    DateTime? EndUtc = null) : IRequest<TaskDto>, ITaskScheduleFields;
+    DateTime? EndUtc = null,
+    Domain.Enums.EventTemplate EventTemplate = Domain.Enums.EventTemplate.Default,
+    bool IsAllDay = false,
+    string? Location = null,
+    string? ColorKey = null,
+    bool IsBusy = true) : IRequest<TaskDto>, ITaskScheduleFields;

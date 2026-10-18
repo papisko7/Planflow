@@ -38,10 +38,18 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
         var previousAssignedUserId = task.AssignedUserId;
         var before = TaskSnapshot.Of(task); // for the "your task was changed" e-mail
 
-        task.Title = request.Title;
-        task.Description = request.Description;
         task.AssignedUserId = request.AssignedUserId;
-        TaskScheduleMapper.Apply(task, request);
+        if (task.IsExternal)
+        {
+            // Google owns the title, time, place, description, colour and template of an imported item (the next sync would overwrite
+            // them), so only PlanFlow's own fields are taken from the request: effort here, impact / status / assignee below.
+            task.EstimatedEffortHours = request.EstimatedEffortHours;
+        }
+        else
+        {
+            task.Title = request.Title;
+            TaskScheduleMapper.Apply(task, request);
+        }
         // A Task is Backlog/InProgress/Completed/Cancelled, an Event Confirmed/Tentative/Cancelled. When the type changed (or an
         // older app sent the other type's status) the status falls back to the new type's default instead of failing the save.
         task.Status = TaskStatusRules.Normalize(task.TaskType, request.Status);

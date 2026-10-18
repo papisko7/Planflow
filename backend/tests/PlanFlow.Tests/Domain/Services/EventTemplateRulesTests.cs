@@ -62,6 +62,25 @@ public class EventTemplateRulesTests
     public void FromGoogleEventType_MapsKnownTypesAndFallsBackToDefault(string? googleType, EventTemplate expected) =>
         Assert.Equal(expected, EventTemplateRules.FromGoogleEventType(googleType));
 
+    [Theory]
+    [InlineData(TaskType.Event, EventTemplate.Default, true, true)]
+    [InlineData(TaskType.Event, EventTemplate.Default, false, false)]
+    [InlineData(TaskType.Event, EventTemplate.Birthday, false, true)]    // always all-day
+    [InlineData(TaskType.Event, EventTemplate.FocusTime, true, false)]   // never all-day
+    [InlineData(TaskType.Event, EventTemplate.OutOfOffice, true, true)]
+    [InlineData(TaskType.Task, EventTemplate.Default, true, false)]      // a task is never flagged
+    public void ResolveAllDay_FollowsTheTemplateThenTheRequest(TaskType type, EventTemplate template, bool requested, bool expected) =>
+        Assert.Equal(expected, EventTemplateRules.ResolveAllDay(type, template, requested));
+
+    [Theory]
+    [InlineData(TaskType.Event, EventTemplate.Default, false, false)]    // the only real choice
+    [InlineData(TaskType.Event, EventTemplate.Default, true, true)]
+    [InlineData(TaskType.Event, EventTemplate.FocusTime, false, true)]   // always busy
+    [InlineData(TaskType.Event, EventTemplate.OutOfOffice, false, true)] // no such field: stored as busy
+    [InlineData(TaskType.Task, EventTemplate.Default, false, true)]
+    public void ResolveBusy_IsAChoiceOnlyForAPlainEvent(TaskType type, EventTemplate template, bool requested, bool expected) =>
+        Assert.Equal(expected, EventTemplateRules.ResolveBusy(type, template, requested));
+
     [Fact]
     public void EveryTemplateHasARow()
     {

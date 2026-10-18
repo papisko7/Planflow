@@ -33,7 +33,6 @@ public class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, TaskD
             TeamId = request.TeamId,
             AssignedUserId = request.AssignedUserId,
             Title = request.Title,
-            Description = request.Description,
             ImpactScore = request.ImpactScore,
             BlockedByTaskId = request.BlockedByTaskId,
             UseAiEnhancement = request.UseAiEnhancement

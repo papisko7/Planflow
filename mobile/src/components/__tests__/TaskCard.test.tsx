@@ -183,4 +183,12 @@ describe('TaskCard long-press menu', () => {
     await render(<TaskCard task={{ ...task, id: 'plain' }} />);
     expect(screen.queryByTestId('item-template-plain')).toBeNull();
   });
+
+  it('shows a dot in the item colour, and none for the default colour', async () => {
+    await render(<TaskCard task={{ ...task, id: 'c1', colorKey: 'tomato' }} />);
+    expect(screen.getByTestId('item-color-c1').props.style).toEqual(expect.arrayContaining([expect.objectContaining({ backgroundColor: '#d50004' })]));
+
+    await render(<TaskCard task={{ ...task, id: 'c2', colorKey: null }} />);
+    expect(screen.queryByTestId('item-color-c2')).toBeNull();
+  });
 });

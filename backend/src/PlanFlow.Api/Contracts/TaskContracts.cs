@@ -16,10 +16,17 @@ public record CreateTaskRequest(
     int? RecurrenceIntervalHours = null,
     DateTime? RecurrenceEndsAtUtc = null,
     bool UseAiEnhancement = false,
-    DateTime? EndUtc = null);
+    DateTime? EndUtc = null,
+    Domain.Enums.EventTemplate EventTemplate = Domain.Enums.EventTemplate.Default,
+    bool IsAllDay = false,
+    string? Location = null,
+    string? ColorKey = null,
+    bool IsBusy = true);
 
 // TaskType doubles as the marker for "this client knows the scheduling block": when it is null (clients from before
 // step 7.1) the stored type/start/effort/recurrence/AI values are kept instead of being reset to defaults.
+// EventTemplate is the same kind of marker for the template block (template, all-day, place, colour, busy/free; step 7.5.5):
+// when it is null the stored values are kept.
 public record UpdateTaskRequest(
     string Title,
     string? Description,
@@ -37,4 +44,9 @@ public record UpdateTaskRequest(
     int? RecurrenceIntervalHours = null,
     DateTime? RecurrenceEndsAtUtc = null,
     bool UseAiEnhancement = false,
-    DateTime? EndUtc = null);
+    DateTime? EndUtc = null,
+    Domain.Enums.EventTemplate? EventTemplate = null,
+    bool IsAllDay = false,
+    string? Location = null,
+    string? ColorKey = null,
+    bool IsBusy = true);

@@ -96,7 +96,7 @@ describe('CreateTaskModal - Task vs Event', () => {
     expect(new Date(endUtc!).getTime() - new Date(startUtc!).getTime()).toBe(3_600_000);
   });
 
-  it('all-day: picking the start day fills the end with the end of that day, and no clock times are offered', async () => {
+  it('all-day: picking the start day fills the end with that same day, and no clock times are offered', async () => {
     mockedCreateTask.mockResolvedValue({} as never);
 
     await render(<CreateTaskModal visible teams={[personal]} tasks={[]} onClose={jest.fn()} onCreated={jest.fn()} />);
@@ -113,11 +113,12 @@ describe('CreateTaskModal - Task vs Event', () => {
     await fireEvent.press(screen.getByTestId('create-task-submit-button'));
     await waitFor(() => expect(mockedCreateTask).toHaveBeenCalled());
     const { startUtc, endUtc } = mockedCreateTask.mock.calls[0][1];
+    // Stored as whole days: midnight UTC of the picked day and the midnight after it, flagged all-day.
     const start = new Date(startUtc!);
     const end = new Date(endUtc!);
-    expect([start.getHours(), start.getMinutes()]).toEqual([0, 0]);
-    expect([end.getHours(), end.getMinutes()]).toEqual([23, 59]);
-    expect(end.toDateString()).toBe(start.toDateString());
+    expect(mockedCreateTask.mock.calls[0][1].isAllDay).toBe(true);
+    expect([start.getUTCHours(), start.getUTCMinutes()]).toEqual([0, 0]);
+    expect(end.getTime() - start.getTime()).toBe(24 * 3_600_000);
   });
 
   it('creates an Event with its start and a recurrence interval in hours', async () => {

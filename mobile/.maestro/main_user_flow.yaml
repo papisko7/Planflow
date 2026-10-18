@@ -68,6 +68,9 @@ appId: com.planflow.mobile
 - tapOn:
     id: "create-task-title-input"
 - inputText: "Setup environment"
+- scrollUntilVisible: # the form got longer in 7.5.5 (template chips, colours): the field can be below the fold
+    element:
+      id: "create-task-impact-input"
 - tapOn:
     id: "create-task-impact-input"
 - inputText: "1"
@@ -89,10 +92,16 @@ appId: com.planflow.mobile
                                          # close enough to the tier math below.
 - tapOn:
     id: "deadline-picker-set"
+- scrollUntilVisible: # the form got longer in 7.5.5 (template chips, colours): the field can be below the fold
+    element:
+      id: "create-task-impact-input"
 - tapOn:
     id: "create-task-impact-input"
 - inputText: "10"
 - hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Setup environment"
 - tapOn:
     text: "Setup environment"
     index: 0 # the chip in the create-form header, not the task card rendered below it — selects it as "blocked by"

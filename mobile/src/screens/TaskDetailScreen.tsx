@@ -8,6 +8,7 @@ import { deleteTask, getTask, getTeamTasks, updateTask } from '../services/taskS
 import { getTeamMembers } from '../services/teamService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { formatDuration } from '../utils/duration';
+import { colorHex, colorLabel } from '../utils/palette';
 import { formatColorKey, formatRecurrence, formatReminder, TEMPLATE_LABEL } from '../utils/itemDisplay';
 import { formatDay } from '../utils/dateUtils';
 import { allDayDays, toUpdateRequest } from '../utils/schedule';
@@ -216,7 +217,9 @@ export default function TaskDetailScreen() {
           )}
           {task.location ? <MetaItem label="Location" value={task.location} /> : null}
           {isEvent && task.eventTemplate === EventTemplate.Default ? <MetaItem label="Show as" value={task.isBusy ? 'Busy' : 'Free'} /> : null}
-          {task.colorKey ? <MetaItem label="Colour" value={formatColorKey(task.colorKey)} /> : null}
+          {task.colorKey ? (
+            <MetaItem label="Colour" value={colorHex(task.colorKey) ? colorLabel(task.colorKey) : formatColorKey(task.colorKey)} swatch={colorHex(task.colorKey)} />
+          ) : null}
           {reminders.length > 0 ? <MetaItem label="Reminders" value={reminders.map(formatReminder).join('\n')} /> : null}
           {task.externalSettings ? <MetaItem label="Google settings" value={task.externalSettings} /> : null}
           {recurrence ? (
@@ -288,16 +291,21 @@ export default function TaskDetailScreen() {
   );
 }
 
-function MetaItem({ label, value }: { label: string; value: string }) {
+function MetaItem({ label, value, swatch }: { label: string; value: string; swatch?: string | null }) {
   return (
     <View style={styles.metaItem}>
       <Text style={styles.metaLabel}>{label}</Text>
-      <Text style={styles.metaValue}>{value}</Text>
+      <View style={styles.metaValueRow}>
+        {swatch ? <View testID="task-color-swatch" style={[styles.swatch, { backgroundColor: swatch }]} /> : null}
+        <Text style={styles.metaValue}>{value}</Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  metaValueRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  swatch: { width: 12, height: 12, borderRadius: 6 },
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, gap: spacing.md },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, gap: spacing.xs },

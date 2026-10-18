@@ -19,4 +19,5 @@ export const PLAIN_TASK_FIELDS = {
   isBusy: true,
   isAllDay: false,
   externalSettings: null,
+  isExternal: false,
 } satisfies Partial<TaskDto>;

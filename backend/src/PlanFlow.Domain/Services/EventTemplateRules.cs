@@ -77,6 +77,22 @@ public static class EventTemplateRules
         _ => EventTemplate.Default
     };
 
+    /// <summary>
+    /// Whether the item is all-day once the template has had its say: Birthday is always all-day, Focus time never, a Task is
+    /// never flagged (its all-day deadline is a different convention, set by the Google Tasks import); the rest follow the request.
+    /// </summary>
+    public static bool ResolveAllDay(TaskType type, EventTemplate template, bool requested) =>
+        type == TaskType.Event && EventRules[template].AllDay switch
+        {
+            AllDayMode.Always => true,
+            AllDayMode.Never => false,
+            _ => requested
+        };
+
+    /// <summary>Busy/Free is a real choice only for a plain event; Focus time is always busy and the other templates have no such field (stored as busy).</summary>
+    public static bool ResolveBusy(TaskType type, EventTemplate template, bool requested) =>
+        For(type, template).Busy != BusyMode.Choice || requested;
+
     /// <summary>A Task must use the Default template, and the value must be a known template.</summary>
     public static bool IsValid(TaskType type, EventTemplate template) =>
         Enum.IsDefined(template) && (type == TaskType.Event || template == EventTemplate.Default);

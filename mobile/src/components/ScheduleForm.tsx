@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { TaskType, type ScheduleFields } from '../types/task';
 import { INTERVAL_UNITS } from '../utils/duration';
 import { startOfDay } from '../utils/dateUtils';
-import { allDayToTimed, isAllDayRange, pairAllDayDates, pairEventTimes } from '../utils/schedule';
+import { allDayToTimed, pairAllDayDates, pairEventTimes, switchKind } from '../utils/schedule';
+import { ITEM_KINDS, rulesFor, WORKING_LOCATION_PRESETS } from '../utils/templateRules';
+import { ColorPicker } from './ColorPicker';
 import { DeadlinePicker } from './DeadlinePicker';
 import { DurationInput } from './DurationInput';
 
@@ -15,66 +17,84 @@ type Props = {
   isNew: boolean;
 };
 
-const TYPE_OPTIONS = [
-  { type: TaskType.Task, label: 'Task', testID: 'schedule-type-task' },
-  { type: TaskType.Event, label: 'Event', testID: 'schedule-type-event' },
-] as const;
-
-// The scheduling part of the create/edit forms, shared by both. A Task is work with ONE deadline and an effort
-// estimate; an Event occupies a time range (start - end). Whatever is not relevant for the chosen type is hidden
-// (and not sent, see normalizeSchedule). An Event can also be all-day (whole days, no clock times). Recurrence applies to both.
+// The scheduling part of the create/edit forms, shared by both. The chips at the top pick the kind of item as in Google
+// Calendar (Task, Event, Out of office, Focus time, Working location, Birthday); the rest of the form shows only the fields
+// that kind has (utils/templateRules.ts). A Task is work with ONE deadline and an effort estimate; an Event occupies a time
+// range, or whole days. Whatever is not relevant is hidden and not sent (see scheduleForRequest). Recurrence applies to all.
 export function ScheduleForm({ value, onChange, isNew }: Props) {
   const isEvent = value.taskType === TaskType.Event;
-  // All-day is not an API field, it is the shape of the range (00:00 - 23:59), so it is local state that starts from
-  // the stored range when editing; the switch can be on before any day is picked.
-  const [allDay, setAllDay] = useState(() => isAllDayRange(value.startUtc, value.endUtc));
+  const rules = rulesFor(value.taskType, value.eventTemplate);
   const patch = (changes: Partial<ScheduleFields>) => onChange({ ...value, ...changes });
+  const isActive = (kind: (typeof ITEM_KINDS)[number]) =>
+    kind.taskType === value.taskType && (kind.taskType === TaskType.Task || kind.template === value.eventTemplate);
 
-  const toggleAllDay = (next: boolean) => {
-    setAllDay(next);
-    patch(next ? pairAllDayDates(value.startUtc, value.endUtc, value.startUtc ? 'start' : 'end') : allDayToTimed(value.startUtc));
-  };
+  const toggleAllDay = (next: boolean) =>
+    patch({
+      isAllDay: next,
+      ...(next ? pairAllDayDates(value.startUtc, value.endUtc, value.startUtc ? 'start' : 'end') : allDayToTimed(value.startUtc)),
+    });
 
   return (
     <View style={styles.wrapper}>
-      <View style={styles.segment}>
-        {TYPE_OPTIONS.map((option) => (
+      <View style={styles.chipRow}>
+        {ITEM_KINDS.map((kind) => (
           <Pressable
-            key={option.type}
-            testID={option.testID}
-            onPress={() => patch({ taskType: option.type })}
-            style={[styles.segmentItem, value.taskType === option.type ? styles.segmentItemActive : null]}
+            key={kind.id}
+            testID={kind.testID}
+            onPress={() => onChange(switchKind(value, kind))}
+            style={[styles.chip, isActive(kind) ? styles.chipActive : null]}
           >
-            <Text style={value.taskType === option.type ? styles.segmentTextActive : styles.segmentText}>{option.label}</Text>
+            <Text style={isActive(kind) ? styles.chipTextActive : styles.chipText}>{kind.label}</Text>
           </Pressable>
         ))}
       </View>
 
       {isEvent ? (
         <>
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>All-day event</Text>
-            <Switch testID="schedule-allday-switch" value={allDay} onValueChange={toggleAllDay} trackColor={{ true: colors.primary }} />
-          </View>
-          <DeadlinePicker
-            testIDPrefix="event-start-picker"
-            label="Start"
-            optional={false}
-            allowAllDay={false}
-            dateOnly={allDay}
-            value={value.startUtc}
-            onChange={(startUtc) => patch(allDay ? pairAllDayDates(startUtc, value.endUtc, 'start') : pairEventTimes(startUtc, value.endUtc, 'start'))}
-          />
-          <DeadlinePicker
-            testIDPrefix="event-end-picker"
-            label="End"
-            optional={false}
-            allowAllDay={false}
-            dateOnly={allDay}
-            minDate={value.startUtc ? startOfDay(new Date(value.startUtc)) : undefined}
-            value={value.endUtc}
-            onChange={(endUtc) => patch(allDay ? pairAllDayDates(value.startUtc, endUtc, 'end') : pairEventTimes(value.startUtc, endUtc, 'end'))}
-          />
+          {rules.allDay === 'optional' ? (
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>All-day event</Text>
+              <Switch testID="schedule-allday-switch" value={value.isAllDay} onValueChange={toggleAllDay} trackColor={{ true: colors.primary }} />
+            </View>
+          ) : null}
+          {rules.allDay === 'always' ? (
+            // A birthday is one day: a single date, the end follows by itself.
+            <DeadlinePicker
+              testIDPrefix="event-start-picker"
+              label="Date"
+              optional={false}
+              allowAllDay={false}
+              dateOnly
+              value={value.startUtc}
+              onChange={(startUtc) => patch(pairAllDayDates(startUtc, null, 'start'))}
+            />
+          ) : (
+            <>
+              <DeadlinePicker
+                testIDPrefix="event-start-picker"
+                label="Start"
+                optional={false}
+                allowAllDay={false}
+                dateOnly={value.isAllDay}
+                value={value.startUtc}
+                onChange={(startUtc) =>
+                  patch(value.isAllDay ? pairAllDayDates(startUtc, value.endUtc, 'start') : pairEventTimes(startUtc, value.endUtc, 'start'))
+                }
+              />
+              <DeadlinePicker
+                testIDPrefix="event-end-picker"
+                label="End"
+                optional={false}
+                allowAllDay={false}
+                dateOnly={value.isAllDay}
+                minDate={value.startUtc ? startOfDay(new Date(value.startUtc)) : undefined}
+                value={value.endUtc}
+                onChange={(endUtc) =>
+                  patch(value.isAllDay ? pairAllDayDates(value.startUtc, endUtc, 'end') : pairEventTimes(value.startUtc, endUtc, 'end'))
+                }
+              />
+            </>
+          )}
         </>
       ) : (
         <>
@@ -87,6 +107,43 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
           />
         </>
       )}
+
+      {rules.location === 'text' ? (
+        <TextInput
+          testID="schedule-location-input"
+          style={styles.input}
+          placeholder="Location"
+          placeholderTextColor={colors.textMuted}
+          value={value.location ?? ''}
+          onChangeText={(location) => patch({ location })}
+        />
+      ) : null}
+      {rules.location === 'workingLocation' ? (
+        <WorkingLocationField value={value.location} onChange={(location) => patch({ location })} />
+      ) : null}
+
+      {rules.busy === 'choice' ? (
+        <View>
+          <Text style={styles.label}>Show me as:</Text>
+          <View style={styles.chipRow}>
+            {[
+              { busy: true, label: 'Busy', testID: 'schedule-busy' },
+              { busy: false, label: 'Free', testID: 'schedule-free' },
+            ].map((option) => (
+              <Pressable
+                key={option.testID}
+                testID={option.testID}
+                onPress={() => patch({ isBusy: option.busy })}
+                style={[styles.chip, value.isBusy === option.busy ? styles.chipActive : null]}
+              >
+                <Text style={value.isBusy === option.busy ? styles.chipTextActive : styles.chipText}>{option.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {rules.allowsColor ? <ColorPicker value={value.colorKey} onChange={(colorKey) => patch({ colorKey })} /> : null}
 
       <View style={styles.switchRow}>
         <Text style={styles.switchLabel}>Repeats</Text>
@@ -120,19 +177,77 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
   );
 }
 
+// Working location: "Home", "Office" or a label of your own, as in Google Calendar.
+function WorkingLocationField({ value, onChange }: { value: string | null; onChange: (location: string | null) => void }) {
+  const isPreset = (WORKING_LOCATION_PRESETS as readonly string[]).includes(value ?? '');
+  // The custom field is open when the stored label is not one of the presets, or after tapping "Other" with nothing typed yet.
+  const [custom, setCustom] = useState(() => Boolean(value) && !isPreset);
+  return (
+    <View>
+      <Text style={styles.label}>Working from:</Text>
+      <View style={styles.chipRow}>
+        {WORKING_LOCATION_PRESETS.map((preset) => (
+          <Pressable
+            key={preset}
+            testID={`schedule-working-${preset.toLowerCase()}`}
+            onPress={() => {
+              setCustom(false);
+              onChange(preset);
+            }}
+            style={[styles.chip, !custom && value === preset ? styles.chipActive : null]}
+          >
+            <Text style={!custom && value === preset ? styles.chipTextActive : styles.chipText}>{preset}</Text>
+          </Pressable>
+        ))}
+        <Pressable
+          testID="schedule-working-other"
+          onPress={() => {
+            setCustom(true);
+            if (isPreset) onChange('');
+          }}
+          style={[styles.chip, custom ? styles.chipActive : null]}
+        >
+          <Text style={custom ? styles.chipTextActive : styles.chipText}>Other</Text>
+        </Pressable>
+      </View>
+      {custom ? (
+        <TextInput
+          testID="schedule-location-input"
+          style={[styles.input, styles.customInput]}
+          placeholder="Label, e.g. Client site"
+          placeholderTextColor={colors.textMuted}
+          value={value ?? ''}
+          onChangeText={onChange}
+        />
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   wrapper: { gap: spacing.sm },
-  segment: {
-    flexDirection: 'row',
+  input: {
+    backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
-    overflow: 'hidden',
+    padding: spacing.md,
+    color: colors.text,
   },
-  segmentItem: { flex: 1, alignItems: 'center', paddingVertical: spacing.sm, backgroundColor: colors.background },
-  segmentItemActive: { backgroundColor: colors.primaryMuted },
-  segmentText: { ...typography.body, color: colors.textMuted },
-  segmentTextActive: { ...typography.body, color: colors.primary, fontWeight: '700' },
+  customInput: { marginTop: spacing.xs },
+  label: { ...typography.body, color: colors.textMuted },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.background,
+  },
+  chipActive: { backgroundColor: colors.primaryMuted, borderColor: colors.primary },
+  chipText: { ...typography.body, fontSize: 12, color: colors.textMuted },
+  chipTextActive: { ...typography.body, fontSize: 12, color: colors.primary, fontWeight: '700' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   switchLabel: { ...typography.body, color: colors.text },
 });

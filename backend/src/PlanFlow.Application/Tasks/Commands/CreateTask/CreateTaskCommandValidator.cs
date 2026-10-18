@@ -17,8 +17,23 @@ public class CreateTaskCommandValidator : TaskScheduleValidator<CreateTaskComman
 
         // A new event that is already over is pointless: it would be scored 0 straight away. (Editing a past one is allowed.)
         RuleFor(x => x.EndUtc)
-            .Must((x, _) => CalendarItemUrgencyScoreFactory.ResolveEventEnd(x.StartUtc, x.EndUtc) > DateTime.UtcNow)
+            .Must((x, _) => EventEndsAfterNow(x))
             .When(x => x.TaskType == Domain.Enums.TaskType.Event && x.StartUtc.HasValue)
             .WithMessage("The event must not be already over.");
+    }
+
+    /// <summary>
+    /// An all-day event ends at a midnight UTC but means the last day in the user's own zone, which can still be running for hours after
+    /// that moment (up to 12 h west of UTC), so it counts as over only once that margin has passed too.
+    /// </summary>
+    private static bool EventEndsAfterNow(CreateTaskCommand x)
+    {
+        if (IsAllDayEvent(x))
+        {
+            var dayEnd = x.EndUtc ?? x.StartUtc!.Value.AddDays(1);
+            return dayEnd.AddHours(12) > DateTime.UtcNow;
+        }
+
+        return CalendarItemUrgencyScoreFactory.ResolveEventEnd(x.StartUtc, x.EndUtc) > DateTime.UtcNow;
     }
 }

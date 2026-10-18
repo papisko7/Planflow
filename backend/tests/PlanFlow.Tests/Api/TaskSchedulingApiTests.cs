@@ -153,6 +153,7 @@ public class TaskSchedulingApiTests : IClassFixture<CustomWebApplicationFactory>
     public async Task ImportedGoogleFields_AreExposedInTheListAndTheDetail_AndSurviveAnEditInTheApp()
     {
         var (client, teamId) = await OwnerWithTeamAsync();
+        var firstDay = DateTime.UtcNow.Date.AddDays(5); // an all-day item is stored as whole days (midnight UTC)
         Guid id;
         using (var scope = _factory.Services.CreateScope())
         {
@@ -160,9 +161,9 @@ public class TaskSchedulingApiTests : IClassFixture<CustomWebApplicationFactory>
             var item = new CalendarItem
             {
                 TeamId = teamId, Title = "Holiday", TaskType = TaskType.Event, Status = TaskStatus.Confirmed,
-                EventTemplate = EventTemplate.OutOfOffice, IsAllDay = true, Location = "Lisbon", ColorKey = "tomato", IsBusy = false,
+                EventTemplate = EventTemplate.Default, IsAllDay = true, ExternalCalendarEventId = "gcal-1", Location = "Lisbon", ColorKey = "tomato", IsBusy = false,
                 ExternalSettings = "Auto-decline: declines all conflicting invitations",
-                StartUtc = DateTime.UtcNow.Date.AddDays(5), EndUtc = DateTime.UtcNow.Date.AddDays(7)
+                StartUtc = firstDay, EndUtc = firstDay.AddDays(2)
             };
             item.Reminders.Add(ItemReminder.Day(1, 540));
             item.Reminders.Add(ItemReminder.Offset(30));
@@ -173,7 +174,8 @@ public class TaskSchedulingApiTests : IClassFixture<CustomWebApplicationFactory>
 
         var detail = await client.GetFromJsonAsync<JsonElement>($"api/tasks/{id}");
         var task = detail.GetProperty("task");
-        Assert.Equal((int)EventTemplate.OutOfOffice, task.GetProperty("eventTemplate").GetInt32());
+        Assert.Equal((int)EventTemplate.Default, task.GetProperty("eventTemplate").GetInt32());
+        Assert.True(task.GetProperty("isExternal").GetBoolean());
         Assert.True(task.GetProperty("isAllDay").GetBoolean());
         Assert.Equal("Lisbon", task.GetProperty("location").GetString());
         Assert.Equal("tomato", task.GetProperty("colorKey").GetString());
@@ -195,14 +197,113 @@ public class TaskSchedulingApiTests : IClassFixture<CustomWebApplicationFactory>
         var edit = await client.PutAsJsonAsync($"api/tasks/{id}", new
         {
             title = "Holiday (renamed)", status = 5, impactScore = 3, taskType = 1,
-            startUtc = Iso(TimeSpan.FromDays(5)), endUtc = Iso(TimeSpan.FromDays(7))
+            startUtc = firstDay, endUtc = firstDay.AddDays(2)
         });
         Assert.Equal(HttpStatusCode.OK, edit.StatusCode);
         var after = (await client.GetFromJsonAsync<JsonElement>($"api/tasks/{id}")).GetProperty("task");
         Assert.Equal("Lisbon", after.GetProperty("location").GetString());
         Assert.Equal("tomato", after.GetProperty("colorKey").GetString());
         Assert.True(after.GetProperty("isAllDay").GetBoolean());
-        Assert.Equal((int)EventTemplate.OutOfOffice, after.GetProperty("eventTemplate").GetInt32());
+        Assert.Equal((int)EventTemplate.Default, after.GetProperty("eventTemplate").GetInt32());
+    }
+
+    [Fact]
+    public async Task TemplateFields_RoundTripThroughCreateAndEdit_AndAnOldClientEditKeepsThem()
+    {
+        var (client, teamId) = await OwnerWithTeamAsync();
+        var firstDay = DateTime.UtcNow.Date.AddDays(10);
+
+        var created = await client.PostAsJsonAsync($"api/teams/{teamId}/tasks", new
+        {
+            title = "Conference", description = "Bring badge", impactScore = 6, taskType = 1,
+            startUtc = firstDay, endUtc = firstDay.AddDays(2), isAllDay = true, eventTemplate = (int)EventTemplate.Default,
+            location = "Warsaw", colorKey = "peacock", isBusy = false
+        });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var dto = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var id = dto.GetProperty("id").GetGuid();
+        Assert.True(dto.GetProperty("isAllDay").GetBoolean());
+        Assert.Equal("Warsaw", dto.GetProperty("location").GetString());
+        Assert.Equal("peacock", dto.GetProperty("colorKey").GetString());
+        Assert.False(dto.GetProperty("isBusy").GetBoolean());
+        Assert.False(dto.GetProperty("isExternal").GetBoolean());
+
+        // A client from before the template fields (no eventTemplate in the body) must not reset them.
+        var oldClient = await client.PutAsJsonAsync($"api/tasks/{id}", new
+        {
+            title = "Conference 2", status = 5, impactScore = 6, taskType = 1, startUtc = firstDay, endUtc = firstDay.AddDays(2)
+        });
+        Assert.Equal(HttpStatusCode.OK, oldClient.StatusCode);
+        var kept = await oldClient.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("Warsaw", kept.GetProperty("location").GetString());
+        Assert.Equal("peacock", kept.GetProperty("colorKey").GetString());
+        Assert.True(kept.GetProperty("isAllDay").GetBoolean());
+        Assert.False(kept.GetProperty("isBusy").GetBoolean());
+
+        // A current client sends the whole block and changes it.
+        var edited = await client.PutAsJsonAsync($"api/tasks/{id}", new
+        {
+            title = "Holiday", status = 5, impactScore = (int?)null, taskType = 1, startUtc = firstDay, endUtc = firstDay.AddDays(2),
+            isAllDay = true, eventTemplate = (int)EventTemplate.OutOfOffice, colorKey = "grape"
+        });
+        Assert.Equal(HttpStatusCode.OK, edited.StatusCode);
+        var changed = await edited.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal((int)EventTemplate.OutOfOffice, changed.GetProperty("eventTemplate").GetInt32());
+        Assert.Equal(JsonValueKind.Null, changed.GetProperty("location").ValueKind);
+        Assert.Equal("grape", changed.GetProperty("colorKey").GetString());
+    }
+
+    [Fact]
+    public async Task InvalidTemplateFields_AreRejectedWith400()
+    {
+        var (client, teamId) = await OwnerWithTeamAsync();
+        var day = DateTime.UtcNow.Date.AddDays(10);
+
+        var unknownColour = await client.PostAsJsonAsync($"api/teams/{teamId}/tasks", new { title = "X", impactScore = 5, deadlineUtc = Iso(TimeSpan.FromDays(2)), colorKey = "neon" });
+        var taskWithTemplate = await client.PostAsJsonAsync($"api/teams/{teamId}/tasks", new { title = "X", impactScore = 5, deadlineUtc = Iso(TimeSpan.FromDays(2)), eventTemplate = (int)EventTemplate.FocusTime });
+        var timedAllDay = await client.PostAsJsonAsync($"api/teams/{teamId}/tasks", new { title = "X", impactScore = 5, taskType = 1, isAllDay = true, startUtc = day.AddHours(9), endUtc = day.AddDays(1) });
+
+        Assert.Equal(HttpStatusCode.BadRequest, unknownColour.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, taskWithTemplate.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, timedAllDay.StatusCode);
+    }
+
+    [Fact]
+    public async Task EditingAnImportedEvent_ChangesOnlyPlanflowFields()
+    {
+        var (client, teamId) = await OwnerWithTeamAsync();
+        var start = DateTime.UtcNow.Date.AddDays(4).AddHours(9);
+        Guid id;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<PlanFlowDbContext>();
+            var item = new CalendarItem
+            {
+                TeamId = teamId, Title = "Google title", Description = "Google notes", TaskType = TaskType.Event, Status = TaskStatus.Confirmed,
+                Location = "Google place", ColorKey = "sage", StartUtc = start, EndUtc = start.AddHours(1), ExternalCalendarEventId = "gcal-2"
+            };
+            db.CalendarItems.Add(item);
+            await db.SaveChangesAsync();
+            id = item.Id;
+        }
+
+        var response = await client.PutAsJsonAsync($"api/tasks/{id}", new
+        {
+            title = "Mine", description = "Mine", status = 6, impactScore = 9, taskType = 1, estimatedEffortHours = 2.0,
+            startUtc = start.AddDays(1), endUtc = start.AddDays(1).AddHours(1), eventTemplate = (int)EventTemplate.Default,
+            location = "Mine", colorKey = "tomato"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var after = (await client.GetFromJsonAsync<JsonElement>($"api/tasks/{id}")).GetProperty("task");
+        Assert.Equal("Google title", after.GetProperty("title").GetString());
+        Assert.Equal("Google notes", after.GetProperty("description").GetString());
+        Assert.Equal("Google place", after.GetProperty("location").GetString());
+        Assert.Equal("sage", after.GetProperty("colorKey").GetString());
+        Assert.Equal(start, after.GetProperty("startUtc").GetDateTime().ToUniversalTime());
+        Assert.Equal(9, after.GetProperty("impactScore").GetInt32());
+        Assert.Equal(2.0, after.GetProperty("estimatedEffortHours").GetDouble());
+        Assert.Equal((int)TaskStatus.Tentative, after.GetProperty("status").GetInt32());
     }
 
     [Theory]

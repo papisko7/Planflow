@@ -4,6 +4,7 @@ import { getCurrentUserId } from '../services/authService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { formatDuration } from '../utils/duration';
 import { formatRecurrence, formatWhen, splitReason, TEMPLATE_LABEL } from '../utils/itemDisplay';
+import { colorHex } from '../utils/palette';
 import { getUrgencyTier, URGENCY_TIER_META } from '../utils/urgencyGrouping';
 import { TaskStatus, TaskType, type TaskDto } from '../types/task';
 import { ItemTypeBadge } from './ItemTypeBadge';
@@ -89,6 +90,9 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
       style={({ pressed }) => [styles.card, { borderLeftColor: TIER_COLOR[tier], opacity: pressed ? 0.7 : 1 }]}
     >
       <View style={styles.headerRow}>
+        {colorHex(task.colorKey) ? (
+          <View testID={`item-color-${task.id}`} style={[styles.colorDot, { backgroundColor: colorHex(task.colorKey)! }]} />
+        ) : null}
         <Text style={styles.title} numberOfLines={2}>
           {task.title}
         </Text>
@@ -180,6 +184,7 @@ const styles = StyleSheet.create({
   },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm },
   title: { ...typography.subtitle, color: colors.text, flex: 1 },
+  colorDot: { width: 10, height: 10, borderRadius: 5, marginTop: 6 },
   scorePill: { borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 2 },
   scoreText: { color: colors.surface, fontSize: 12, fontWeight: '700' },
   description: { ...typography.body, color: colors.textMuted },

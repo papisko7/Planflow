@@ -71,7 +71,12 @@ public class TasksController : ControllerBase
                 request.RecurrenceIntervalHours,
                 request.RecurrenceEndsAtUtc,
                 request.UseAiEnhancement,
-                request.EndUtc),
+                request.EndUtc,
+                request.EventTemplate,
+                request.IsAllDay,
+                request.Location,
+                request.ColorKey,
+                request.IsBusy),
             cancellationToken);
 
         return CreatedAtAction(nameof(GetTask), new { taskId = task.Id }, task);
@@ -144,6 +149,7 @@ public class TasksController : ControllerBase
         // of the title would silently turn an Event into a plain Task and wipe its effort and recurrence.
         var stored = existing.Task;
         var keepStored = request.TaskType is null;
+        var keepTemplate = request.EventTemplate is null; // same for a client from before the template fields (7.5.5)
 
         var task = await _sender.Send(
             new UpdateTaskCommand(
@@ -165,7 +171,12 @@ public class TasksController : ControllerBase
                 keepStored ? stored.RecurrenceIntervalHours : request.RecurrenceIntervalHours,
                 keepStored ? stored.RecurrenceEndsAtUtc : request.RecurrenceEndsAtUtc,
                 keepStored ? stored.UseAiEnhancement : request.UseAiEnhancement,
-                keepStored ? stored.EndUtc : request.EndUtc),
+                keepStored ? stored.EndUtc : request.EndUtc,
+                keepTemplate ? stored.EventTemplate : request.EventTemplate!.Value,
+                keepTemplate ? stored.IsAllDay : request.IsAllDay,
+                keepTemplate ? stored.Location : request.Location,
+                keepTemplate ? stored.ColorKey : request.ColorKey,
+                keepTemplate ? stored.IsBusy : request.IsBusy),
             cancellationToken);
 
         return Ok(task);

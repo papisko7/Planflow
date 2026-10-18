@@ -1,5 +1,6 @@
 import { addDays, composeDeadline, startOfDay } from './dateUtils';
-import { TaskType, type ScheduleFields, type TaskDto, type UpdateTaskRequest } from '../types/task';
+import { EventTemplate, TaskType, type ScheduleFields, type TaskDto, type UpdateTaskRequest } from '../types/task';
+import { resolveAllDay, resolveBusy, rulesFor, WORKING_LOCATION_PRESETS, type ItemKind } from './templateRules';
 
 // Same bound as the backend's TaskScheduleValidator: one year in hours.
 const MAX_HOURS = 366 * 24;
@@ -7,9 +8,14 @@ const MAX_HOURS = 366 * 24;
 export const DEFAULT_EVENT_HOURS = 1;
 const HOUR_MS = 3_600_000;
 
-export function emptySchedule(taskType: TaskType = TaskType.Task): ScheduleFields {
+export function emptySchedule(taskType: TaskType = TaskType.Task, eventTemplate: EventTemplate = EventTemplate.Default): ScheduleFields {
   return {
     taskType,
+    eventTemplate,
+    isAllDay: resolveAllDay(taskType, eventTemplate, false),
+    location: rulesFor(taskType, eventTemplate).location === 'workingLocation' ? WORKING_LOCATION_PRESETS[0] : null,
+    colorKey: null,
+    isBusy: true,
     deadlineUtc: null,
     startUtc: null,
     endUtc: null,
@@ -20,9 +26,16 @@ export function emptySchedule(taskType: TaskType = TaskType.Task): ScheduleField
   };
 }
 
+// The stored values as they are (the wire convention for all-day items). Quick actions resend these untouched; the edit
+// form starts from scheduleForEditing instead.
 export function scheduleFromTask(task: TaskDto): ScheduleFields {
   return {
     taskType: task.taskType,
+    eventTemplate: task.eventTemplate,
+    isAllDay: task.isAllDay,
+    location: task.location,
+    colorKey: task.colorKey,
+    isBusy: task.isBusy,
     deadlineUtc: task.deadlineUtc,
     startUtc: task.startUtc,
     endUtc: task.endUtc,
@@ -33,13 +46,39 @@ export function scheduleFromTask(task: TaskDto): ScheduleFields {
   };
 }
 
-// The form always shows both ends of an event, so an event stored without an end (e.g. imported) is opened with the
-// end the backend assumes anyway. Only the edit form uses this; quick actions resend the stored values untouched.
+// What the edit form starts from. In the form an all-day event is what the date pickers produce - local 00:00 of the first
+// day to local 23:59 of the last - whichever way it is stored (the flag convention, or the older shape-only one);
+// scheduleForRequest turns it back into the stored convention on save. The form always shows both ends of a timed event, so
+// one stored without an end (e.g. imported) is opened with the end the backend assumes anyway.
 export function scheduleForEditing(task: TaskDto): ScheduleFields {
   const schedule = scheduleFromTask(task);
-  return task.taskType === TaskType.Event && schedule.startUtc && !schedule.endUtc
-    ? { ...schedule, ...pairEventTimes(schedule.startUtc, null, 'start') }
-    : schedule;
+  if (task.taskType !== TaskType.Event || !schedule.startUtc) return schedule;
+  const days = allDayDays(task);
+  if (days) {
+    return { ...schedule, isAllDay: true, startUtc: composeDeadline(days.first, '00:00'), endUtc: composeDeadline(days.last, null) };
+  }
+  return schedule.endUtc ? schedule : { ...schedule, ...pairEventTimes(schedule.startUtc, null, 'start') };
+}
+
+// Picking another chip of the form (Task, Event, Out of office, ...): the type and template change, what the new kind does
+// not have is cleared, and the dates are re-shaped when the kind is all-day (Birthday) or never all-day (Focus time).
+export function switchKind(s: ScheduleFields, kind: ItemKind): ScheduleFields {
+  const rules = rulesFor(kind.taskType, kind.template);
+  const wasAllDay = s.taskType === TaskType.Event && s.isAllDay;
+  const next: ScheduleFields = { ...s, taskType: kind.taskType, eventTemplate: kind.template };
+
+  // The place changes meaning between a free-text place and a working-location label, so it does not carry over.
+  const mode = rulesFor(s.taskType, s.eventTemplate).location;
+  if (rules.location !== mode) next.location = rules.location === 'workingLocation' ? WORKING_LOCATION_PRESETS[0] : null;
+  if (!rules.allowsColor) next.colorKey = null;
+  next.isBusy = resolveBusy(kind.taskType, kind.template, s.isBusy);
+
+  next.isAllDay = resolveAllDay(kind.taskType, kind.template, wasAllDay);
+  if (kind.taskType === TaskType.Event) {
+    if (next.isAllDay && !wasAllDay) Object.assign(next, pairAllDayDates(s.startUtc, s.endUtc, s.startUtc ? 'start' : 'end'));
+    if (!next.isAllDay && wasAllDay) Object.assign(next, allDayToTimed(s.startUtc));
+  }
+  return next;
 }
 
 // Start and end fill each other in so the user always sees a complete range after touching either one:
@@ -143,18 +182,39 @@ export function isPastEvent(
   return end < now.getTime();
 }
 
-// Drops what does not apply to the chosen type, so switching Task <-> Event in the form never sends stale dates
+// Drops what does not apply to the chosen type and template, so switching kinds in the form never sends stale values
 // (the backend does the same; this keeps the request honest).
 export function normalizeSchedule(s: ScheduleFields): ScheduleFields {
   const isEvent = s.taskType === TaskType.Event;
+  const eventTemplate = isEvent ? s.eventTemplate : EventTemplate.Default;
+  const rules = rulesFor(s.taskType, eventTemplate);
   return {
     ...s,
+    eventTemplate,
+    isAllDay: resolveAllDay(s.taskType, eventTemplate, s.isAllDay),
+    location: rules.location === 'none' ? null : s.location?.trim() || null,
+    colorKey: rules.allowsColor ? s.colorKey : null,
+    isBusy: resolveBusy(s.taskType, eventTemplate, s.isBusy),
     deadlineUtc: isEvent ? null : s.deadlineUtc,
     startUtc: isEvent ? s.startUtc : null,
     endUtc: isEvent ? s.endUtc : null,
     recurrenceIntervalHours: s.isRecurring ? s.recurrenceIntervalHours : null,
     recurrenceEndsAtUtc: s.isRecurring ? s.recurrenceEndsAtUtc : null,
   };
+}
+
+// A calendar day as midnight UTC - the stored form of an all-day date (see utcDay for the way back).
+const utcMidnight = (d: Date) => new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).toISOString();
+
+// The fields as the API stores them. Timed values pass through; an all-day event's local days (start 00:00, end 23:59) become
+// midnight UTC of the first day and of the day AFTER the last one (Google's exclusive end), so the day never shifts with the
+// time zone. Use this for the request, normalizeSchedule + validateSchedule for what the user sees in the form.
+export function scheduleForRequest(raw: ScheduleFields): ScheduleFields {
+  const s = normalizeSchedule(raw);
+  if (!s.isAllDay || !s.startUtc) return s;
+  const first = startOfDay(new Date(s.startUtc));
+  const last = s.endUtc ? startOfDay(new Date(s.endUtc)) : first;
+  return { ...s, startUtc: utcMidnight(first), endUtc: utcMidnight(addDays(last < first ? first : last, 1)) };
 }
 
 // Client-side twin of the backend validator, so the user gets a message before the round trip.

@@ -118,6 +118,12 @@ public class CalendarItem : BaseEntity
     public Guid? SourceCalendarIntegrationId { get; set; }
     public CalendarIntegration? SourceCalendarIntegration { get; set; }
 
+    /// <summary>
+    /// True for an item imported from Google. Google owns its title, time, place, description, colour and template (a sync overwrites
+    /// them), so the app lets the user change only the PlanFlow fields (impact, effort, status, assignee...). Derived, not stored.
+    /// </summary>
+    public bool IsExternal => ExternalCalendarEventId is not null;
+
     public ICollection<CalendarItem> BlockedTasks { get; set; } = new List<CalendarItem>();
     public ICollection<TaskHistory> History { get; set; } = new List<TaskHistory>();
     public ICollection<UrgencyScoreLog> UrgencyScoreLogs { get; set; } = new List<UrgencyScoreLog>();
