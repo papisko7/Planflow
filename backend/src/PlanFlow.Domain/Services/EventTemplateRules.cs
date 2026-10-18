@@ -64,6 +64,19 @@ public static class EventTemplateRules
 
     public static ScoringProfile ProfileOf(CalendarItem item) => For(item.TaskType, item.EventTemplate).Profile;
 
+    /// <summary>
+    /// Google's <c>eventType</c> as a template. "fromGmail" (flights, hotels, reservations) and anything unknown or new
+    /// is an ordinary event, so a future Google event type can never break the import.
+    /// </summary>
+    public static EventTemplate FromGoogleEventType(string? eventType) => eventType switch
+    {
+        "outOfOffice" => EventTemplate.OutOfOffice,
+        "focusTime" => EventTemplate.FocusTime,
+        "workingLocation" => EventTemplate.WorkingLocation,
+        "birthday" => EventTemplate.Birthday,
+        _ => EventTemplate.Default
+    };
+
     /// <summary>A Task must use the Default template, and the value must be a known template.</summary>
     public static bool IsValid(TaskType type, EventTemplate template) =>
         Enum.IsDefined(template) && (type == TaskType.Event || template == EventTemplate.Default);

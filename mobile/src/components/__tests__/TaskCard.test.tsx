@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import * as authService from '../../services/authService';
 import { TaskCard } from '../TaskCard';
-import { TaskStatus, TaskType, type TaskDto } from '../../types/task';
+import { EventTemplate, TaskStatus, TaskType, type TaskDto } from '../../types/task';
 import { PLAIN_TASK_FIELDS } from '../../test-fixtures';
 
 const task: TaskDto = {
@@ -162,5 +162,25 @@ describe('TaskCard long-press menu', () => {
 
     await render(<TaskCard task={{ ...task, id: 't2', isDataIncomplete: false }} />);
     expect(screen.queryByTestId('needs-details-t2')).toBeNull();
+  });
+
+  it('shows the place and the kind of an imported event (Out of office, Focus time...), and nothing for an ordinary one', async () => {
+    const holiday: TaskDto = {
+      ...task,
+      id: 'e1',
+      taskType: TaskType.Event,
+      eventTemplate: EventTemplate.OutOfOffice,
+      location: 'Lisbon',
+      isAllDay: true,
+      startUtc: '2026-10-20T00:00:00Z',
+      endUtc: '2026-10-21T00:00:00Z',
+    };
+    await render(<TaskCard task={holiday} />);
+    expect(screen.getByTestId('item-template-e1').props.children).toBe('Out of office');
+    expect(screen.getByText(/Lisbon/)).toBeTruthy();
+    expect(screen.getByText(/all day/)).toBeTruthy();
+
+    await render(<TaskCard task={{ ...task, id: 'plain' }} />);
+    expect(screen.queryByTestId('item-template-plain')).toBeNull();
   });
 });

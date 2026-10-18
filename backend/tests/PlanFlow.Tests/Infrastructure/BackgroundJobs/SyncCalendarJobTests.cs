@@ -376,7 +376,7 @@ public class SyncCalendarJobTests
         var item = await context.CalendarItems.SingleAsync();
         Assert.Equal(TaskType.Event, item.TaskType);
         Assert.Equal("Sprint review", item.Title);                 // the tag is not part of the visible title
-        Assert.Equal("Agenda\n[planflow] impact=8 effort=2h\nBring laptop", item.Description);
+        Assert.Equal("Agenda\nBring laptop", item.Description);     // the tag line only fills the fields; it is not kept in the text
         Assert.Equal(6, item.ImpactScore);                         // title tag wins over the description tag
         Assert.Equal(2, item.EstimatedEffortHours);
         Assert.False(item.IsDataIncomplete);
@@ -565,5 +565,357 @@ public class SyncCalendarJobTests
         Assert.True((await context.CalendarItems.SingleAsync()).IsDataIncomplete);
         Assert.Empty(context.Notifications);
         Assert.Empty(context.EmailOutbox);
+    }
+
+    // ---------- step 7.5.2: template, colour, place, all-day, series, status, reminders, full pass ----------
+
+    private static (PlanFlowDbContext Context, CalendarIntegration Integration) SetUp()
+    {
+        var context = CreateInMemoryContext();
+        var (user, _) = SeedUserWithTeam(context);
+        return (context, SeedActiveIntegration(context, user.Id));
+    }
+
+    private static async Task SyncAsync(PlanFlowDbContext context, params GoogleCalendarEvent[] events) =>
+        await CreateJob(context, ClientReturning(events)).Execute(CreateJobContext().Object);
+
+    private static DateTime Midnight(int daysAhead) => DateTime.UtcNow.Date.AddDays(daysAhead);
+
+    [Fact]
+    public async Task Execute_AllDayEvent_IsStoredAsDatesWithTheAllDayFlag()
+    {
+        var (context, _) = SetUp();
+
+        await SyncAsync(context, new GoogleCalendarEvent("e1", "Conference", Midnight(3), Midnight(5), IsCancelled: false, IsAllDay: true));
+
+        var item = await context.CalendarItems.SingleAsync();
+        Assert.True(item.IsAllDay);
+        Assert.Equal(Midnight(3), item.StartUtc);
+        Assert.Equal(Midnight(5), item.EndUtc);   // Google's exclusive end: it covers the 3rd and the 4th day
+    }
+
+    [Fact]
+    public async Task Execute_OutOfOffice_IsAnInformationalItem_NeverIncomplete_AndOnlyKeepsWhatItsTemplateAllows()
+    {
+        var (context, _) = SetUp();
+
+        await SyncAsync(context, new GoogleCalendarEvent(
+            "e1", Title: null, Midnight(10), Midnight(14), IsCancelled: false, IsAllDay: true, EventType: "outOfOffice",
+            Description: "[planflow] impact=9 effort=1h", Location: "Paris", ColorId: "11", IsFree: true,
+            ReminderMinutes: [1440]));
+
+        var item = await context.CalendarItems.SingleAsync();
+        Assert.Equal(EventTemplate.OutOfOffice, item.EventTemplate);
+        Assert.Equal("Out of office", item.Title);          // the template's own title when Google sends none
+        Assert.False(item.IsDataIncomplete);                // there is nothing to rank, so nothing to complete
+        Assert.Empty(context.Notifications);
+        Assert.Null(item.ImpactScore);                      // a tag on an informational item is ignored
+        Assert.Null(item.EstimatedEffortHours);
+        Assert.Null(item.Location);                         // the template has no place field
+        Assert.Null(item.Description);                      // ...and no description
+        Assert.Equal("tomato", item.ColorKey);              // colour is allowed
+        Assert.True(item.IsBusy);                           // Busy/Free does not exist for it
+        Assert.Empty(context.ItemReminders);                // ...and neither do alerts
+    }
+
+    [Fact]
+    public async Task Execute_FocusTime_KeepsPlaceAndReminders_AndIsAlwaysBusy()
+    {
+        var (context, _) = SetUp();
+        var start = DateTime.UtcNow.AddDays(1);
+
+        await SyncAsync(context, new GoogleCalendarEvent(
+            "e1", "Focus time", start, start.AddHours(2), IsCancelled: false, EventType: "focusTime",
+            Location: "Library", IsFree: true, ReminderMinutes: [15],
+            SettingsText: "Auto-decline: declines all conflicting invitations"));
+
+        var item = await context.CalendarItems.SingleAsync();
+        Assert.Equal(EventTemplate.FocusTime, item.EventTemplate);
+        Assert.Equal("Library", item.Location);
+        Assert.True(item.IsBusy);                           // Google says "free", the template says always busy
+        Assert.Equal("Auto-decline: declines all conflicting invitations", item.ExternalSettings);
+        Assert.Equal(15, Assert.Single(context.ItemReminders).OffsetMinutes);
+        Assert.False(item.IsDataIncomplete);
+    }
+
+    [Fact]
+    public async Task Execute_WorkingLocation_KeepsTheLabel_ButHasNoColour()
+    {
+        var (context, _) = SetUp();
+
+        await SyncAsync(context, new GoogleCalendarEvent(
+            "e1", Title: "", Midnight(1), Midnight(2), IsCancelled: false, IsAllDay: true, EventType: "workingLocation",
+            Location: "Home", ColorId: "5"));
+
+        var item = await context.CalendarItems.SingleAsync();
+        Assert.Equal(EventTemplate.WorkingLocation, item.EventTemplate);
+        Assert.Equal("Home", item.Location);
+        Assert.Null(item.ColorKey);
+        Assert.Equal("Working location", item.Title);
+    }
+
+    [Fact]
+    public async Task Execute_DefaultEvent_MapsColourPlaceFreeTimeAndSeries()
+    {
+        var (context, _) = SetUp();
+        var start = DateTime.UtcNow.AddDays(1);
+
+        await SyncAsync(context, new GoogleCalendarEvent(
+            "e1_20261020", "Stand-up", start, start.AddMinutes(15), IsCancelled: false,
+            ColorId: "7", Location: "  Room 4  ", IsFree: true, RecurringEventId: "e1"));
+
+        var item = await context.CalendarItems.SingleAsync();
+        Assert.Equal(EventTemplate.Default, item.EventTemplate);
+        Assert.Equal("peacock", item.ColorKey);             // Google's colorId 7
+        Assert.Equal("Room 4", item.Location);
+        Assert.False(item.IsBusy);                          // transparent = free
+        Assert.Equal("e1", item.SeriesId);                  // every occurrence points at the series master
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("99")]      // a colour Google may add one day
+    public async Task Execute_UnknownOrMissingColour_FallsBackToTheDefaultColour(string? colorId)
+    {
+        var (context, _) = SetUp();
+        var start = DateTime.UtcNow.AddDays(1);
+
+        await SyncAsync(context, new GoogleCalendarEvent("e1", "Plain", start, start.AddHours(1), IsCancelled: false, ColorId: colorId));
+
+        Assert.Null((await context.CalendarItems.SingleAsync()).ColorKey);
+    }
+
+    [Fact]
+    public async Task Execute_TooLongTitleAndPlace_AreCutToTheirColumnsInsteadOfFailingTheSync()
+    {
+        var (context, _) = SetUp();
+        var start = DateTime.UtcNow.AddDays(1);
+
+        await SyncAsync(context, new GoogleCalendarEvent(
+            "e1", new string('T', 400), start, start.AddHours(1), IsCancelled: false, Location: new string('L', 900)));
+
+        var item = await context.CalendarItems.SingleAsync();
+        Assert.Equal(256, item.Title.Length);
+        Assert.Equal(512, item.Location!.Length);
+    }
+
+    // --- tag and text ---
+
+    [Fact]
+    public async Task Execute_UnchangedGoogleText_NeverOverwritesImpactTheUserEdited()
+    {
+        var (context, _) = SetUp();
+        var start = DateTime.UtcNow.AddDays(1);
+        GoogleCalendarEvent Event(DateTime end) =>
+            new("e1", "Review", start, end, IsCancelled: false, Description: "Notes\n[planflow] impact=5 effort=2h");
+
+        await SyncAsync(context, Event(start.AddHours(1)));
+        var item = await context.CalendarItems.SingleAsync();
+        item.ImpactScore = 9;                       // the user changed it in the app
+        item.EstimatedEffortHours = 4;
+        await context.SaveChangesAsync();
+
+        await SyncAsync(context, Event(start.AddHours(2)));   // Google moved the end; its text is the same, tag included
+
+        item = await context.CalendarItems.SingleAsync();
+        Assert.Equal(9, item.ImpactScore);
+        Assert.Equal(4, item.EstimatedEffortHours);
+        Assert.Equal(start.AddHours(2), item.EndUtc);         // the rest of the event still follows Google
+    }
+
+    [Fact]
+    public async Task Execute_TagTextChangedInGoogle_IsAppliedAgain()
+    {
+        var (context, _) = SetUp();
+        var start = DateTime.UtcNow.AddDays(1);
+
+        await SyncAsync(context, new GoogleCalendarEvent("e1", "Review", start, start.AddHours(1), false, Description: "[planflow] impact=5"));
+        var item = await context.CalendarItems.SingleAsync();
+        item.ImpactScore = 9;
+        await context.SaveChangesAsync();
+
+        await SyncAsync(context, new GoogleCalendarEvent("e1", "Review", start, start.AddHours(1), false, Description: "[planflow] impact=3"));
+
+        Assert.Equal(3, (await context.CalendarItems.SingleAsync()).ImpactScore);
+    }
+
+    // --- status ---
+
+    [Fact]
+    public async Task Execute_TentativeEvent_IsImportedAsTentative()
+    {
+        var (context, _) = SetUp();
+        var start = DateTime.UtcNow.AddDays(1);
+
+        await SyncAsync(context, new GoogleCalendarEvent("e1", "Maybe", start, start.AddHours(1), false, Status: "tentative"));
+
+        var item = await context.CalendarItems.SingleAsync();
+        Assert.Equal(TaskStatus.Tentative, item.Status);
+        Assert.Equal("tentative", item.ExternalStatus);
+    }
+
+    [Fact]
+    public async Task Execute_StatusTheUserChose_SurvivesAnUnrelatedGoogleEdit_ButFollowsARealStatusChange()
+    {
+        var (context, _) = SetUp();
+        var start = DateTime.UtcNow.AddDays(1);
+        GoogleCalendarEvent Event(string title, string status) => new("e1", title, start, start.AddHours(1), false, Status: status);
+
+        await SyncAsync(context, Event("Dentist", "confirmed"));
+        var item = await context.CalendarItems.SingleAsync();
+        item.Status = TaskStatus.Cancelled;          // the user decided not to go
+        await context.SaveChangesAsync();
+
+        await SyncAsync(context, Event("Dentist (moved)", "confirmed"));   // Google's status did not change
+        Assert.Equal(TaskStatus.Cancelled, (await context.CalendarItems.SingleAsync()).Status);
+
+        await SyncAsync(context, Event("Dentist (moved)", "tentative"));   // now it did
+        Assert.Equal(TaskStatus.Tentative, (await context.CalendarItems.SingleAsync()).Status);
+    }
+
+    // --- reminders ---
+
+    [Fact]
+    public async Task Execute_TimedEventReminders_AreStoredAsOffsets()
+    {
+        var (context, _) = SetUp();
+        var start = DateTime.UtcNow.AddDays(1);
+
+        await SyncAsync(context, new GoogleCalendarEvent("e1", "Meeting", start, start.AddHours(1), false, ReminderMinutes: [10, 1440]));
+
+        Assert.Equal([10, 1440], context.ItemReminders.Select(r => r.OffsetMinutes!.Value).OrderBy(m => m));
+    }
+
+    [Fact]
+    public async Task Execute_AllDayEventReminders_AreStoredAsDaysBeforeAtATimeOfDay()
+    {
+        var (context, _) = SetUp();
+
+        await SyncAsync(context, new GoogleCalendarEvent(
+            "e1", "Holiday", Midnight(5), Midnight(6), false, IsAllDay: true, ReminderMinutes: [900]));
+
+        var reminder = Assert.Single(context.ItemReminders);
+        Assert.Equal(1, reminder.DaysBefore);
+        Assert.Equal(9 * 60, reminder.TimeOfDayMinutes);     // 900 minutes before midnight = the day before at 09:00
+        Assert.Null(reminder.OffsetMinutes);
+    }
+
+    [Fact]
+    public async Task Execute_MoreThanFourReminders_KeepsTheFirstFour()
+    {
+        var (context, _) = SetUp();
+        var start = DateTime.UtcNow.AddDays(1);
+
+        await SyncAsync(context, new GoogleCalendarEvent("e1", "Busy", start, start.AddHours(1), false, ReminderMinutes: [5, 10, 15, 20, 25, 30]));
+
+        Assert.Equal(4, await context.ItemReminders.CountAsync());
+    }
+
+    [Fact]
+    public async Task Execute_SameRemindersAgain_AreNotRewritten()
+    {
+        var (context, _) = SetUp();
+        var start = DateTime.UtcNow.AddDays(1);
+        GoogleCalendarEvent Event() => new("e1", "Meeting", start, start.AddHours(1), false, ReminderMinutes: [10, 60]);
+
+        await SyncAsync(context, Event());
+        var idsBefore = await context.ItemReminders.Select(r => r.Id).OrderBy(i => i).ToListAsync();
+        await SyncAsync(context, Event());
+
+        Assert.Equal(idsBefore, await context.ItemReminders.Select(r => r.Id).OrderBy(i => i).ToListAsync());
+    }
+
+    [Fact]
+    public async Task Execute_RemindersChangedInGoogle_ReplaceTheStoredOnes_AndNoneClearsThem()
+    {
+        var (context, _) = SetUp();
+        var start = DateTime.UtcNow.AddDays(1);
+        GoogleCalendarEvent Event(params int[] minutes) => new("e1", "Meeting", start, start.AddHours(1), false, ReminderMinutes: minutes);
+
+        await SyncAsync(context, Event(10));
+        await SyncAsync(context, Event(30, 120));
+        Assert.Equal([30, 120], context.ItemReminders.Select(r => r.OffsetMinutes!.Value).OrderBy(m => m));
+
+        await SyncAsync(context, Event());   // Google now has none
+        Assert.Empty(context.ItemReminders);
+    }
+
+    [Fact]
+    public async Task Execute_SyncThatSaysNothingAboutReminders_LeavesTheStoredOnesAlone()
+    {
+        var (context, _) = SetUp();
+        var start = DateTime.UtcNow.AddDays(1);
+
+        await SyncAsync(context, new GoogleCalendarEvent("e1", "Meeting", start, start.AddHours(1), false, ReminderMinutes: [10]));
+        await SyncAsync(context, new GoogleCalendarEvent("e1", "Meeting", start, start.AddHours(1), false, ReminderMinutes: null));
+
+        Assert.Single(context.ItemReminders);
+    }
+
+    // --- the daily full pass ---
+
+    [Fact]
+    public async Task Execute_FirstRun_IsAFullPass_AndRemembersBothMoments()
+    {
+        var (context, _) = SetUp();
+        var calendarClient = new Mock<IGoogleCalendarClient>();
+        calendarClient.Setup(c => c.ListEventsAsync(It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        var before = DateTime.UtcNow;
+
+        await CreateJob(context, calendarClient).Execute(CreateJobContext().Object);
+
+        calendarClient.Verify(c => c.ListEventsAsync(It.IsAny<string>(), null, It.IsAny<CancellationToken>()), Times.Once);
+        var integration = await context.CalendarIntegrations.SingleAsync();
+        Assert.InRange(integration.LastSyncedAtUtc!.Value, before, DateTime.UtcNow);
+        Assert.Equal(integration.LastSyncedAtUtc, integration.LastFullSyncAtUtc);
+    }
+
+    [Fact]
+    public async Task Execute_NextRunsSoonAfter_AreIncrementalFromTheLastPoll()
+    {
+        var (context, _) = SetUp();
+        var calendarClient = new Mock<IGoogleCalendarClient>();
+        calendarClient.Setup(c => c.ListEventsAsync(It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        var job = CreateJob(context, calendarClient);
+
+        await job.Execute(CreateJobContext().Object);
+        var firstPoll = (await context.CalendarIntegrations.SingleAsync()).LastSyncedAtUtc;
+        await job.Execute(CreateJobContext().Object);
+
+        calendarClient.Verify(c => c.ListEventsAsync(It.IsAny<string>(), firstPoll, It.IsAny<CancellationToken>()), Times.Once);
+        var integration = await context.CalendarIntegrations.SingleAsync();
+        Assert.True(integration.LastSyncedAtUtc > firstPoll);
+        Assert.Equal(firstPoll, integration.LastFullSyncAtUtc);   // an incremental poll does not count as the full pass
+    }
+
+    [Fact]
+    public async Task Execute_AfterADay_TheWindowIsFetchedInFullAgain()
+    {
+        var (context, integration) = SetUp();
+        integration.LastSyncedAtUtc = DateTime.UtcNow.AddMinutes(-5);
+        integration.LastFullSyncAtUtc = DateTime.UtcNow.AddHours(-25);
+        await context.SaveChangesAsync();
+        var calendarClient = new Mock<IGoogleCalendarClient>();
+        calendarClient.Setup(c => c.ListEventsAsync(It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+
+        await CreateJob(context, calendarClient).Execute(CreateJobContext().Object);
+
+        calendarClient.Verify(c => c.ListEventsAsync(It.IsAny<string>(), null, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.True((await context.CalendarIntegrations.SingleAsync()).LastFullSyncAtUtc > DateTime.UtcNow.AddMinutes(-1));
+    }
+
+    [Fact]
+    public async Task Execute_FailedRun_DoesNotMoveEitherMoment()
+    {
+        var (context, _) = SetUp();
+        var calendarClient = new Mock<IGoogleCalendarClient>();
+        calendarClient.Setup(c => c.ListEventsAsync(It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("Google is down"));
+
+        await CreateJob(context, calendarClient).Execute(CreateJobContext().Object);
+
+        var integration = await context.CalendarIntegrations.SingleAsync();
+        Assert.Null(integration.LastSyncedAtUtc);       // so the next run repeats the full pass
+        Assert.Null(integration.LastFullSyncAtUtc);
     }
 }

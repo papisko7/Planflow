@@ -50,6 +50,18 @@ public class EventTemplateRulesTests
     public void IsValid_TaskNeedsDefault_UnknownTemplateIsRejected(TaskType type, EventTemplate template, bool expected) =>
         Assert.Equal(expected, EventTemplateRules.IsValid(type, template));
 
+    [Theory]
+    [InlineData("default", EventTemplate.Default)]
+    [InlineData("outOfOffice", EventTemplate.OutOfOffice)]
+    [InlineData("focusTime", EventTemplate.FocusTime)]
+    [InlineData("workingLocation", EventTemplate.WorkingLocation)]
+    [InlineData("birthday", EventTemplate.Birthday)]
+    [InlineData("fromGmail", EventTemplate.Default)]        // flights, reservations: ordinary events
+    [InlineData("someFutureGoogleType", EventTemplate.Default)] // a new Google type never breaks the import
+    [InlineData(null, EventTemplate.Default)]
+    public void FromGoogleEventType_MapsKnownTypesAndFallsBackToDefault(string? googleType, EventTemplate expected) =>
+        Assert.Equal(expected, EventTemplateRules.FromGoogleEventType(googleType));
+
     [Fact]
     public void EveryTemplateHasARow()
     {

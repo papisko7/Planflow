@@ -19,6 +19,7 @@ public class CalendarItemConfiguration : IEntityTypeConfiguration<CalendarItem>
         builder.Property(t => t.SeriesId).HasMaxLength(512);
         builder.Property(t => t.ExternalStatus).HasMaxLength(32);
         builder.Property(t => t.ExternalDescriptionHash).HasMaxLength(64); // hex SHA-256
+        builder.Property(t => t.ExternalSettings).HasMaxLength(1000);
 
         // Dashboard's main query is "give me this team's tasks sorted by urgency" — both filter
         // and sort columns are indexed so Postgres can serve it without a full table scan.

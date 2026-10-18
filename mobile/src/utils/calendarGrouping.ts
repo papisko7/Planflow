@@ -1,6 +1,6 @@
 import type { TaskDto } from '../types/task';
 import { dayKey } from './dateUtils';
-import { dueUtc } from './schedule';
+import { dueUtc, utcDay } from './schedule';
 
 export interface AgendaSection<T extends TaskDto = TaskDto> {
   dateKey: string;
@@ -33,7 +33,8 @@ export function groupTasksByDueDate<T extends TaskDto>(tasks: T[]): { sections: 
       undated.push(task);
       continue;
     }
-    const key = dateKey(due);
+    // An imported all-day event is a date (midnight UTC), not a moment: its section is that date wherever the viewer is.
+    const key = task.isAllDay ? dayKey(utcDay(due)) : dateKey(due);
     if (!buckets.has(key)) buckets.set(key, []);
     buckets.get(key)!.push(task);
   }

@@ -20,6 +20,24 @@ export enum TaskType {
   Event = 1,
 }
 
+// Mirrors backend PlanFlow.Domain.Enums.EventTemplate (plain int on the wire): the Google-Calendar-style kind of an Event.
+// A Task is always Default.
+export enum EventTemplate {
+  Default = 0,
+  OutOfOffice = 1,
+  FocusTime = 2,
+  WorkingLocation = 3,
+  Birthday = 4,
+}
+
+// Mirrors PlanFlow.Application.Tasks.Common.ReminderDto. Offset form: offsetMinutes before the start.
+// Day form: daysBefore whole days earlier, at timeOfDayMinutes after midnight. The fields of the other form are null.
+export interface ReminderDto {
+  offsetMinutes: number | null;
+  daysBefore: number | null;
+  timeOfDayMinutes: number | null;
+}
+
 // Mirrors PlanFlow.Application.Tasks.Common.TaskDto
 export interface TaskDto {
   id: string;
@@ -47,6 +65,14 @@ export interface TaskDto {
   aiImpactScore: number | null;
   aiImpactReasoning: string | null;
   isDataIncomplete: boolean;
+  eventTemplate: EventTemplate;
+  location: string | null;
+  colorKey: string | null; // palette name (e.g. "tomato"), null = default colour
+  isBusy: boolean;
+  // All-day items store their DATES as midnight UTC, read literally (see utils/schedule.ts allDayDays); the end is the
+  // midnight after the last day. Items created in the app before 7.5.5 mark all-day by shape instead and have this false.
+  isAllDay: boolean;
+  externalSettings: string | null; // read-only note about Google-only settings of an imported Out of office / Focus time
   // Latest "[Priority] why" sentence; only the team list endpoint fills it.
   reasonText?: string | null;
 }
@@ -67,6 +93,7 @@ export interface UrgencyScoreBreakdownDto {
 export interface TaskDetailDto {
   task: TaskDto;
   latestScoreBreakdown: UrgencyScoreBreakdownDto | null;
+  reminders?: ReminderDto[]; // imported from Google for now; absent on older servers
 }
 
 // The scheduling fields shared by the create and update requests (type, dates, effort, recurrence).

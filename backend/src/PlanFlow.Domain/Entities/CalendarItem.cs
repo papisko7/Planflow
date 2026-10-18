@@ -38,6 +38,8 @@ public class CalendarItem : BaseEntity
     /// <summary>
     /// All-day item: the date is stored as midnight UTC of that calendar date and read literally (no zone conversion),
     /// so the day never shifts when the user travels; "end of day" is computed in the user's own time zone.
+    /// <see cref="EndUtc"/> follows Google's convention: midnight UTC of the day AFTER the last day (exclusive), so a one-day
+    /// event on 20 Oct is 20 Oct 00:00 to 21 Oct 00:00.
     /// </summary>
     public bool IsAllDay { get; set; }
 
@@ -50,8 +52,11 @@ public class CalendarItem : BaseEntity
     /// <summary>Last status seen in the external system; a sync changes our status only when this value changed, so the app's own edits are not undone.</summary>
     public string? ExternalStatus { get; set; }
 
-    /// <summary>Hash of the raw external description, so the [planflow] tag is applied only when Google's text really changed.</summary>
+    /// <summary>Hash of the raw external title + description, so the [planflow] tag is applied only when Google's text really changed.</summary>
     public string? ExternalDescriptionHash { get; set; }
+
+    /// <summary>Read-only note about Google-only settings of an imported Out of office / Focus time event (auto-decline, do-not-disturb, message). Shown, never edited.</summary>
+    public string? ExternalSettings { get; set; }
 
     /// <summary>Who assigned the item to <see cref="AssignedUserId"/>; null when nobody did (self-taken, imported, unassigned).</summary>
     public Guid? AssignedByUserId { get; set; }
@@ -117,4 +122,5 @@ public class CalendarItem : BaseEntity
     public ICollection<TaskHistory> History { get; set; } = new List<TaskHistory>();
     public ICollection<UrgencyScoreLog> UrgencyScoreLogs { get; set; } = new List<UrgencyScoreLog>();
     public ICollection<Alert> Alerts { get; set; } = new List<Alert>();
+    public ICollection<ItemReminder> Reminders { get; set; } = new List<ItemReminder>();
 }

@@ -1,4 +1,4 @@
-import { TaskType, type TaskDto } from './types/task';
+import { EventTemplate, TaskType, type TaskDto } from './types/task';
 
 // The scheduling/AI part of a TaskDto for a plain Task, so test fixtures only spell out what they care about.
 export const PLAIN_TASK_FIELDS = {
@@ -13,4 +13,10 @@ export const PLAIN_TASK_FIELDS = {
   aiImpactScore: null,
   aiImpactReasoning: null,
   isDataIncomplete: false,
+  eventTemplate: EventTemplate.Default,
+  location: null,
+  colorKey: null,
+  isBusy: true,
+  isAllDay: false,
+  externalSettings: null,
 } satisfies Partial<TaskDto>;

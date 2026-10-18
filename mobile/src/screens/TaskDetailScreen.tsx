@@ -8,14 +8,14 @@ import { deleteTask, getTask, getTeamTasks, updateTask } from '../services/taskS
 import { getTeamMembers } from '../services/teamService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { formatDuration } from '../utils/duration';
-import { formatRecurrence } from '../utils/itemDisplay';
+import { formatColorKey, formatRecurrence, formatReminder, TEMPLATE_LABEL } from '../utils/itemDisplay';
 import { formatDay } from '../utils/dateUtils';
-import { isAllDayRange, toUpdateRequest } from '../utils/schedule';
+import { allDayDays, toUpdateRequest } from '../utils/schedule';
 import type { RootStackParamList } from '../navigation/types';
 import type { ApiError } from '../types/api';
 import { TeamRole, type TeamMemberDto } from '../types/team';
 import type { TaskDetailDto, TaskDto } from '../types/task';
-import { TaskStatus, TaskType } from '../types/task';
+import { EventTemplate, TaskStatus, TaskType } from '../types/task';
 import { ItemTypeBadge } from '../components/ItemTypeBadge';
 import { STATUS_LABEL } from '../utils/taskStatus';
 
@@ -93,12 +93,16 @@ export default function TaskDetailScreen() {
   }
 
   const { task, latestScoreBreakdown } = detail;
+  const reminders = detail.reminders ?? [];
   const isEvent = task.taskType === TaskType.Event;
   const dueDate = formatDateTime(task.deadlineUtc);
   // An all-day event reads "Oct 19, 2026 · all day" instead of 12:00 AM - 11:59 PM.
-  const allDay = isAllDayRange(task.startUtc, task.endUtc);
-  const startDate = allDay ? formatDay(task.startUtc!) : formatDateTime(task.startUtc);
-  const endDate = allDay ? formatDay(task.endUtc!) : formatDateTime(task.endUtc);
+  // (For an imported all-day event the end shown is its LAST day, not the midnight after it that is stored.)
+  const days = allDayDays(task);
+  const allDay = days !== null;
+  const startDate = days ? formatDay(days.first.toISOString()) : formatDateTime(task.startUtc);
+  const endDate = days ? formatDay(days.last.toISOString()) : formatDateTime(task.endUtc);
+  const templateLabel = TEMPLATE_LABEL[task.eventTemplate];
   const recurrence = formatRecurrence(task);
   const recurrenceEnd = formatDateTime(task.recurrenceEndsAtUtc);
   const createdDate = formatDateTime(task.createdAtUtc);
@@ -188,6 +192,7 @@ export default function TaskDetailScreen() {
         <View style={styles.badgeRow}>
           <Text style={styles.statusBadge}>{STATUS_LABEL[task.status]}</Text>
           <ItemTypeBadge testID="task-type-badge" type={task.taskType} />
+          {templateLabel ? <Text testID="task-template-badge" style={styles.statusBadge}>{templateLabel}</Text> : null}
           {task.isDataIncomplete ? <Text testID="needs-details-badge" style={styles.overrideBadge}>⚠ Needs details</Text> : null}
           {task.manualUrgencyOverride !== null ? <Text style={styles.overrideBadge}>Manual override</Text> : null}
         </View>
@@ -209,6 +214,11 @@ export default function TaskDetailScreen() {
               ) : null}
             </>
           )}
+          {task.location ? <MetaItem label="Location" value={task.location} /> : null}
+          {isEvent && task.eventTemplate === EventTemplate.Default ? <MetaItem label="Show as" value={task.isBusy ? 'Busy' : 'Free'} /> : null}
+          {task.colorKey ? <MetaItem label="Colour" value={formatColorKey(task.colorKey)} /> : null}
+          {reminders.length > 0 ? <MetaItem label="Reminders" value={reminders.map(formatReminder).join('\n')} /> : null}
+          {task.externalSettings ? <MetaItem label="Google settings" value={task.externalSettings} /> : null}
           {recurrence ? (
             <MetaItem label="Repeats" value={recurrenceEnd ? `${recurrence}, until ${recurrenceEnd}` : recurrence} />
           ) : null}

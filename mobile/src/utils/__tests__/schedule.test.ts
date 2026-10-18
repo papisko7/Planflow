@@ -1,6 +1,7 @@
 import { PLAIN_TASK_FIELDS } from '../../test-fixtures';
 import { TaskStatus, TaskType, type ScheduleFields, type TaskDto } from '../../types/task';
 import {
+  allDayDays,
   allDayToTimed,
   dueUtc,
   emptySchedule,
@@ -11,6 +12,7 @@ import {
   pairEventTimes,
   scheduleForEditing,
   toUpdateRequest,
+  utcDay,
   validateSchedule,
 } from '../schedule';
 
@@ -187,5 +189,50 @@ describe('all-day events', () => {
     expect(local(range.startUtc)).toEqual([19, 9, 0]);
     expect(local(range.endUtc)).toEqual([19, 10, 0]);
     expect(allDayToTimed(null)).toEqual({ startUtc: null, endUtc: null });
+  });
+});
+
+describe('imported all-day events (dates stored as midnight UTC)', () => {
+  // A two-day conference on 20 and 21 October. Google's end is the midnight AFTER the last day.
+  const imported = { startUtc: '2026-10-20T00:00:00Z', endUtc: '2026-10-22T00:00:00Z', isAllDay: true };
+
+  it("utcDay reads the date from the UTC parts, so the day never shifts with the viewer's zone", () => {
+    const day = utcDay('2026-10-20T00:00:00Z');
+    expect([day.getFullYear(), day.getMonth(), day.getDate()]).toEqual([2026, 9, 20]);
+  });
+
+  it('allDayDays gives the first and the LAST day (not the stored midnight after it)', () => {
+    const days = allDayDays(imported)!;
+    expect(days.first.getDate()).toBe(20);
+    expect(days.last.getDate()).toBe(21);
+  });
+
+  it('a one-day event is a single day', () => {
+    const days = allDayDays({ startUtc: '2026-10-20T00:00:00Z', endUtc: '2026-10-21T00:00:00Z', isAllDay: true })!;
+    expect(days.first.getTime()).toBe(days.last.getTime());
+  });
+
+  it('an imported all-day event without an end covers just its first day', () => {
+    const days = allDayDays({ startUtc: '2026-10-20T00:00:00Z', endUtc: null, isAllDay: true })!;
+    expect(days.first.getTime()).toBe(days.last.getTime());
+  });
+
+  it('still recognises the older all-day shape (local 00:00 to local 23:59) without the flag', () => {
+    const start = new Date(2026, 9, 20, 0, 0).toISOString();
+    const end = new Date(2026, 9, 21, 23, 59).toISOString();
+    const days = allDayDays({ startUtc: start, endUtc: end, isAllDay: false })!;
+    expect([days.first.getDate(), days.last.getDate()]).toEqual([20, 21]);
+  });
+
+  it('a timed event is not all-day', () => {
+    expect(allDayDays({ startUtc: '2026-10-20T08:00:00Z', endUtc: '2026-10-20T09:00:00Z', isAllDay: false })).toBeNull();
+    expect(allDayDays({ startUtc: null, endUtc: null, isAllDay: true })).toBeNull();
+  });
+
+  it('is over only after its last day is over for the viewer, not at midnight UTC', () => {
+    const item = { taskType: TaskType.Event, ...imported };
+    expect(isPastEvent(item, new Date(2026, 9, 21, 23, 0))).toBe(false); // evening of the last day
+    expect(isPastEvent(item, new Date(2026, 9, 22, 0, 30))).toBe(true); // just after local midnight
+    expect(isPastEvent(item, new Date(2026, 9, 20, 12, 0))).toBe(false);
   });
 });

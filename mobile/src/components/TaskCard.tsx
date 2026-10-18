@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { getCurrentUserId } from '../services/authService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { formatDuration } from '../utils/duration';
-import { formatRecurrence, formatWhen, splitReason } from '../utils/itemDisplay';
+import { formatRecurrence, formatWhen, splitReason, TEMPLATE_LABEL } from '../utils/itemDisplay';
 import { getUrgencyTier, URGENCY_TIER_META } from '../utils/urgencyGrouping';
 import { TaskStatus, TaskType, type TaskDto } from '../types/task';
 import { ItemTypeBadge } from './ItemTypeBadge';
@@ -44,6 +44,7 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
   const isEvent = task.taskType === TaskType.Event;
   const when = formatWhen(task);
   const recurrence = formatRecurrence(task);
+  const templateLabel = TEMPLATE_LABEL[task.eventTemplate];
   const reason = splitReason(task.reasonText);
 
   // Double tap toggles done: an open task becomes done, a done task is reopened. To tell it apart from a
@@ -104,9 +105,11 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
 
       <View style={styles.metaRow}>
         <ItemTypeBadge testID={`item-type-${task.id}`} type={task.taskType} />
+        {templateLabel ? <Text testID={`item-template-${task.id}`} style={styles.metaText}>{templateLabel}</Text> : null}
         {task.teamName ? <Text style={styles.teamChip}>👥 {task.teamName}</Text> : null}
         {!task.assignedUserId ? <Text style={styles.metaText}>👤 Unassigned</Text> : null}
         {when ? <Text style={styles.metaText}>{isEvent ? '🗓' : '📅'} {when}</Text> : null}
+        {task.location ? <Text style={styles.metaText}>📍 {task.location}</Text> : null}
         {!isEvent && task.estimatedEffortHours !== null ? (
           <Text style={styles.metaText}>⏱ {formatDuration(task.estimatedEffortHours)}</Text>
         ) : null}

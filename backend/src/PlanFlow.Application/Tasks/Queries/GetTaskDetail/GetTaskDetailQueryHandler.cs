@@ -46,6 +46,12 @@ public class GetTaskDetailQueryHandler : IRequestHandler<GetTaskDetailQuery, Tas
             }
         }
 
-        return new TaskDetailDto(TaskDto.FromEntity(task), breakdown);
+        var reminders = await _context.ItemReminders
+            .AsNoTracking()
+            .Where(r => r.CalendarItemId == request.TaskId)
+            .OrderBy(r => r.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        return new TaskDetailDto(TaskDto.FromEntity(task), breakdown, reminders.Select(ReminderDto.FromEntity).ToList());
     }
 }

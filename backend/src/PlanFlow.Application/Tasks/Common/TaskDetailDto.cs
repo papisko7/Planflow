@@ -30,5 +30,15 @@ public record UrgencyScoreBreakdownDto(
         log.ReasonText);
 }
 
-/// <summary>Full detail view for a single task: the task itself plus its latest urgency breakdown.</summary>
-public record TaskDetailDto(TaskDto Task, UrgencyScoreBreakdownDto? LatestScoreBreakdown);
+/// <summary>
+/// One reminder of an item. Offset form: <see cref="OffsetMinutes"/> before the start. Day form: <see cref="DaysBefore"/> whole days
+/// before, at <see cref="TimeOfDayMinutes"/> after midnight. The fields of the other form are null.
+/// </summary>
+public record ReminderDto(int? OffsetMinutes, int? DaysBefore, int? TimeOfDayMinutes)
+{
+    public static ReminderDto FromEntity(ItemReminder reminder) =>
+        new(reminder.OffsetMinutes, reminder.DaysBefore, reminder.TimeOfDayMinutes);
+}
+
+/// <summary>Full detail view for a single task: the task itself, its latest urgency breakdown and its reminders.</summary>
+public record TaskDetailDto(TaskDto Task, UrgencyScoreBreakdownDto? LatestScoreBreakdown, IReadOnlyList<ReminderDto>? Reminders = null);

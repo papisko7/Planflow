@@ -81,6 +81,26 @@ public static partial class PlanflowTagParser
         return text.Length == 0 ? null : text;
     }
 
+    /// <summary>
+    /// Removes the <c>[planflow]</c> line(s) from an already plain-text description. The tag only fills fields, so it is not kept
+    /// in the stored text; lines around it stay, and the blank line a removal leaves behind is dropped. Null when nothing is left.
+    /// </summary>
+    public static string? StripTagLines(string? plainDescription)
+    {
+        if (string.IsNullOrWhiteSpace(plainDescription))
+        {
+            return null;
+        }
+
+        var kept = plainDescription
+            .Replace("\r\n", "\n")
+            .Split('\n')
+            .Where(line => !TagLine().IsMatch(line))
+            .ToList();
+        var text = string.Join('\n', kept).Trim();
+        return text.Length == 0 ? null : text;
+    }
+
     private static int? ReadImpact(string line)
     {
         var match = Impact().Match(line);

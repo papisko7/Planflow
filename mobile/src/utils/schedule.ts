@@ -1,4 +1,4 @@
-import { composeDeadline, startOfDay } from './dateUtils';
+import { addDays, composeDeadline, startOfDay } from './dateUtils';
 import { TaskType, type ScheduleFields, type TaskDto, type UpdateTaskRequest } from '../types/task';
 
 // Same bound as the backend's TaskScheduleValidator: one year in hours.
@@ -71,6 +71,34 @@ export function isAllDayRange(startUtc: string | null, endUtc: string | null): b
   return start.getHours() === 0 && start.getMinutes() === 0 && end.getHours() === 23 && end.getMinutes() === 59 && end >= start;
 }
 
+// The calendar DATE inside a UTC timestamp, as a local Date at midnight of that date. An imported all-day item stores
+// its dates as midnight UTC and means "that date, wherever you are", so it is read from the UTC parts: converting to
+// local time first would show the previous day in any zone west of UTC.
+export function utcDay(iso: string): Date {
+  const d = new Date(iso);
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+// The first and last calendar day of an all-day event, or null when the event is not all-day. Two storage conventions meet here:
+// - imported (isAllDay): dates as midnight UTC, the end being the midnight AFTER the last day (Google's convention);
+// - created in the app before the form learnt the flag: local 00:00 to local 23:59, recognised by that shape alone.
+export function allDayDays(item: {
+  startUtc: string | null;
+  endUtc: string | null;
+  isAllDay?: boolean;
+}): { first: Date; last: Date } | null {
+  if (!item.startUtc) return null;
+  if (item.isAllDay) {
+    const first = utcDay(item.startUtc);
+    const last = item.endUtc ? addDays(utcDay(item.endUtc), -1) : first;
+    return { first, last: last < first ? first : last };
+  }
+  if (isAllDayRange(item.startUtc, item.endUtc)) {
+    return { first: startOfDay(new Date(item.startUtc)), last: startOfDay(new Date(item.endUtc!)) };
+  }
+  return null;
+}
+
 // All-day twin of pairEventTimes, working on whole days. Start is the base value: picking a start day makes the
 // event last that one day (end = 23:59 of it), and an end that is still on or after the start day is kept, so a
 // multi-day event the user set up is not collapsed. Picking an end day first fills the start with that same day.
@@ -102,8 +130,15 @@ export function dueUtc(item: Pick<TaskDto, 'taskType' | 'deadlineUtc' | 'startUt
 
 // An Event whose end (or start + 1h when it has no end) has passed is history: the backend scores it 0 and it
 // never counts as open work. A Task is never "past" - an overdue Task stays urgent.
-export function isPastEvent(item: Pick<TaskDto, 'taskType' | 'startUtc' | 'endUtc'>, now: Date = new Date()): boolean {
+export function isPastEvent(
+  item: Pick<TaskDto, 'taskType' | 'startUtc' | 'endUtc'> & { isAllDay?: boolean },
+  now: Date = new Date(),
+): boolean {
   if (item.taskType !== TaskType.Event || !item.startUtc) return false;
+  // An imported all-day event is over when its last day is over for the person looking at it (local midnight after that day),
+  // not at midnight UTC, which for a viewer in Poland is already two in the morning of the next day.
+  const days = item.isAllDay ? allDayDays(item) : null;
+  if (days) return addDays(days.last, 1).getTime() <= now.getTime();
   const end = item.endUtc ? new Date(item.endUtc).getTime() : new Date(item.startUtc).getTime() + DEFAULT_EVENT_HOURS * 3_600_000;
   return end < now.getTime();
 }

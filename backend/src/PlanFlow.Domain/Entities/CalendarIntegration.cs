@@ -21,6 +21,13 @@ public class CalendarIntegration : BaseEntity
     public string EncryptedRefreshToken { get; set; } = string.Empty;
     public DateTime AccessTokenExpiresAtUtc { get; set; }
 
+    /// <summary>When the last poll started. The next incremental poll asks Google only for events changed since then.</summary>
     public DateTime? LastSyncedAtUtc { get; set; }
+
+    /// <summary>
+    /// When the whole forward window (now to +90 days) was last fetched. Incremental polls cannot see events that merely
+    /// <i>enter</i> the window as time passes, so a full fetch is repeated once a day (and covers anything a poll missed).
+    /// </summary>
+    public DateTime? LastFullSyncAtUtc { get; set; }
     public bool IsActive { get; set; } = true;
 }

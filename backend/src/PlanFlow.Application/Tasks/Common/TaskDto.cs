@@ -33,6 +33,12 @@ public record TaskDto(
     double? AiImpactScore,
     string? AiImpactReasoning,
     bool IsDataIncomplete,
+    Domain.Enums.EventTemplate EventTemplate,
+    string? Location,
+    string? ColorKey,
+    bool IsBusy,
+    bool IsAllDay,
+    string? ExternalSettings,
     string? ReasonText = null)
 {
     public static TaskDto FromEntity(CalendarItem task) => new(
@@ -60,5 +66,11 @@ public record TaskDto(
         task.UseAiEnhancement,
         task.AiImpactScore,
         task.AiImpactReasoning,
-        task.IsDataIncomplete);
+        task.IsDataIncomplete,
+        task.EventTemplate,
+        task.Location,
+        task.ColorKey,
+        task.IsBusy,
+        task.IsAllDay,
+        task.ExternalSettings);
 }

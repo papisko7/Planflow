@@ -157,7 +157,7 @@ public class CalendarSyncIntegrationTests
         Assert.Equal(TaskType.Event, task.TaskType);
         Assert.Equal(deadline.AddHours(-1), task.StartUtc);
         Assert.Equal(deadline, task.EndUtc);
-        Assert.Equal("Rehearse\n[planflow] impact=8 effort=90min", task.Description);
+        Assert.Equal("Rehearse", task.Description); // the [planflow] line only fills the fields; it is not kept in the text
         Assert.Equal(8, task.ImpactScore);
         Assert.Equal(1.5, task.EstimatedEffortHours);
         Assert.False(task.IsDataIncomplete);

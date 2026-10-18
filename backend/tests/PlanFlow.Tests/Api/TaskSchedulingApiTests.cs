@@ -8,6 +8,7 @@ using PlanFlow.Domain.Entities;
 using PlanFlow.Domain.Enums;
 using PlanFlow.Infrastructure.Persistence;
 using PlanFlow.Tests.Integration.PostgresIntegration;
+using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 
 namespace PlanFlow.Tests.Api;
 
@@ -146,6 +147,62 @@ public class TaskSchedulingApiTests : IClassFixture<CustomWebApplicationFactory>
         Assert.StartsWith("[", listReason);
         Assert.Contains("impact 8/10", listReason);
         Assert.Equal(listReason, detail.GetProperty("latestScoreBreakdown").GetProperty("reasonText").GetString());
+    }
+
+    [Fact]
+    public async Task ImportedGoogleFields_AreExposedInTheListAndTheDetail_AndSurviveAnEditInTheApp()
+    {
+        var (client, teamId) = await OwnerWithTeamAsync();
+        Guid id;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<PlanFlowDbContext>();
+            var item = new CalendarItem
+            {
+                TeamId = teamId, Title = "Holiday", TaskType = TaskType.Event, Status = TaskStatus.Confirmed,
+                EventTemplate = EventTemplate.OutOfOffice, IsAllDay = true, Location = "Lisbon", ColorKey = "tomato", IsBusy = false,
+                ExternalSettings = "Auto-decline: declines all conflicting invitations",
+                StartUtc = DateTime.UtcNow.Date.AddDays(5), EndUtc = DateTime.UtcNow.Date.AddDays(7)
+            };
+            item.Reminders.Add(ItemReminder.Day(1, 540));
+            item.Reminders.Add(ItemReminder.Offset(30));
+            db.CalendarItems.Add(item);
+            await db.SaveChangesAsync();
+            id = item.Id;
+        }
+
+        var detail = await client.GetFromJsonAsync<JsonElement>($"api/tasks/{id}");
+        var task = detail.GetProperty("task");
+        Assert.Equal((int)EventTemplate.OutOfOffice, task.GetProperty("eventTemplate").GetInt32());
+        Assert.True(task.GetProperty("isAllDay").GetBoolean());
+        Assert.Equal("Lisbon", task.GetProperty("location").GetString());
+        Assert.Equal("tomato", task.GetProperty("colorKey").GetString());
+        Assert.False(task.GetProperty("isBusy").GetBoolean());
+        Assert.Equal("Auto-decline: declines all conflicting invitations", task.GetProperty("externalSettings").GetString());
+        var reminders = detail.GetProperty("reminders").EnumerateArray().ToList();
+        Assert.Equal(2, reminders.Count);
+        Assert.Contains(reminders, r => r.GetProperty("daysBefore").ValueKind == JsonValueKind.Number
+            && r.GetProperty("daysBefore").GetInt32() == 1 && r.GetProperty("timeOfDayMinutes").GetInt32() == 540);
+        Assert.Contains(reminders, r => r.GetProperty("offsetMinutes").ValueKind == JsonValueKind.Number
+            && r.GetProperty("offsetMinutes").GetInt32() == 30);
+
+        var listed = (await client.GetFromJsonAsync<JsonElement>($"api/teams/{teamId}/tasks"))
+            .EnumerateArray().Single(t => t.GetProperty("id").GetGuid() == id);
+        Assert.True(listed.GetProperty("isAllDay").GetBoolean());
+        Assert.Equal("tomato", listed.GetProperty("colorKey").GetString());
+
+        // Editing the item in the app (a different title and impact) must not wipe what came from Google.
+        var edit = await client.PutAsJsonAsync($"api/tasks/{id}", new
+        {
+            title = "Holiday (renamed)", status = 5, impactScore = 3, taskType = 1,
+            startUtc = Iso(TimeSpan.FromDays(5)), endUtc = Iso(TimeSpan.FromDays(7))
+        });
+        Assert.Equal(HttpStatusCode.OK, edit.StatusCode);
+        var after = (await client.GetFromJsonAsync<JsonElement>($"api/tasks/{id}")).GetProperty("task");
+        Assert.Equal("Lisbon", after.GetProperty("location").GetString());
+        Assert.Equal("tomato", after.GetProperty("colorKey").GetString());
+        Assert.True(after.GetProperty("isAllDay").GetBoolean());
+        Assert.Equal((int)EventTemplate.OutOfOffice, after.GetProperty("eventTemplate").GetInt32());
     }
 
     [Theory]

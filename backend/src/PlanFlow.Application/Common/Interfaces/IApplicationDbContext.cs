@@ -15,6 +15,7 @@ public interface IApplicationDbContext
     DbSet<Team> Teams { get; }
     DbSet<TeamMember> TeamMembers { get; }
     DbSet<CalendarItem> CalendarItems { get; }
+    DbSet<ItemReminder> ItemReminders { get; }
     DbSet<TaskHistory> TaskHistories { get; }
     DbSet<UrgencyScoreLog> UrgencyScoreLogs { get; }
     DbSet<Alert> Alerts { get; }
