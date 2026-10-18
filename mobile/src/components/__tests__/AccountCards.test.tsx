@@ -66,6 +66,9 @@ describe('ChangePasswordCard', () => {
     mockedChange.mockResolvedValue(undefined);
   });
 
+  // The form lives in a collapsed section; open it like a user would.
+  const open = () => fireEvent.press(screen.getByTestId('change-password-section-header'));
+
   const fill = async (current: string, next: string, repeat: string) => {
     await fireEvent.changeText(screen.getByTestId('password-current-input'), current);
     await fireEvent.changeText(screen.getByTestId('password-new-input'), next);
@@ -73,8 +76,17 @@ describe('ChangePasswordCard', () => {
     await fireEvent.press(screen.getByTestId('password-submit'));
   };
 
+  it('starts collapsed so the form does not clutter Settings', async () => {
+    await render(<ChangePasswordCard />);
+
+    expect(screen.queryByTestId('password-current-input')).toBeNull();
+    await open();
+    expect(screen.getByTestId('password-current-input')).toBeTruthy();
+  });
+
   it('changes the password and clears the form', async () => {
     await render(<ChangePasswordCard />);
+    await open();
 
     await fill('old-password-1', 'new-password-2', 'new-password-2');
 
@@ -85,6 +97,7 @@ describe('ChangePasswordCard', () => {
 
   it('validates on the device before calling the server', async () => {
     await render(<ChangePasswordCard />);
+    await open();
 
     await fill('old-password-1', 'short', 'short');
     expect(screen.getByText('The new password needs at least 8 characters.')).toBeTruthy();
@@ -101,6 +114,7 @@ describe('ChangePasswordCard', () => {
   it('says so when the current password is wrong', async () => {
     mockedChange.mockRejectedValue({ status: 400, message: 'x', isNetworkError: false });
     await render(<ChangePasswordCard />);
+    await open();
 
     await fill('wrong-password', 'new-password-2', 'new-password-2');
 

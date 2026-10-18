@@ -10,20 +10,21 @@ import { useTaskActions } from '../hooks/useTaskActions';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import type { RootStackParamList } from '../navigation/types';
 import { TaskType, type TaskDto, type TaskWithTeam } from '../types/task';
-import { countByTab, filterByTab, type ItemTab } from '../utils/itemFilter';
+import { buildRows, countByTab, type ItemRow, type ItemTab } from '../utils/itemFilter';
 
 export default function ItemsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { state, tasks, teams, errorMessage, refreshing, refresh, reload } = useAllTasks();
   const taskActions = useTaskActions(reload);
-  const listRef = useRef<FlatList<TaskWithTeam>>(null);
+  const listRef = useRef<FlatList<ItemRow<TaskWithTeam>>>(null);
   useScrollToTop(listRef);
   const [creatingTask, setCreatingTask] = useState(false);
-  // Tasks and Events are one list on the server (CalendarItem); the two tabs are just a filter over it.
-  const [tab, setTab] = useState<ItemTab>('tasks');
-  const visibleItems = useMemo(() => filterByTab(tasks, tab), [tasks, tab]);
+  // Tasks and Events are one list on the server (CalendarItem); the tabs are just a filter over it.
+  // All shows both, split into a Tasks and an Events section.
+  const [tab, setTab] = useState<ItemTab>('all');
+  const rows = useMemo(() => buildRows(tasks, tab), [tasks, tab]);
   const counts = useMemo(() => countByTab(tasks), [tasks]);
-  const noun = tab === 'events' ? 'event' : 'task';
+  const noun = tab === 'all' ? 'item' : tab === 'events' ? 'event' : 'task';
 
   const onTaskPress = useCallback(
     (task: TaskDto) => navigation.navigate('TaskDetail', { taskId: task.id, teamId: task.teamId }),
@@ -61,14 +62,22 @@ export default function ItemsScreen() {
       <FlatList
         ref={listRef}
         style={styles.list}
-        data={visibleItems}
-        keyExtractor={(item) => item.id}
+        data={rows}
+        keyExtractor={(row) => row.key}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
-        renderItem={({ item }) => <TaskCard task={item} onPress={onTaskPress} actions={taskActions} />}
+        renderItem={({ item: row }) =>
+          row.type === 'header' ? (
+            <Text testID={`items-section-${row.key.replace('header-', '')}`} style={styles.sectionHeader}>
+              {row.title} · {row.count}
+            </Text>
+          ) : (
+            <TaskCard task={row.item} onPress={onTaskPress} actions={taskActions} />
+          )
+        }
         ListHeaderComponent={
           <View style={styles.headerRow}>
             <View style={styles.tabs}>
-              {(['tasks', 'events'] as const).map((t) => (
+              {(['all', 'tasks', 'events'] as const).map((t) => (
                 <Pressable
                   key={t}
                   testID={`items-tab-${t}`}
@@ -76,7 +85,7 @@ export default function ItemsScreen() {
                   style={[styles.tab, tab === t ? styles.tabActive : null]}
                 >
                   <Text style={tab === t ? styles.tabTextActive : styles.tabText}>
-                    {t === 'tasks' ? 'Tasks' : 'Events'} ({counts[t]})
+                    {t === 'all' ? 'All' : t === 'tasks' ? 'Tasks' : 'Events'} ({counts[t]})
                   </Text>
                 </Pressable>
               ))}
@@ -94,7 +103,7 @@ export default function ItemsScreen() {
             <Text style={styles.subtitle}>Tap + to create your first {noun}.</Text>
           </View>
         }
-        contentContainerStyle={visibleItems.length === 0 ? styles.emptyContainer : styles.listContent}
+        contentContainerStyle={rows.length === 0 ? styles.emptyContainer : styles.listContent}
       />
       {teams.length > 0 ? <Fab onPress={() => setCreatingTask(true)} /> : null}
       <CreateTaskModal
@@ -121,6 +130,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.sm,
   },
@@ -129,12 +140,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.lg,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
   },
   tabActive: { backgroundColor: colors.primaryMuted, borderColor: colors.primary },
   tabText: { ...typography.body, color: colors.textMuted },
   tabTextActive: { ...typography.body, color: colors.primary, fontWeight: '600' },
+  sectionHeader: {
+    ...typography.body,
+    fontWeight: '700',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
+  },
   smallButton: {
     backgroundColor: colors.primary,
     borderRadius: radius.sm,

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { AccordionSection } from './AccordionSection';
 import { getNotificationPreferences, updateNotificationPreferences, updateTeamNotificationSettings } from '../services/notificationService';
 import { PUSH_STATUS_TEXT, getLastPushStatus, registerForPush, type PushStatus } from '../services/pushService';
 import { getMyTeams } from '../services/teamService';
@@ -10,12 +11,13 @@ import type { TeamDto } from '../types/team';
 
 type SwitchRow = { key: NotificationSwitch; label: string; hint?: string };
 
+// "Item" = a task or an event: one switch covers both; the notification itself says which one it is.
 // One row per category the server lets a user switch on/off (see PlanFlow NotificationPolicy).
 const SWITCH_ROWS: SwitchRow[] = [
-  { key: 'taskAssignments', label: 'Task assigned to you or taken from you' },
-  { key: 'taskChanges', label: 'Someone edits or deletes your task' },
-  { key: 'teamTasks', label: 'New task in your teams', hint: 'Added by an owner or admin, even when it is not yours. Can be noisy.' },
-  { key: 'taskUrgency', label: 'Your task becomes urgent', hint: 'Deadline within 24 h or a jump in urgency. At most once a day per task.' },
+  { key: 'taskAssignments', label: 'Item assigned to you or taken from you' },
+  { key: 'taskChanges', label: 'Someone edits or deletes your item' },
+  { key: 'teamTasks', label: 'New item in your teams', hint: 'Added by an owner or admin, even when it is not yours. Can be noisy.' },
+  { key: 'taskUrgency', label: 'Your item becomes urgent', hint: 'Due within 24 h or a jump in urgency. At most once a day per item.' },
   { key: 'teamMembership', label: 'Team changes', hint: 'You are added or removed, your role changes, or the team is deleted.' },
   { key: 'chatDigest', label: 'Chat summary while you are offline', hint: 'One e-mail with the number of missed messages, at most once an hour (e-mail only).' },
   { key: 'calendarIssues', label: 'Google Calendar connection problems' },
@@ -75,9 +77,13 @@ export function NotificationSettingsCard() {
     }
   };
 
+  // Shown while collapsed: how many of the switches are on.
+  const switches = preferences ? [preferences.pushEnabled, preferences.emailEnabled, ...SWITCH_ROWS.map((row) => preferences[row.key])] : [];
+  const summary = preferences ? `${switches.filter(Boolean).length} of ${switches.length} on` : undefined;
+  const mutedTeams = teams.filter((team) => team.muteNotifications || team.muteChat).length;
+
   return (
-    <View style={styles.card}>
-      <Text style={styles.sectionTitle}>Notifications</Text>
+    <AccordionSection testID="notifications-section" title="Notifications" summary={summary}>
 
       {loading ? <ActivityIndicator color={colors.primary} /> : null}
 
@@ -128,60 +134,60 @@ export function NotificationSettingsCard() {
           ) : null}
 
           {/* The categories decide what reaches the inbox, the phone and the mailbox alike. */}
-          <>
-              <Text style={styles.groupLabel}>Tell me when…</Text>
-              {SWITCH_ROWS.map((row) => (
-                <View key={row.key} style={styles.row}>
-                  <View style={styles.rowText}>
-                    <Text style={styles.rowLabel}>{row.label}</Text>
-                    {row.hint ? <Text style={styles.hint}>{row.hint}</Text> : null}
+          <Text style={styles.groupLabel}>Tell me when…</Text>
+          {SWITCH_ROWS.map((row) => (
+            <View key={row.key} style={styles.row}>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>{row.label}</Text>
+                {row.hint ? <Text style={styles.hint}>{row.hint}</Text> : null}
+              </View>
+              <Switch
+                testID={`notif-switch-${row.key}`}
+                value={preferences[row.key]}
+                onValueChange={(value) => savePreferences({ ...preferences, [row.key]: value })}
+              />
+            </View>
+          ))}
+
+          {teams.length > 0 ? (
+            <AccordionSection
+              nested
+              testID="notif-teams-section"
+              title="Teams"
+              summary={mutedTeams === 0 ? 'None muted' : `${mutedTeams} muted`}
+            >
+              {teams.map((team) => (
+                <View key={team.id} style={styles.teamBlock}>
+                  <Text style={styles.rowLabel}>{team.name}</Text>
+                  <View style={styles.row}>
+                    <Text style={[styles.hint, styles.rowText]}>Mute item notifications</Text>
+                    <Switch
+                      testID={`notif-team-tasks-${team.id}`}
+                      value={team.muteNotifications}
+                      onValueChange={(value) => saveTeamMute(team, { muteNotifications: value })}
+                    />
                   </View>
-                  <Switch
-                    testID={`notif-switch-${row.key}`}
-                    value={preferences[row.key]}
-                    onValueChange={(value) => savePreferences({ ...preferences, [row.key]: value })}
-                  />
+                  <View style={styles.row}>
+                    <Text style={[styles.hint, styles.rowText]}>Mute chat summaries</Text>
+                    <Switch
+                      testID={`notif-team-chat-${team.id}`}
+                      value={team.muteChat}
+                      onValueChange={(value) => saveTeamMute(team, { muteChat: value })}
+                    />
+                  </View>
                 </View>
               ))}
-
-              {teams.length > 0 ? (
-                <>
-                  <Text style={styles.groupLabel}>Mute a team</Text>
-                  {teams.map((team) => (
-                    <View key={team.id} style={styles.teamBlock}>
-                      <Text style={styles.rowLabel}>{team.name}</Text>
-                      <View style={styles.row}>
-                        <Text style={[styles.hint, styles.rowText]}>Mute task notifications</Text>
-                        <Switch
-                          testID={`notif-team-tasks-${team.id}`}
-                          value={team.muteNotifications}
-                          onValueChange={(value) => saveTeamMute(team, { muteNotifications: value })}
-                        />
-                      </View>
-                      <View style={styles.row}>
-                        <Text style={[styles.hint, styles.rowText]}>Mute chat summaries</Text>
-                        <Switch
-                          testID={`notif-team-chat-${team.id}`}
-                          value={team.muteChat}
-                          onValueChange={(value) => saveTeamMute(team, { muteChat: value })}
-                        />
-                      </View>
-                    </View>
-                  ))}
-                </>
-              ) : null}
-          </>
+            </AccordionSection>
+          ) : null}
         </>
       ) : null}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
-    </View>
+    </AccordionSection>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: spacing.xs },
-  sectionTitle: { ...typography.subtitle, color: colors.text, marginBottom: spacing.xs },
   groupLabel: { ...typography.body, fontSize: 12, color: colors.textMuted, marginTop: spacing.sm, textTransform: 'uppercase' },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingVertical: spacing.xs },
   rowText: { flex: 1 },

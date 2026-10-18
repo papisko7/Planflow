@@ -172,4 +172,25 @@ public class NotificationServiceTests
         Assert.DoesNotContain('\n', content.Subject);
         Assert.DoesNotContain('\r', content.Subject);
     }
+
+    [Fact]
+    public void ItemWording_FollowsTheItemType_TaskByDefault()
+    {
+        var when = new DateTime(2026, 10, 19, 9, 0, 0, DateTimeKind.Utc);
+        var task = EmailTemplates.TaskAssigned("Report", "Team", "Ann", when)("Bob");
+        var ev = EmailTemplates.TaskAssigned("Standup", "Team", "Ann", when, TaskType.Event)("Bob");
+
+        Assert.Equal("New task for you: Report", task.Subject);
+        Assert.Contains("Deadline:", task.TextBody);
+        Assert.Equal("New event for you: Standup", ev.Subject);
+        Assert.Contains("assigned the event", ev.TextBody);
+        Assert.Contains("Starts:", ev.TextBody);
+        Assert.DoesNotContain("task", ev.TextBody, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Equal("Event taken off you: Standup", EmailTemplates.TaskUnassigned("Standup", "Team", "Ann", TaskType.Event)("Bob").Subject);
+        Assert.Equal("Your event was changed: Standup", EmailTemplates.TaskChanged("Standup", "Team", "Ann", Array.Empty<string>(), TaskType.Event)("Bob").Subject);
+        Assert.Equal("Your event was deleted: Standup", EmailTemplates.TaskDeleted("Standup", "Team", "Ann", TaskType.Event)("Bob").Subject);
+        Assert.Equal("New event in Team: Standup", EmailTemplates.TeamTaskAdded("Standup", "Team", "Ann", TaskType.Event)("Bob").Subject);
+        Assert.Contains("Your event", EmailTemplates.TaskUrgent("Standup", when, 0.9, TaskType.Event)("Bob").TextBody);
+    }
 }

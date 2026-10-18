@@ -46,7 +46,7 @@ public class AlertingJob : IJob
             .Where(t => t.Status != TaskStatus.Done && t.Status != TaskStatus.Cancelled)
             .Where(t => t.AssignedUserId != null)
             .Where(t => t.CurrentUrgencyScore >= UrgencyThreshold)
-            .Select(t => new { t.Id, t.TeamId, t.AssignedUserId, t.Title, DeadlineUtc = t.DeadlineUtc ?? t.StartUtc, t.CurrentUrgencyScore })
+            .Select(t => new { t.Id, t.TeamId, t.AssignedUserId, t.Title, t.TaskType, DeadlineUtc =t.DeadlineUtc ?? t.StartUtc, t.CurrentUrgencyScore })
             .ToListAsync(cancellationToken);
 
         if (candidateTasks.Count == 0)
@@ -79,7 +79,7 @@ public class AlertingJob : IJob
                 UserId = task.AssignedUserId!.Value,
                 CalendarItemId = task.Id,
                 Type = AlertType.UrgencySpike,
-                Message = $"Task \"{task.Title}\" urgency reached {task.CurrentUrgencyScore:P0}."
+                Message = $"{EmailTemplates.Capitalized(task.TaskType)} \"{task.Title}\" urgency reached {task.CurrentUrgencyScore:P0}."
             });
             newAlerts++;
 
@@ -89,7 +89,7 @@ public class AlertingJob : IJob
                 await _notifications.NotifyAsync(
                     NotificationEvent.TaskUrgent,
                     new[] { task.AssignedUserId!.Value },
-                    EmailTemplates.TaskUrgent(task.Title, task.DeadlineUtc, task.CurrentUrgencyScore),
+                    EmailTemplates.TaskUrgent(task.Title, task.DeadlineUtc, task.CurrentUrgencyScore, task.TaskType),
                     task.TeamId,
                     cancellationToken: cancellationToken,
                     taskId: task.Id);

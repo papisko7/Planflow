@@ -36,6 +36,19 @@ const defaults: NotificationPreferences = {
 const personal: TeamDto = { id: 'p', name: 'Me', description: null, memberCount: 1, isPersonal: true, muteNotifications: false, muteChat: false };
 const squad: TeamDto = { id: 's', name: 'Squad', description: null, memberCount: 3, isPersonal: false, muteNotifications: false, muteChat: false };
 
+// Everything sits in the collapsed Notifications section (the team mutes in a nested Teams one inside it);
+// these open them the way a user would.
+const openNotifications = async () => {
+  await waitFor(() => expect(screen.getByText(/ of 9 on/)).toBeTruthy()); // settings loaded
+  await fireEvent.press(screen.getByTestId('notifications-section-header'));
+};
+const openTeams = () => fireEvent.press(screen.getByTestId('notif-teams-section-header'));
+
+async function renderOpen() {
+  await render(<NotificationSettingsCard />);
+  await openNotifications();
+}
+
 describe('NotificationSettingsCard', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -46,17 +59,29 @@ describe('NotificationSettingsCard', () => {
     mockedRegister.mockResolvedValue('registered');
   });
 
-  it('shows the saved settings', async () => {
+  it('is collapsed by default and summarises how many switches are on', async () => {
     await render(<NotificationSettingsCard />);
 
-    await waitFor(() => expect(screen.getByTestId('notif-master-switch').props.value).toBe(true));
+    // push, e-mail and 7 categories; the defaults have teamTasks and chatDigest off
+    await waitFor(() => expect(screen.getByText('7 of 9 on')).toBeTruthy());
+    expect(screen.queryByTestId('notif-master-switch')).toBeNull();
+
+    await openNotifications();
+    expect(screen.getByTestId('notif-master-switch')).toBeTruthy();
+    expect(screen.queryByTestId('notif-team-tasks-s')).toBeNull(); // the Teams section is collapsed too
+    expect(screen.getByText('None muted')).toBeTruthy();
+  });
+
+  it('shows the saved settings', async () => {
+    await renderOpen();
+
+    expect(screen.getByTestId('notif-master-switch').props.value).toBe(true);
     expect(screen.getByTestId('notif-switch-teamTasks').props.value).toBe(false);
     expect(screen.getByTestId('notif-switch-taskAssignments').props.value).toBe(true);
   });
 
   it('saves a single category switch with the rest unchanged', async () => {
-    await render(<NotificationSettingsCard />);
-    await waitFor(() => screen.getByTestId('notif-switch-teamTasks'));
+    await renderOpen();
 
     await fireEvent(screen.getByTestId('notif-switch-teamTasks'), 'valueChange', true);
 
@@ -65,8 +90,7 @@ describe('NotificationSettingsCard', () => {
   });
 
   it('switching e-mail off hides only the sign-in alerts - the categories still steer the inbox and push', async () => {
-    await render(<NotificationSettingsCard />);
-    await waitFor(() => screen.getByTestId('notif-master-switch'));
+    await renderOpen();
 
     await fireEvent(screen.getByTestId('notif-master-switch'), 'valueChange', false);
 
@@ -77,8 +101,7 @@ describe('NotificationSettingsCard', () => {
   });
 
   it('saves the push switch on its own and explains what this phone can do', async () => {
-    await render(<NotificationSettingsCard />);
-    await waitFor(() => screen.getByTestId('notif-push-switch'));
+    await renderOpen();
 
     expect(screen.getByTestId('notif-push-switch').props.value).toBe(true);
     await waitFor(() => expect(screen.getByTestId('push-status').props.children).toMatch(/receives push/));
@@ -90,14 +113,13 @@ describe('NotificationSettingsCard', () => {
 
   it('tells the user why this phone cannot get pushes', async () => {
     mockedRegister.mockResolvedValue('expoGoAndroid');
-    await render(<NotificationSettingsCard />);
+    await renderOpen();
 
     await waitFor(() => expect(screen.getByTestId('push-status').props.children).toMatch(/Expo Go on Android/));
   });
 
   it('changes the sign-in alert mode', async () => {
-    await render(<NotificationSettingsCard />);
-    await waitFor(() => screen.getByTestId('notif-login-1'));
+    await renderOpen();
 
     await fireEvent.press(screen.getByTestId('notif-login-1'));
 
@@ -105,9 +127,10 @@ describe('NotificationSettingsCard', () => {
   });
 
   it('lists only real teams for muting (not the personal workspace) and saves a mute', async () => {
-    await render(<NotificationSettingsCard />);
-    await waitFor(() => screen.getByTestId('notif-team-tasks-s'));
+    await renderOpen();
+    await openTeams();
 
+    expect(screen.getByTestId('notif-team-tasks-s')).toBeTruthy();
     expect(screen.queryByTestId('notif-team-tasks-p')).toBeNull();
 
     await fireEvent(screen.getByTestId('notif-team-chat-s'), 'valueChange', true);
@@ -115,10 +138,16 @@ describe('NotificationSettingsCard', () => {
     await waitFor(() => expect(mockedTeamUpdate).toHaveBeenCalledWith('s', { muteNotifications: false, muteChat: true }));
   });
 
+  it('counts muted teams in the collapsed Teams header', async () => {
+    mockedTeams.mockResolvedValue([personal, { ...squad, muteChat: true }]);
+    await renderOpen();
+
+    expect(screen.getByText('1 muted')).toBeTruthy();
+  });
+
   it('puts the switch back and shows an error when saving fails', async () => {
     mockedUpdate.mockRejectedValue({ status: 500, message: 'Server exploded', isNetworkError: false });
-    await render(<NotificationSettingsCard />);
-    await waitFor(() => screen.getByTestId('notif-switch-chatDigest'));
+    await renderOpen();
 
     await fireEvent(screen.getByTestId('notif-switch-chatDigest'), 'valueChange', true);
 

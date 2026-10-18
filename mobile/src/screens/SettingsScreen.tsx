@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { PinSettingsCard } from '../components/PinSettingsCard';
-import { ChangePasswordCard } from '../components/ChangePasswordCard';
+import { AccordionSection } from '../components/AccordionSection';
+import { CredentialsSection } from '../components/CredentialsSection';
 import { EmailVerificationCard } from '../components/EmailVerificationCard';
 import { NotificationSettingsCard } from '../components/NotificationSettingsCard';
 import { useSession } from '../context/SessionContext';
@@ -77,8 +77,7 @@ export default function SettingsScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Settings</Text>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Profile</Text>
+      <AccordionSection testID="profile-section" title="Profile" summary={loading ? undefined : displayName}>
         {loading ? (
           <ActivityIndicator color={colors.primary} />
         ) : (
@@ -122,13 +121,11 @@ export default function SettingsScreen() {
             </Pressable>
           </>
         )}
-      </View>
+      </AccordionSection>
 
       {!loading && !emailVerified ? <EmailVerificationCard email={savedEmail} onVerified={() => setEmailVerified(true)} /> : null}
 
-      <ChangePasswordCard />
-
-      <PinSettingsCard />
+      <CredentialsSection />
 
       <NotificationSettingsCard />
 
@@ -143,8 +140,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, gap: spacing.md },
   title: { ...typography.title, color: colors.text },
-  card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: spacing.xs },
-  sectionTitle: { ...typography.subtitle, color: colors.text, marginBottom: spacing.xs },
   label: { ...typography.body, fontSize: 12, color: colors.textMuted, marginTop: spacing.xs },
   input: {
     backgroundColor: colors.background,

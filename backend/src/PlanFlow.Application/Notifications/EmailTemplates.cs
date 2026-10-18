@@ -67,43 +67,52 @@ public static class EmailTemplates
             "If this was you, nothing to do. If not, change your password."
         });
 
-    // ---------- Tasks ----------
+    // ---------- Tasks and events ----------
+    // One CalendarItem, two kinds: the wording says "task" or "event" to match what the recipient actually got.
 
-    public static Func<string, EmailContent> TaskAssigned(string taskTitle, string teamName, string byName, DateTime? deadlineUtc) => name => EmailLayout.Build(
-        $"New task for you: {Clean(taskTitle)}",
+    public static Func<string, EmailContent> TaskAssigned(string taskTitle, string teamName, string byName, DateTime? dueUtc, TaskType type = TaskType.Task) => name => EmailLayout.Build(
+        $"New {Noun(type)} for you: {Clean(taskTitle)}",
         name,
         Lines(
-            $"{byName} assigned the task \"{taskTitle}\" to you in the team \"{teamName}\".",
-            deadlineUtc is null ? null : $"Deadline: {Format(deadlineUtc.Value)}."));
+            $"{byName} assigned the {Noun(type)} \"{taskTitle}\" to you in the team \"{teamName}\".",
+            dueUtc is null ? null : $"{DueLabel(type)}: {Format(dueUtc.Value)}."));
 
-    public static Func<string, EmailContent> TaskUnassigned(string taskTitle, string teamName, string byName) => name => EmailLayout.Build(
-        $"Task taken off you: {Clean(taskTitle)}",
+    public static Func<string, EmailContent> TaskUnassigned(string taskTitle, string teamName, string byName, TaskType type = TaskType.Task) => name => EmailLayout.Build(
+        $"{Capitalized(type)} taken off you: {Clean(taskTitle)}",
         name,
-        Lines($"{byName} unassigned you from the task \"{taskTitle}\" in the team \"{teamName}\"."));
+        Lines($"{byName} unassigned you from the {Noun(type)} \"{taskTitle}\" in the team \"{teamName}\"."));
 
-    public static Func<string, EmailContent> TaskChanged(string taskTitle, string teamName, string byName, IReadOnlyList<string> changes) => name => EmailLayout.Build(
-        $"Your task was changed: {Clean(taskTitle)}",
+    public static Func<string, EmailContent> TaskChanged(string taskTitle, string teamName, string byName, IReadOnlyList<string> changes, TaskType type = TaskType.Task) => name => EmailLayout.Build(
+        $"Your {Noun(type)} was changed: {Clean(taskTitle)}",
         name,
         Lines(
-            $"{byName} changed your task \"{taskTitle}\" in the team \"{teamName}\".",
+            $"{byName} changed your {Noun(type)} \"{taskTitle}\" in the team \"{teamName}\".",
             changes.Count == 0 ? null : "What changed: " + string.Join("; ", changes) + "."));
 
-    public static Func<string, EmailContent> TaskDeleted(string taskTitle, string teamName, string byName) => name => EmailLayout.Build(
-        $"Your task was deleted: {Clean(taskTitle)}",
+    public static Func<string, EmailContent> TaskDeleted(string taskTitle, string teamName, string byName, TaskType type = TaskType.Task) => name => EmailLayout.Build(
+        $"Your {Noun(type)} was deleted: {Clean(taskTitle)}",
         name,
-        Lines($"{byName} deleted your task \"{taskTitle}\" from the team \"{teamName}\"."));
+        Lines($"{byName} deleted your {Noun(type)} \"{taskTitle}\" from the team \"{teamName}\"."));
 
-    public static Func<string, EmailContent> TeamTaskAdded(string taskTitle, string teamName, string byName) => name => EmailLayout.Build(
-        $"New task in {Clean(teamName)}: {Clean(taskTitle)}",
+    public static Func<string, EmailContent> TeamTaskAdded(string taskTitle, string teamName, string byName, TaskType type = TaskType.Task) => name => EmailLayout.Build(
+        $"New {Noun(type)} in {Clean(teamName)}: {Clean(taskTitle)}",
         name,
-        Lines($"{byName} added the task \"{taskTitle}\" to the team \"{teamName}\"."));
+        Lines($"{byName} added the {Noun(type)} \"{taskTitle}\" to the team \"{teamName}\"."));
 
-    public static Func<string, EmailContent> TaskUrgent(string taskTitle, DateTime? deadlineUtc, double urgencyScore) => name => EmailLayout.Build(
+    public static Func<string, EmailContent> TaskUrgent(string taskTitle, DateTime? dueUtc, double urgencyScore, TaskType type = TaskType.Task) => name => EmailLayout.Build(
         $"Urgent: {Clean(taskTitle)}",
         name,
         Lines(
-            $"Your task \"{taskTitle}\" is now very urgent (urgency {urgencyScore:P0}).",
-            deadlineUtc is null ? null : $"Deadline: {Format(deadlineUtc.Value)}."));
+            $"Your {Noun(type)} \"{taskTitle}\" is now very urgent (urgency {urgencyScore:P0}).",
+            dueUtc is null ? null : $"{DueLabel(type)}: {Format(dueUtc.Value)}."));
+
+    /// <summary>"task" or "event": the word notifications use for an item of the given type.</summary>
+    public static string Noun(TaskType type) => type == TaskType.Event ? "event" : "task";
+
+    public static string Capitalized(TaskType type) => type == TaskType.Event ? "Event" : "Task";
+
+    // An event has a start, not a deadline.
+    private static string DueLabel(TaskType type) => type == TaskType.Event ? "Starts" : "Deadline";
 
     // ---------- Team membership ----------
 
@@ -122,12 +131,12 @@ public static class EmailTemplates
         name,
         Lines(
             $"{byName} removed you from the team \"{teamName}\".",
-            "Tasks that were assigned to you in that team are now unassigned."));
+            "Tasks and events that were assigned to you in that team are now unassigned."));
 
     public static Func<string, EmailContent> TeamDeleted(string teamName, string byName) => name => EmailLayout.Build(
         $"Team {Clean(teamName)} was deleted",
         name,
-        Lines($"{byName} deleted the team \"{teamName}\" together with its tasks and chat."));
+        Lines($"{byName} deleted the team \"{teamName}\" together with its tasks, events and chat."));
 
     // ---------- Chat / calendar ----------
 

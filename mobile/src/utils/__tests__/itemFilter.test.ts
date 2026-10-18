@@ -1,6 +1,6 @@
 import { PLAIN_TASK_FIELDS } from '../../test-fixtures';
 import { TaskStatus, TaskType, type TaskDto } from '../../types/task';
-import { countByTab, filterByTab } from '../itemFilter';
+import { buildRows, countByTab, filterByTab } from '../itemFilter';
 
 const HOUR = 3_600_000;
 const inHours = (h: number) => new Date(Date.now() + h * HOUR).toISOString();
@@ -44,7 +44,35 @@ describe('filterByTab', () => {
     expect(filterByTab(all, 'events').map((i) => i.id)).toEqual(['soon', 'later', 'old', 'older']);
   });
 
-  it('counts both kinds', () => {
-    expect(countByTab(all)).toEqual({ tasks: 1, events: 4 });
+  it('counts both kinds and the total', () => {
+    expect(countByTab(all)).toEqual({ all: 5, tasks: 1, events: 4 });
+  });
+
+  it('All lists the tasks first, then the events in their own order', () => {
+    expect(filterByTab(all, 'all').map((i) => i.id)).toEqual(['task1', 'soon', 'later', 'old', 'older']);
+  });
+});
+
+describe('buildRows', () => {
+  const task1 = item({ id: 'task1' });
+  const task2 = item({ id: 'task2' });
+  const soon = item({ id: 'soon', taskType: TaskType.Event, startUtc: inHours(2) });
+
+  it('All puts a heading with a count above the Tasks and above the Events', () => {
+    const rows = buildRows([soon, task1, task2], 'all');
+
+    expect(rows.map((r) => (r.type === 'header' ? `${r.title} ${r.count}` : r.item.id))).toEqual([
+      'Tasks 2', 'task1', 'task2', 'Events 1', 'soon',
+    ]);
+  });
+
+  it('All leaves out the heading of an empty section', () => {
+    expect(buildRows([task1], 'all').map((r) => r.type)).toEqual(['header', 'item']);
+    expect(buildRows([], 'all')).toEqual([]);
+  });
+
+  it('the Tasks and Events tabs are plain lists without headings', () => {
+    expect(buildRows([soon, task1], 'tasks').map((r) => r.type)).toEqual(['item']);
+    expect(buildRows([soon, task1], 'events').map((r) => r.type)).toEqual(['item']);
   });
 });

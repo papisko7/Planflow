@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput } from 'react-native';
+import { AccordionSection } from './AccordionSection';
 import { changePassword } from '../services/userService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import type { ApiError } from '../types/api';
 
-// Change the password while signed in: the current password proves it is really the owner holding the phone, and the
+// Change the password while signed in (a nested, collapsed-by-default section of Credentials): the current password proves it is really the owner holding the phone, and the
 // server signs every OTHER device out (this one stays signed in).
 export function ChangePasswordCard() {
   const [current, setCurrent] = useState('');
@@ -50,8 +51,7 @@ export function ChangePasswordCard() {
   };
 
   return (
-    <View testID="change-password-card" style={styles.card}>
-      <Text style={styles.sectionTitle}>Change password</Text>
+    <AccordionSection nested testID="change-password-section" title="Change password">
       <TextInput
         testID="password-current-input"
         style={styles.input}
@@ -86,13 +86,11 @@ export function ChangePasswordCard() {
       <Pressable testID="password-submit" style={styles.button} onPress={submit} disabled={busy}>
         {busy ? <ActivityIndicator color={colors.surface} size="small" /> : <Text style={styles.buttonText}>Change password</Text>}
       </Pressable>
-    </View>
+    </AccordionSection>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: spacing.xs },
-  sectionTitle: { ...typography.subtitle, color: colors.text, marginBottom: spacing.xs },
   input: {
     backgroundColor: colors.background,
     borderWidth: 1,

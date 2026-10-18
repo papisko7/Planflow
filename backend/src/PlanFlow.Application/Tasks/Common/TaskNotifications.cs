@@ -32,7 +32,7 @@ internal static class TaskNotifications
         {
             await notifications.NotifyAsync(
                 NotificationEvent.TaskAssignedToYou, new[] { assignee },
-                EmailTemplates.TaskAssigned(task.Title, teamName, actorName, task.DueUtc),
+                EmailTemplates.TaskAssigned(task.Title, teamName, actorName, task.DueUtc, task.TaskType),
                 task.TeamId, actorUserId, cancellationToken, task.Id);
         }
 
@@ -51,7 +51,7 @@ internal static class TaskNotifications
 
             await notifications.NotifyAsync(
                 NotificationEvent.TeamTaskAdded, others,
-                EmailTemplates.TeamTaskAdded(task.Title, teamName, actorName),
+                EmailTemplates.TeamTaskAdded(task.Title, teamName, actorName, task.TaskType),
                 task.TeamId, actorUserId, cancellationToken, task.Id);
         }
     }
@@ -69,7 +69,7 @@ internal static class TaskNotifications
             {
                 await notifications.NotifyAsync(
                     NotificationEvent.TaskAssignedToYou, new[] { newAssignee },
-                    EmailTemplates.TaskAssigned(task.Title, teamName, actorName, task.DueUtc),
+                    EmailTemplates.TaskAssigned(task.Title, teamName, actorName, task.DueUtc, task.TaskType),
                     task.TeamId, actorUserId, cancellationToken, task.Id);
             }
 
@@ -77,7 +77,7 @@ internal static class TaskNotifications
             {
                 await notifications.NotifyAsync(
                     NotificationEvent.TaskUnassigned, new[] { oldAssignee },
-                    EmailTemplates.TaskUnassigned(task.Title, teamName, actorName),
+                    EmailTemplates.TaskUnassigned(task.Title, teamName, actorName, task.TaskType),
                     task.TeamId, actorUserId, cancellationToken);
             }
 
@@ -92,7 +92,7 @@ internal static class TaskNotifications
             {
                 await notifications.NotifyAsync(
                     NotificationEvent.TaskChanged, new[] { assignee },
-                    EmailTemplates.TaskChanged(task.Title, teamName, actorName, changes),
+                    EmailTemplates.TaskChanged(task.Title, teamName, actorName, changes, task.TaskType),
                     task.TeamId, actorUserId, cancellationToken, task.Id);
             }
         }
@@ -111,7 +111,8 @@ internal static class TaskNotifications
             EmailTemplates.TaskDeleted(
                 task.Title,
                 await NotificationLookups.TeamNameAsync(context, task.TeamId, cancellationToken),
-                await NotificationLookups.UserNameAsync(context, actorUserId, cancellationToken)),
+                await NotificationLookups.UserNameAsync(context, actorUserId, cancellationToken),
+                task.TaskType),
             task.TeamId, actorUserId, cancellationToken);
     }
 
@@ -132,7 +133,8 @@ internal static class TaskNotifications
 
         if (before.DeadlineUtc != after.DeadlineUtc)
         {
-            changes.Add($"deadline {FormatDeadline(before.DeadlineUtc)} → {FormatDeadline(after.DeadlineUtc)}");
+            // For an event the tracked moment is its start, not a deadline.
+            changes.Add($"{(after.TaskType == TaskType.Event ? "start" : "deadline")} {FormatDeadline(before.DeadlineUtc)} → {FormatDeadline(after.DeadlineUtc)}");
         }
 
         if (before.ImpactScore != after.ImpactScore)
