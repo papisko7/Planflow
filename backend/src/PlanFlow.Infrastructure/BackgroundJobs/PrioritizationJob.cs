@@ -35,7 +35,7 @@ public class PrioritizationJob : IJob
         var nowUtc = DateTime.UtcNow;
 
         var activeTasks = await _context.CalendarItems
-            .Where(t => t.Status != TaskStatus.Done && t.Status != TaskStatus.Cancelled)
+            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Cancelled)
             .ToListAsync(cancellationToken);
 
         if (activeTasks.Count == 0)

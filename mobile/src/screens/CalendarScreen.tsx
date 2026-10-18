@@ -24,7 +24,8 @@ import { groupTasksByDueDate } from '../utils/calendarGrouping';
 import { dayKey, pinchDirection } from '../utils/dateUtils';
 import { getUrgencyTier } from '../utils/urgencyGrouping';
 import type { RootStackParamList } from '../navigation/types';
-import { TaskStatus, type TaskDto, type TaskWithTeam } from '../types/task';
+import { type TaskDto, type TaskWithTeam } from '../types/task';
+import { isFinishedStatus } from '../utils/taskStatus';
 
 type ViewMode = 'agenda' | 'month';
 
@@ -62,7 +63,7 @@ export default function CalendarScreen() {
   const markers = useMemo(() => {
     const map = new Map<string, string>();
     for (const section of sections) {
-      const open = section.data.filter((t) => t.status !== TaskStatus.Done && t.status !== TaskStatus.Cancelled);
+      const open = section.data.filter((t) => !isFinishedStatus(t.status));
       if (open.length === 0) {
         map.set(section.dateKey, colors.border);
         continue;

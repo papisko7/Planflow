@@ -32,3 +32,32 @@ export async function verifyEmail(code: string): Promise<void> {
 export async function resendEmailVerification(): Promise<void> {
   await http.post('/api/users/me/resend-verification');
 }
+
+// The server needs the user's IANA time zone (e.g. "Europe/Warsaw") to know where a day ends. The phone knows it,
+// so it is reported once per sign-in; the server ignores a zone it already has.
+export function deviceTimeZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
+
+let reportedTimeZone: string | null = null;
+
+// Best effort: a failure is simply retried at the next start, it never blocks the app.
+export async function reportTimeZone(): Promise<void> {
+  const timeZoneId = deviceTimeZone();
+  if (!timeZoneId || timeZoneId === reportedTimeZone) return;
+  try {
+    await http.put('/api/users/me/time-zone', { timeZoneId });
+    reportedTimeZone = timeZoneId;
+  } catch {
+    // ignored on purpose, see above
+  }
+}
+
+// After sign-out the next account on this phone must report again.
+export function forgetReportedTimeZone(): void {
+  reportedTimeZone = null;
+}

@@ -137,13 +137,13 @@ describe('scheduleForEditing', () => {
 describe('toUpdateRequest', () => {
   it('resends the whole item with only the override changed', () => {
     const dto: TaskDto = {
-      id: '1', teamId: 't', assignedUserId: null, title: 'Standup', description: null, status: TaskStatus.Todo,
+      id: '1', teamId: 't', assignedUserId: null, title: 'Standup', description: null, status: TaskStatus.Backlog,
       deadlineUtc: null, impactScore: 3, blockedByTaskId: null, manualUrgencyOverride: null,
       manualUrgencyOverrideExpiresAtUtc: null, currentUrgencyScore: 0.2, createdAtUtc: 'x', updatedAtUtc: null,
       ...PLAIN_TASK_FIELDS, taskType: TaskType.Event, startUtc: '2026-10-20T08:00:00Z', endUtc: '2026-10-20T08:15:00Z',
     };
-    const req = toUpdateRequest(dto, { status: TaskStatus.Done });
-    expect(req.status).toBe(TaskStatus.Done);
+    const req = toUpdateRequest(dto, { status: TaskStatus.Completed });
+    expect(req.status).toBe(TaskStatus.Completed);
     expect(req.taskType).toBe(TaskType.Event);
     expect(req.startUtc).toBe(dto.startUtc);
     expect(req.endUtc).toBe(dto.endUtc);

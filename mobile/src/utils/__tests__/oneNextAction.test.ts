@@ -12,7 +12,7 @@ function buildTask(overrides: Partial<TaskDto> = {}): TaskDto {
     assignedUserId: null,
     title: `Task ${nextId}`,
     description: null,
-    status: TaskStatus.Todo,
+    status: TaskStatus.Backlog,
     deadlineUtc: null,
     impactScore: 1,
     blockedByTaskId: null,
@@ -31,19 +31,22 @@ describe('selectOneNextAction', () => {
     expect(selectOneNextAction([])).toBeNull();
   });
 
-  it('returns null when every task is done, cancelled, or blocked', () => {
-    const tasks = [
-      buildTask({ status: TaskStatus.Done }),
-      buildTask({ status: TaskStatus.Cancelled }),
-      buildTask({ status: TaskStatus.Blocked }),
-    ];
+  it('returns null when every task is completed or cancelled', () => {
+    const tasks = [buildTask({ status: TaskStatus.Completed }), buildTask({ status: TaskStatus.Cancelled })];
     expect(selectOneNextAction(tasks)).toBeNull();
+  });
+
+  it('offers the blocker instead of the more urgent task that waits on it', () => {
+    // The blocked task cannot be started yet, so the only actionable item is the blocker.
+    const blocker = buildTask({ currentUrgencyScore: 0.2 });
+    const blocked = buildTask({ currentUrgencyScore: 0.9, blockedByTaskId: blocker.id });
+    expect(selectOneNextAction([blocked, blocker])).toBe(blocker);
   });
 
   it('picks the highest urgency score among active tasks', () => {
     const low = buildTask({ currentUrgencyScore: 0.3 });
     const high = buildTask({ currentUrgencyScore: 0.9 });
-    const done = buildTask({ currentUrgencyScore: 0.99, status: TaskStatus.Done });
+    const done = buildTask({ currentUrgencyScore: 0.99, status: TaskStatus.Completed });
 
     expect(selectOneNextAction([low, high, done])).toBe(high);
   });
@@ -86,13 +89,32 @@ describe('selectOneNextAction', () => {
     expect(selectOneNextAction([newer, older])).toBe(older);
   });
 
-  it('excludes blocked, done, and cancelled tasks even when they would otherwise outrank the winner', () => {
+  it('excludes completed and cancelled tasks even when they would otherwise outrank the winner', () => {
     const active = buildTask({ currentUrgencyScore: 0.5 });
-    const blocked = buildTask({ currentUrgencyScore: 0.95, status: TaskStatus.Blocked });
-    const done = buildTask({ currentUrgencyScore: 0.95, status: TaskStatus.Done });
+    const done = buildTask({ currentUrgencyScore: 0.95, status: TaskStatus.Completed });
     const cancelled = buildTask({ currentUrgencyScore: 0.95, status: TaskStatus.Cancelled });
 
-    expect(selectOneNextAction([blocked, done, cancelled, active])).toBe(active);
+    expect(selectOneNextAction([done, cancelled, active])).toBe(active);
+  });
+
+  it('skips a task that is blocked by an unfinished task, however urgent it is', () => {
+    const blocker = buildTask({ currentUrgencyScore: 0.4 });
+    const blocked = buildTask({ currentUrgencyScore: 0.95, blockedByTaskId: blocker.id });
+    const other = buildTask({ currentUrgencyScore: 0.5 });
+
+    expect(selectOneNextAction([blocked, other, blocker])).toBe(other);
+  });
+
+  it('treats a task as unblocked once its blocker is completed', () => {
+    const blocker = buildTask({ status: TaskStatus.Completed });
+    const unblocked = buildTask({ currentUrgencyScore: 0.9, blockedByTaskId: blocker.id });
+
+    expect(selectOneNextAction([blocker, unblocked])).toBe(unblocked);
+  });
+
+  it('treats a task as unblocked when its blocker is not in the list at all', () => {
+    const task = buildTask({ blockedByTaskId: 'somewhere-else' });
+    expect(selectOneNextAction([task])).toBe(task);
   });
 
   it('includes in-progress tasks as eligible candidates', () => {

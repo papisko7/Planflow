@@ -23,6 +23,6 @@ public class GetProfileQueryHandler : IRequestHandler<GetProfileQuery, UserProfi
             .FirstOrDefaultAsync(u => u.Id == request.UserId, cancellationToken)
             ?? throw new NotFoundException(nameof(User), request.UserId);
 
-        return new UserProfileDto(user.Id, user.Email, user.DisplayName, user.IsEmailVerified);
+        return new UserProfileDto(user.Id, user.Email, user.DisplayName, user.IsEmailVerified, user.TimeZoneId);
     }
 }

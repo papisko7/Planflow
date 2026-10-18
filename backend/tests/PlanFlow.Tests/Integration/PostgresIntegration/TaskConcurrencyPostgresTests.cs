@@ -42,7 +42,7 @@ public class TaskConcurrencyPostgresTests
         // connections from the pool) to prove the update handler doesn't deadlock, crash, or lose
         // writes under real concurrent database access.
         const int concurrentRequests = 10;
-        var statuses = new[] { TaskStatus.InProgress, TaskStatus.Blocked, TaskStatus.Done };
+        var statuses = new[] { TaskStatus.InProgress, TaskStatus.Backlog, TaskStatus.Completed };
 
         var tasks = Enumerable.Range(0, concurrentRequests).Select(async i =>
         {

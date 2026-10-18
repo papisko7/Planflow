@@ -11,7 +11,7 @@ function task(overrides: Partial<TaskDto>): TaskDto {
     assignedUserId: null,
     title: 'Task',
     description: null,
-    status: TaskStatus.Todo,
+    status: TaskStatus.Backlog,
     deadlineUtc: null,
     impactScore: 1,
     blockedByTaskId: null,
@@ -32,7 +32,7 @@ describe('computeDashboardStats', () => {
         task({ id: '1' }),
         task({ id: '2', deadlineUtc: new Date('2026-10-04T10:00:00').toISOString() }),
         task({ id: '3', deadlineUtc: new Date('2026-10-05T18:00:00').toISOString() }),
-        task({ id: '4', status: TaskStatus.Done }),
+        task({ id: '4', status: TaskStatus.Completed }),
         task({ id: '5', status: TaskStatus.Cancelled }),
       ],
       NOW,
@@ -43,7 +43,7 @@ describe('computeDashboardStats', () => {
 
   it('does not count a finished task as overdue', () => {
     const stats = computeDashboardStats(
-      [task({ status: TaskStatus.Done, deadlineUtc: new Date('2026-10-01T10:00:00').toISOString() })],
+      [task({ status: TaskStatus.Completed, deadlineUtc: new Date('2026-10-01T10:00:00').toISOString() })],
       NOW,
     );
 

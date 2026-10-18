@@ -205,7 +205,7 @@ public class SyncCalendarJob : IJob
                     AssignedUserId = integration.UserId,
                     Title = title.Length == 0 ? "(untitled Google Calendar event)" : title,
                     Description = description,
-                    Status = TaskStatus.Todo,
+                    Status = TaskStatus.Confirmed,
                     TaskType = TaskType.Event,
                     StartUtc = calendarEvent.StartUtc,
                     EndUtc = calendarEvent.EndUtc,
@@ -244,7 +244,7 @@ public class SyncCalendarJob : IJob
                 if (task.Status == TaskStatus.Cancelled)
                 {
                     // Google un-cancelled a previously-cancelled event (e.g. the organizer restored it).
-                    task.Status = TaskStatus.Todo;
+                    task.Status = TaskStatus.Confirmed;
                 }
                 task.UpdatedAtUtc = nowUtc;
                 updated++;

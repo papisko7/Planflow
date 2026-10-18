@@ -14,6 +14,11 @@ public class CalendarItemConfiguration : IEntityTypeConfiguration<CalendarItem>
         builder.Property(t => t.Title).IsRequired().HasMaxLength(256);
         builder.Property(t => t.ExternalCalendarEventId).HasMaxLength(512);
         builder.Property(t => t.AiImpactReasoning).HasMaxLength(2000);
+        builder.Property(t => t.Location).HasMaxLength(512);
+        builder.Property(t => t.ColorKey).HasMaxLength(32);
+        builder.Property(t => t.SeriesId).HasMaxLength(512);
+        builder.Property(t => t.ExternalStatus).HasMaxLength(32);
+        builder.Property(t => t.ExternalDescriptionHash).HasMaxLength(64); // hex SHA-256
 
         // Dashboard's main query is "give me this team's tasks sorted by urgency" — both filter
         // and sort columns are indexed so Postgres can serve it without a full table scan.
@@ -45,6 +50,12 @@ public class CalendarItemConfiguration : IEntityTypeConfiguration<CalendarItem>
         builder.HasOne(t => t.AssignedUser)
             .WithMany(u => u.AssignedTasks)
             .HasForeignKey(t => t.AssignedUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Who assigned the item is just a reference too: removing that user leaves the assignment, minus the "who".
+        builder.HasOne(t => t.AssignedByUser)
+            .WithMany()
+            .HasForeignKey(t => t.AssignedByUserId)
             .OnDelete(DeleteBehavior.SetNull);
 
         // Self-reference for the "blocking" urgency component: deleting a blocker frees the

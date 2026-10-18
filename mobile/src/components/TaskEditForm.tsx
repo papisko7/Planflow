@@ -6,8 +6,9 @@ import { AssigneePicker } from './AssigneePicker';
 import { ScheduleForm } from './ScheduleForm';
 import type { ApiError } from '../types/api';
 import type { TeamMemberDto } from '../types/team';
-import { TaskStatus, type ScheduleFields, type TaskDto } from '../types/task';
+import type { ScheduleFields, TaskDto } from '../types/task';
 import { normalizeSchedule, scheduleForEditing, toUpdateRequest, validateSchedule } from '../utils/schedule';
+import { normalizeStatus, STATUS_LABEL, statusesFor } from '../utils/taskStatus';
 
 type Props = {
   task: TaskDto;
@@ -18,20 +19,14 @@ type Props = {
   onCancel: () => void;
 };
 
-const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
-  { value: TaskStatus.Todo, label: 'To Do' },
-  { value: TaskStatus.InProgress, label: 'In Progress' },
-  { value: TaskStatus.Blocked, label: 'Blocked' },
-  { value: TaskStatus.Done, label: 'Done' },
-  { value: TaskStatus.Cancelled, label: 'Cancelled' },
-];
-
 export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Props) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
   const [schedule, setSchedule] = useState<ScheduleFields>(() => scheduleForEditing(task));
   const [impact, setImpact] = useState(task.impactScore === null ? "" : String(task.impactScore));
-  const [status, setStatus] = useState(task.status);
+  const [pickedStatus, setPickedStatus] = useState(task.status);
+  // A Task and an Event have different statuses; switching the type in the form swaps the list and resets an illegal pick.
+  const status = normalizeStatus(schedule.taskType, pickedStatus);
   const [assignedUserId, setAssignedUserId] = useState(task.assignedUserId);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,14 +107,14 @@ export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Pr
       <View>
         <Text style={styles.label}>Status:</Text>
         <View style={styles.chipRow}>
-          {STATUS_OPTIONS.map((option) => (
+          {statusesFor(schedule.taskType).map((value) => (
             <Pressable
-              key={option.value}
-              testID={`edit-task-status-${option.value}`}
-              onPress={() => setStatus(option.value)}
-              style={[styles.chip, status === option.value ? styles.chipActive : null]}
+              key={value}
+              testID={`edit-task-status-${value}`}
+              onPress={() => setPickedStatus(value)}
+              style={[styles.chip, status === value ? styles.chipActive : null]}
             >
-              <Text style={status === option.value ? styles.chipTextActive : styles.chipText}>{option.label}</Text>
+              <Text style={status === value ? styles.chipTextActive : styles.chipText}>{STATUS_LABEL[value]}</Text>
             </Pressable>
           ))}
         </View>

@@ -141,7 +141,7 @@ public class TaskNotificationTests
         Assert.Equal(NotificationEvent.TaskChanged, mail.Event);
         Assert.Equal(member.Email, mail.ToEmail);
         Assert.Contains("Write final report", mail.TextBody);
-        Assert.Contains("status Todo → InProgress", mail.TextBody);
+        Assert.Contains("status Backlog → InProgress", mail.TextBody);
         Assert.Contains("deadline none →", mail.TextBody);
     }
 
@@ -153,7 +153,7 @@ public class TaskNotificationTests
         ClearOutbox(db);
         await db.SaveChangesAsync();
 
-        await Update(db, db.CalendarItems.Single(), member.Id, status: TaskStatus.Done);
+        await Update(db, db.CalendarItems.Single(), member.Id, status: TaskStatus.Completed);
 
         Assert.Empty(db.EmailOutbox);
     }

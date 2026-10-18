@@ -18,10 +18,47 @@ public class CalendarItem : BaseEntity
 
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public Enums.TaskStatus Status { get; set; } = Enums.TaskStatus.Todo;
+    public Enums.TaskStatus Status { get; set; } = Enums.TaskStatus.Backlog;
 
     /// <summary>Task = work to do (scored from deadline minus effort); Event = fixed-time happening (scored from <see cref="StartUtc"/>).</summary>
     public Enums.TaskType TaskType { get; set; } = Enums.TaskType.Task;
+
+    /// <summary>Google-style template (Out of office, Focus time, ...). Always Default for a Task; decides the form fields and the scoring profile.</summary>
+    public Enums.EventTemplate EventTemplate { get; set; } = Enums.EventTemplate.Default;
+
+    /// <summary>Free-text place (events and Focus time) or the Working location label ("Home", "Office", custom).</summary>
+    public string? Location { get; set; }
+
+    /// <summary>Palette name (see ItemColors), not a hex value; null = default colour.</summary>
+    public string? ColorKey { get; set; }
+
+    /// <summary>Busy (blocks the person's time for availability) or Free. Meaningful only for events.</summary>
+    public bool IsBusy { get; set; } = true;
+
+    /// <summary>
+    /// All-day item: the date is stored as midnight UTC of that calendar date and read literally (no zone conversion),
+    /// so the day never shifts when the user travels; "end of day" is computed in the user's own time zone.
+    /// </summary>
+    public bool IsAllDay { get; set; }
+
+    /// <summary>True when the deadline was filled in with "tomorrow" because the source (e.g. a Google task) had none.</summary>
+    public bool IsDeadlineDefaulted { get; set; }
+
+    /// <summary>Groups the occurrences of one repeating series (an imported event's recurringEventId, or an own series id).</summary>
+    public string? SeriesId { get; set; }
+
+    /// <summary>Last status seen in the external system; a sync changes our status only when this value changed, so the app's own edits are not undone.</summary>
+    public string? ExternalStatus { get; set; }
+
+    /// <summary>Hash of the raw external description, so the [planflow] tag is applied only when Google's text really changed.</summary>
+    public string? ExternalDescriptionHash { get; set; }
+
+    /// <summary>Who assigned the item to <see cref="AssignedUserId"/>; null when nobody did (self-taken, imported, unassigned).</summary>
+    public Guid? AssignedByUserId { get; set; }
+    public User? AssignedByUser { get; set; }
+
+    /// <summary>True when an Owner/Admin assigned the item: the assignee cannot give it back. Decided by the role at assignment time.</summary>
+    public bool IsAssignmentLocked { get; set; }
 
     /// <summary>Event only: when it begins. Always null for a Task.</summary>
     public DateTime? StartUtc { get; set; }

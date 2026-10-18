@@ -74,12 +74,12 @@ export function useTaskActions(reload: () => unknown) {
   );
 
   const complete = useCallback(
-    (task: TaskDto) => saveChange(task, { status: TaskStatus.Done }, "Couldn't update item"),
+    (task: TaskDto) => saveChange(task, { status: TaskStatus.Completed }, "Couldn't update item"),
     [saveChange],
   );
-  // Undo for "done": the task goes back to the To Do list and the next urgency recalculation picks it up again.
+  // Undo for "done": the task goes back to the backlog and the next urgency recalculation picks it up again.
   const reopen = useCallback(
-    (task: TaskDto) => saveChange(task, { status: TaskStatus.Todo }, "Couldn't update item"),
+    (task: TaskDto) => saveChange(task, { status: TaskStatus.Backlog }, "Couldn't update item"),
     [saveChange],
   );
   // Claim: a member takes an unassigned task. From then on it is "theirs", so they may edit and delete it.

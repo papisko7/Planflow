@@ -28,7 +28,7 @@ public class IncompleteDataFlagTests
         await db.SaveChangesAsync();
 
         var dto = await new UpdateTaskCommandHandler(db, new Mock<ICacheService>().Object, new NotificationService(db)).Handle(
-            new UpdateTaskCommand(item.Id, "Imported", null, TaskStatus.Todo, owner.Id, null, 7, null, null, null, owner.Id,
+            new UpdateTaskCommand(item.Id, "Imported", null, TaskStatus.Backlog, owner.Id, null, 7, null, null, null, owner.Id,
                 TaskType.Event, StartUtc: start, EndUtc: start.AddHours(1)),
             CancellationToken.None);
 

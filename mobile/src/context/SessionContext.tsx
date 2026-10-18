@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { logout as authLogout, softLogout, restoreSession, setSessionExpiredHandler } from '../services/authService';
 import { isPinEnabled } from '../services/pinService';
 import { unregisterPush } from '../services/pushService';
+import { forgetReportedTimeZone, reportTimeZone } from '../services/userService';
 
 interface SessionState {
   status: 'checking' | 'signedIn' | 'signedOut';
@@ -21,6 +22,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setSessionExpiredHandler(() => setStatus('signedOut'));
     return () => setSessionExpiredHandler(null);
   }, []);
+
+  // Tell the server the phone's time zone whenever a session is active (it needs it to compute "end of day").
+  useEffect(() => {
+    if (status === 'signedIn') void reportTimeZone();
+    else forgetReportedTimeZone();
+  }, [status]);
 
   const signIn = useCallback(() => setStatus('signedIn'), []);
   const signOut = useCallback(async () => {

@@ -19,7 +19,8 @@ import { AssigneePicker } from './AssigneePicker';
 import { ScheduleForm } from './ScheduleForm';
 import type { ApiError } from '../types/api';
 import { TeamRole, type TeamDto, type TeamMemberDto } from '../types/team';
-import { TaskStatus, TaskType, type ScheduleFields, type TaskDto } from '../types/task';
+import { TaskType, type ScheduleFields, type TaskDto } from '../types/task';
+import { isFinishedStatus } from '../utils/taskStatus';
 import { emptySchedule, normalizeSchedule, validateSchedule } from '../utils/schedule';
 
 type Props = {
@@ -87,7 +88,7 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
   const myRole = members.find((m) => m.userId === myUserId)?.role;
   const canAssign = !team?.isPersonal && (myRole === TeamRole.Owner || myRole === TeamRole.Admin);
   const blockerChoices = tasks.filter(
-    (t) => t.teamId === teamId && t.status !== TaskStatus.Done && t.status !== TaskStatus.Cancelled,
+    (t) => t.teamId === teamId && !isFinishedStatus(t.status),
   );
 
   const submit = useCallback(async () => {

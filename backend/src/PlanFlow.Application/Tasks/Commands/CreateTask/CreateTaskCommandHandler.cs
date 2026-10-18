@@ -5,6 +5,7 @@ using PlanFlow.Application.Notifications;
 using PlanFlow.Application.Tasks.Common;
 using PlanFlow.Domain.Entities;
 using PlanFlow.Domain.Enums;
+using PlanFlow.Domain.Services;
 using ScoreTriggerSource = PlanFlow.Domain.Enums.ScoreTriggerSource;
 
 namespace PlanFlow.Application.Tasks.Commands.CreateTask;
@@ -38,6 +39,7 @@ public class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, TaskD
             UseAiEnhancement = request.UseAiEnhancement
         };
         TaskScheduleMapper.Apply(task, request);
+        task.Status = TaskStatusRules.DefaultFor(task.TaskType); // a Task starts in Backlog, an Event is Confirmed
 
         _context.CalendarItems.Add(task);
 

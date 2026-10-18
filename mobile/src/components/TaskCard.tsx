@@ -48,8 +48,9 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
 
   // Double tap toggles done: an open task becomes done, a done task is reopened. To tell it apart from a
   // single tap, the single tap (open details) waits DOUBLE_TAP_MS for a possible second tap; cards
-  // without actions open instantly because they have no double-tap action.
-  const isDone = task.status === TaskStatus.Done;
+  // without actions open instantly because they have no double-tap action. Events cannot be "done",
+  // so they never have the double-tap action either.
+  const isDone = task.status === TaskStatus.Completed;
   const isUnassigned = !task.assignedUserId;
   // Only the current assignee can abandon a task (the API enforces the same).
   const isMine = !!task.assignedUserId && task.assignedUserId === getCurrentUserId();
@@ -62,7 +63,7 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
   );
 
   const handlePress = () => {
-    if (!actions) {
+    if (!actions || isEvent) {
       onPress?.(task);
       return;
     }
@@ -152,8 +153,8 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
         onClaim={isUnassigned ? () => actions.claim(task) : undefined}
         onAbandon={isMine ? () => actions.abandon(task) : undefined}
         onEdit={() => actions.edit(task)}
-        onComplete={isDone ? undefined : () => actions.complete(task)}
-        onReopen={isDone ? () => actions.reopen(task) : undefined}
+        onComplete={isEvent || isDone ? undefined : () => actions.complete(task)}
+        onReopen={!isEvent && isDone ? () => actions.reopen(task) : undefined}
         onDelete={() => actions.remove(task)}
       />
     </View>

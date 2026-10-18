@@ -128,11 +128,18 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Property<double?>("AiImpactScore")
                         .HasColumnType("double precision");
 
+                    b.Property<Guid?>("AssignedByUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("AssignedUserId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid?>("BlockedByTaskId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ColorKey")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -152,18 +159,45 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Property<double?>("EstimatedEffortHours")
                         .HasColumnType("double precision");
 
+                    b.Property<int>("EventTemplate")
+                        .HasColumnType("integer");
+
                     b.Property<string>("ExternalCalendarEventId")
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
+                    b.Property<string>("ExternalDescriptionHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ExternalStatus")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<int?>("ImpactScore")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("IsAllDay")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsAssignmentLocked")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsBusy")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDataIncomplete")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsDeadlineDefaulted")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsRecurring")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
 
                     b.Property<double?>("ManualUrgencyOverride")
                         .HasColumnType("double precision");
@@ -176,6 +210,10 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
 
                     b.Property<int?>("RecurrenceIntervalHours")
                         .HasColumnType("integer");
+
+                    b.Property<string>("SeriesId")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
 
                     b.Property<Guid?>("SourceCalendarIntegrationId")
                         .HasColumnType("uuid");
@@ -204,6 +242,8 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AssignedByUserId");
 
                     b.HasIndex("AssignedUserId");
 
@@ -645,6 +685,9 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("AlgorithmVersion")
+                        .HasColumnType("integer");
+
                     b.Property<double>("BlockingComponent")
                         .HasColumnType("double precision");
 
@@ -669,6 +712,9 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Property<string>("ReasonText")
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
+
+                    b.Property<double?>("ScheduledComponent")
+                        .HasColumnType("double precision");
 
                     b.Property<int>("TriggerSource")
                         .HasColumnType("integer");
@@ -695,6 +741,9 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Property<string>("AvatarUrl")
                         .HasColumnType("text");
 
+                    b.Property<int>("CalendarSharingLevel")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -717,6 +766,10 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("TimeZoneId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -796,6 +849,11 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.CalendarItem", b =>
                 {
+                    b.HasOne("PlanFlow.Domain.Entities.User", "AssignedByUser")
+                        .WithMany()
+                        .HasForeignKey("AssignedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("PlanFlow.Domain.Entities.User", "AssignedUser")
                         .WithMany("AssignedTasks")
                         .HasForeignKey("AssignedUserId")
@@ -816,6 +874,8 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .HasForeignKey("TeamId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("AssignedByUser");
 
                     b.Navigation("AssignedUser");
 

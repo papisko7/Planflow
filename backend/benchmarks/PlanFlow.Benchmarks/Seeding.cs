@@ -51,7 +51,7 @@ public static class Seeding
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
 
-        var statuses = new[] { TaskStatus.Todo, TaskStatus.InProgress, TaskStatus.Blocked };
+        var statuses = new[] { TaskStatus.Backlog, TaskStatus.InProgress }; // active statuses only: the benchmark scores open items
         var previousIds = new List<Guid>();
         const int batchSize = 1000;
 

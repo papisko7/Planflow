@@ -33,7 +33,7 @@ public class RecurringItemJobTests
         var team = await TestDb.AddTeamAsync(db, (user, TeamRole.Owner));
         var item = new CalendarItem
         {
-            TeamId = team.Id, AssignedUserId = user.Id, Title = "Weekly report", Status = TaskStatus.Done,
+            TeamId = team.Id, AssignedUserId = user.Id, Title = "Weekly report", Status = TaskStatus.Completed,
             IsRecurring = true, RecurrenceIntervalHours = 24 * 7, DeadlineUtc = Now.AddDays(1), ImpactScore = 6
         };
         configure(item);
@@ -52,7 +52,7 @@ public class RecurringItemJobTests
 
         var next = Assert.Single(db.CalendarItems, t => t.Id != item.Id);
         Assert.Equal(oldDeadline.AddDays(7), next.DeadlineUtc);
-        Assert.Equal(TaskStatus.Todo, next.Status);
+        Assert.Equal(TaskStatus.Backlog, next.Status);
         Assert.Equal("Weekly report", next.Title);
         Assert.Equal(item.AssignedUserId, next.AssignedUserId);
         Assert.Equal(6, next.ImpactScore);
@@ -126,16 +126,21 @@ public class RecurringItemJobTests
         Assert.True(next.DeadlineUtc <= DateTime.UtcNow.AddHours(24)); // the nearest future slot, not further
     }
 
-    [Fact]
-    public async Task Execute_RecurringEvent_ShiftsStartAndEndTogether()
-    {
-        var (db, item) = await SetUpAsync(t =>
+    // An Event has no "completed" status: it counts as finished once it is over, then its next occurrence is created.
+    private static Task<(PlanFlowDbContext Db, CalendarItem Item)> SetUpEventAsync(TimeSpan startOffset, TaskStatus status = TaskStatus.Confirmed) =>
+        SetUpAsync(t =>
         {
             t.TaskType = TaskType.Event;
+            t.Status = status;
             t.DeadlineUtc = null;
-            t.StartUtc = Now.AddHours(2);
-            t.EndUtc = Now.AddHours(3);
+            t.StartUtc = Now + startOffset;
+            t.EndUtc = Now + startOffset + TimeSpan.FromHours(1);
         });
+
+    [Fact]
+    public async Task Execute_RecurringEventThatIsOver_ShiftsStartAndEndTogether()
+    {
+        var (db, item) = await SetUpEventAsync(TimeSpan.FromHours(-3));
 
         await Job(db).Execute(JobContext().Object);
 
@@ -143,10 +148,34 @@ public class RecurringItemJobTests
         Assert.Equal(item.StartUtc!.Value.AddDays(7), next.StartUtc);
         Assert.Equal(item.EndUtc!.Value.AddDays(7), next.EndUtc);
         Assert.Null(next.DeadlineUtc);
+        Assert.Equal(TaskStatus.Confirmed, next.Status); // a new event starts Confirmed, not as a task in the backlog
+        Assert.False(item.IsRecurring);
+    }
+
+    [Fact]
+    public async Task Execute_RecurringEventNotOverYet_IsLeftAlone()
+    {
+        var (db, item) = await SetUpEventAsync(TimeSpan.FromHours(2));
+
+        await Job(db).Execute(JobContext().Object);
+
+        Assert.Single(db.CalendarItems);
+        Assert.True(item.IsRecurring);
+    }
+
+    [Fact]
+    public async Task Execute_CancelledRecurringEventThatIsOver_IsLeftAlone()
+    {
+        var (db, item) = await SetUpEventAsync(TimeSpan.FromHours(-3), TaskStatus.Cancelled);
+
+        await Job(db).Execute(JobContext().Object);
+
+        Assert.Single(db.CalendarItems);
+        Assert.True(item.IsRecurring);
     }
 
     [Theory]
-    [InlineData(TaskStatus.Todo)]
+    [InlineData(TaskStatus.Backlog)]
     [InlineData(TaskStatus.InProgress)]
     [InlineData(TaskStatus.Cancelled)]
     public async Task Execute_ItemNotDone_IsLeftAlone(TaskStatus status)
@@ -164,7 +193,7 @@ public class RecurringItemJobTests
     {
         var finished = new CalendarItem
         {
-            IsRecurring = true, RecurrenceIntervalHours = 24, DeadlineUtc = Now.AddHours(1), Status = TaskStatus.Done,
+            IsRecurring = true, RecurrenceIntervalHours = 24, DeadlineUtc = Now.AddHours(1), Status = TaskStatus.Completed,
             BlockedByTaskId = Guid.NewGuid(), ExternalCalendarEventId = "gcal-1", SourceCalendarIntegrationId = Guid.NewGuid()
         };
 

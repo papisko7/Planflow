@@ -1,5 +1,6 @@
 import { TaskStatus, type TaskDto } from '../types/task';
 import { dueUtc, isPastEvent } from './schedule';
+import { isFinishedStatus } from './taskStatus';
 
 export interface DashboardStats {
   open: number;
@@ -10,7 +11,7 @@ export interface DashboardStats {
   total: number;
 }
 
-const isOpen = (t: TaskDto) => t.status !== TaskStatus.Done && t.status !== TaskStatus.Cancelled;
+const isOpen = (t: TaskDto) => !isFinishedStatus(t.status);
 
 function sameLocalDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
@@ -26,7 +27,7 @@ export function computeDashboardStats(tasks: TaskDto[], now: Date = new Date()):
   let done = 0;
 
   for (const task of tasks) {
-    if (task.status === TaskStatus.Done) {
+    if (task.status === TaskStatus.Completed) {
       done++;
       continue;
     }

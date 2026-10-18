@@ -1,5 +1,6 @@
 using PlanFlow.Domain.Entities;
 using PlanFlow.Domain.Enums;
+using PlanFlow.Domain.Services;
 
 namespace PlanFlow.Application.Tasks.Common;
 
@@ -47,7 +48,7 @@ public static class RecurrenceScheduler
             AssignedUserId = finished.AssignedUserId,
             Title = finished.Title,
             Description = finished.Description,
-            Status = Domain.Enums.TaskStatus.Todo,
+            Status = TaskStatusRules.DefaultFor(finished.TaskType),
             TaskType = finished.TaskType,
             // An event keeps its length: start and end move together.
             StartUtc = isEvent ? finished.StartUtc + shift : null,

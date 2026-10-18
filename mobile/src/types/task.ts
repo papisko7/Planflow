@@ -1,11 +1,16 @@
 // Mirrors backend PlanFlow.Domain.Enums.TaskStatus — no JsonStringEnumConverter is configured,
-// so the API serializes this as a plain int; the numeric order here must stay in sync.
+// so the API serializes this as a plain int; the numbers here must stay in sync. 2 (the old "Blocked")
+// is retired: "blocked" is now derived from blockedByTaskId.
 export enum TaskStatus {
-  Todo = 0,
+  // Task statuses
+  Backlog = 0,
   InProgress = 1,
-  Blocked = 2,
-  Done = 3,
+  Completed = 3,
+  // Both types
   Cancelled = 4,
+  // Event statuses
+  Confirmed = 5,
+  Tentative = 6,
 }
 
 // Mirrors backend PlanFlow.Domain.Enums.TaskType (plain int on the wire): a Task is work with a deadline,

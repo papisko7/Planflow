@@ -22,7 +22,7 @@ public class TeamUrgencyRecalculatorTests
     }
 
     private static CalendarItem AddTask(PlanFlowDbContext db, Guid teamId, DateTime? deadline = null, int? impact = 5,
-        Guid? blockedBy = null, TaskStatus status = TaskStatus.Todo)
+        Guid? blockedBy = null, TaskStatus status = TaskStatus.Backlog)
     {
         var task = new CalendarItem
         {
@@ -121,7 +121,7 @@ public class TeamUrgencyRecalculatorTests
         await TeamUrgencyRecalculator.RecalculateTeamAsync(db, teamId, Now, ScoreTriggerSource.ManualUpdate, null, CancellationToken.None);
         var whileBlocked = dependent.CurrentUrgencyScore;
 
-        blocker.Status = TaskStatus.Done;
+        blocker.Status = TaskStatus.Completed;
         await TeamUrgencyRecalculator.RecalculateTeamAsync(db, teamId, Now, ScoreTriggerSource.ManualUpdate, blocker, CancellationToken.None);
 
         Assert.True(dependent.CurrentUrgencyScore > whileBlocked);
@@ -132,7 +132,7 @@ public class TeamUrgencyRecalculatorTests
     public async Task RecalculateTeam_FinishedTasks_AreNotRescoredByTheScheduledPass()
     {
         var (db, teamId) = await CreateTeamAsync();
-        var done = AddTask(db, teamId, deadline: Now.AddDays(1), impact: 9, status: TaskStatus.Done);
+        var done = AddTask(db, teamId, deadline: Now.AddDays(1), impact: 9, status: TaskStatus.Completed);
         await db.SaveChangesAsync();
 
         var changed = await TeamUrgencyRecalculator.RecalculateTeamAsync(

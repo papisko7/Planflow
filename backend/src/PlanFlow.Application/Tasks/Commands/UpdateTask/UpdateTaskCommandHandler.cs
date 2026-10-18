@@ -7,6 +7,7 @@ using PlanFlow.Application.Notifications;
 using PlanFlow.Application.Tasks.Common;
 using PlanFlow.Domain.Entities;
 using PlanFlow.Domain.Enums;
+using PlanFlow.Domain.Services;
 using ScoreTriggerSource = PlanFlow.Domain.Enums.ScoreTriggerSource;
 
 namespace PlanFlow.Application.Tasks.Commands.UpdateTask;
@@ -39,9 +40,11 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
 
         task.Title = request.Title;
         task.Description = request.Description;
-        task.Status = request.Status;
         task.AssignedUserId = request.AssignedUserId;
         TaskScheduleMapper.Apply(task, request);
+        // A Task is Backlog/InProgress/Completed/Cancelled, an Event Confirmed/Tentative/Cancelled. When the type changed (or an
+        // older app sent the other type's status) the status falls back to the new type's default instead of failing the save.
+        task.Status = TaskStatusRules.Normalize(task.TaskType, request.Status);
         task.UseAiEnhancement = request.UseAiEnhancement;
         task.ImpactScore = request.ImpactScore;
         task.BlockedByTaskId = request.BlockedByTaskId;

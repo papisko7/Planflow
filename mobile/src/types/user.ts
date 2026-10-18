@@ -5,6 +5,8 @@ export interface UserProfileDto {
   displayName: string;
   // False until the owner types the code from the confirmation e-mail; optional mails only reach confirmed addresses.
   emailVerified: boolean;
+  // IANA zone reported by the phone (null until the first sign-in after the update).
+  timeZoneId?: string | null;
 }
 
 // Mirrors PlanFlow.Api.Contracts.UpdateProfileRequest; currentPassword is only needed when the e-mail changes.

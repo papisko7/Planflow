@@ -9,6 +9,7 @@ using PlanFlow.Application.Auth.Commands.ResendEmailVerification;
 using PlanFlow.Application.Auth.Commands.VerifyEmail;
 using PlanFlow.Application.Users.Commands.UpdateNotificationPreferences;
 using PlanFlow.Application.Users.Commands.UpdateProfile;
+using PlanFlow.Application.Users.Commands.UpdateTimeZone;
 using PlanFlow.Application.Users.Common;
 using PlanFlow.Application.Users.Queries.GetNotificationPreferences;
 using PlanFlow.Application.Users.Queries.GetProfile;
@@ -42,6 +43,14 @@ public class UsersController : ControllerBase
             cancellationToken);
 
         return Ok(profile);
+    }
+
+    // The phone reports its time zone here (on sign-in / when it changes), so the server can compute "end of day" per user.
+    [HttpPut("time-zone")]
+    public async Task<IActionResult> UpdateTimeZone(UpdateTimeZoneRequest request, CancellationToken cancellationToken)
+    {
+        await _sender.Send(new UpdateTimeZoneCommand(User.GetUserId(), request.TimeZoneId), cancellationToken);
+        return NoContent();
     }
 
     [HttpGet("notification-preferences")]

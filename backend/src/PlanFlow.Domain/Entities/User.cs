@@ -17,6 +17,12 @@ public class User : BaseEntity
     public DateTime? EmailVerifiedAtUtc { get; set; }
     public bool IsEmailVerified => EmailVerifiedAtUtc is not null;
 
+    /// <summary>IANA time zone from the device (e.g. "Europe/Warsaw"); needed for "end of day", all-day items and alert hours. Null until the app reports it.</summary>
+    public string? TimeZoneId { get; set; }
+
+    /// <summary>How much of the user's calendar teammates may see; defaults to availability only.</summary>
+    public Enums.CalendarSharingLevel CalendarSharingLevel { get; set; } = Enums.CalendarSharingLevel.Availability;
+
     public ICollection<TeamMember> TeamMemberships { get; set; } = new List<TeamMember>();
     public ICollection<CalendarItem> AssignedTasks { get; set; } = new List<CalendarItem>();
     public ICollection<CalendarIntegration> CalendarIntegrations { get; set; } = new List<CalendarIntegration>();

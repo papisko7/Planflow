@@ -81,7 +81,7 @@ public static class TeamUrgencyRecalculator
         }
     }
 
-    private static bool IsActive(CalendarItem task) => task.Status is not (TaskStatus.Done or TaskStatus.Cancelled);
+    private static bool IsActive(CalendarItem task) => task.Status is not (TaskStatus.Completed or TaskStatus.Cancelled);
 
     private static void Stage(
         IApplicationDbContext context, CalendarItem task, UrgencyScoreLog log, DateTime nowUtc, List<Guid> changed)

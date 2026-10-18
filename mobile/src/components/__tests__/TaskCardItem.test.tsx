@@ -10,7 +10,7 @@ const base: TaskDto = {
   assignedUserId: null,
   title: 'Standup',
   description: null,
-  status: TaskStatus.Todo,
+  status: TaskStatus.Backlog,
   deadlineUtc: null,
   impactScore: null,
   blockedByTaskId: null,

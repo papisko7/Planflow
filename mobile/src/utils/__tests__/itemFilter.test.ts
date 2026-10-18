@@ -14,7 +14,7 @@ function item(over: Partial<TaskDto>): TaskDto {
     assignedUserId: null,
     title: `Item ${n}`,
     description: null,
-    status: TaskStatus.Todo,
+    status: TaskStatus.Backlog,
     deadlineUtc: null,
     impactScore: null,
     blockedByTaskId: null,

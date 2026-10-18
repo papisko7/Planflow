@@ -79,7 +79,7 @@ public class TaskCrudPostgresTests
             "High urgency", null, null, DateTime.UtcNow.AddDays(1), 10, null));
         var highUrgency = await highUrgencyResponse.Content.ReadFromJsonAsync<TaskDto>();
         await client.PutAsJsonAsync($"api/tasks/{highUrgency!.Id}", new UpdateTaskRequest(
-            "High urgency", null, TaskStatus.Todo, null, DateTime.UtcNow.AddDays(-1), 10, null, null, null));
+            "High urgency", null, TaskStatus.Backlog, null, DateTime.UtcNow.AddDays(-1), 10, null, null, null));
 
         var (otherTeamId, otherUserId) = await SeedTeamWithMemberAsync(TeamRole.Owner);
         var otherClient = await AuthenticatedClientAsync(otherUserId, otherTeamId, TeamRole.Owner);
@@ -147,7 +147,7 @@ public class TaskCrudPostgresTests
         var created = await createResponse.Content.ReadFromJsonAsync<TaskDto>();
 
         var updateResponse = await client.PutAsJsonAsync($"api/tasks/{created!.Id}", new UpdateTaskRequest(
-            "Unassigned task", null, TaskStatus.Todo, assigneeId, null, 2, null, null, null));
+            "Unassigned task", null, TaskStatus.Backlog, assigneeId, null, 2, null, null, null));
 
         updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -181,7 +181,7 @@ public class TaskCrudPostgresTests
         // Creating the dependent rescored the whole team, so the blocker's stored score already rose;
         // an explicit edit of the blocker keeps it there.
         var updateResponse = await client.PutAsJsonAsync($"api/tasks/{blocker.Id}", new UpdateTaskRequest(
-            "Blocker", null, TaskStatus.Todo, null, null, 0, null, null, null));
+            "Blocker", null, TaskStatus.Backlog, null, null, 0, null, null, null));
         var updatedBlocker = await updateResponse.Content.ReadFromJsonAsync<TaskDto>();
 
         updatedBlocker!.CurrentUrgencyScore.Should().BeGreaterThan(blockerInitialScore);
@@ -201,7 +201,7 @@ public class TaskCrudPostgresTests
             "Solo", null, null, null, 5, null))).Content.ReadFromJsonAsync<TaskDto>();
 
         var response = await client.PutAsJsonAsync($"api/tasks/{created!.Id}", new UpdateTaskRequest(
-            "Solo", null, TaskStatus.Todo, null, null, 5, created.Id, null, null));
+            "Solo", null, TaskStatus.Backlog, null, null, 5, created.Id, null, null));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -218,7 +218,7 @@ public class TaskCrudPostgresTests
 
         // A is already waiting for nobody and B waits for A; making A wait for B would close the loop.
         var response = await client.PutAsJsonAsync($"api/tasks/{a.Id}", new UpdateTaskRequest(
-            "A", null, TaskStatus.Todo, null, null, 5, b!.Id, null, null));
+            "A", null, TaskStatus.Backlog, null, null, 5, b!.Id, null, null));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -235,7 +235,7 @@ public class TaskCrudPostgresTests
         var scoreWhileBlocked = (await client.GetFromJsonAsync<TaskDetailDto>($"api/tasks/{blocked!.Id}"))!.Task.CurrentUrgencyScore;
 
         await client.PutAsJsonAsync($"api/tasks/{blocker.Id}", new UpdateTaskRequest(
-            "Blocker", null, TaskStatus.Done, null, null, 0, null, null, null));
+            "Blocker", null, TaskStatus.Completed, null, null, 0, null, null, null));
 
         var freed = await client.GetFromJsonAsync<TaskDetailDto>($"api/tasks/{blocked.Id}");
         freed!.Task.CurrentUrgencyScore.Should().BeGreaterThan(scoreWhileBlocked);
@@ -255,7 +255,7 @@ public class TaskCrudPostgresTests
         // Push the deadline overdue via UpdateTask — CreateTask's validator rejects a past
         // DeadlineUtc outright, while UpdateTask allows it (see CreateTaskCommandValidator).
         await client.PutAsJsonAsync($"api/tasks/{created!.Id}", new UpdateTaskRequest(
-            "Detail me", null, TaskStatus.Todo, null, DateTime.UtcNow.AddDays(-1), 10, null, null, null));
+            "Detail me", null, TaskStatus.Backlog, null, DateTime.UtcNow.AddDays(-1), 10, null, null, null));
 
         var response = await client.GetAsync($"api/tasks/{created!.Id}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -316,7 +316,7 @@ public class TaskCrudPostgresTests
 
         // Claim = assign to yourself.
         var claim = await member.PutAsJsonAsync($"api/tasks/{created.Id}", new UpdateTaskRequest(
-            "Nobody's task", null, TaskStatus.Todo, memberId, null, 3, null, null, null));
+            "Nobody's task", null, TaskStatus.Backlog, memberId, null, 3, null, null, null));
         claim.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Once it is theirs they may edit and delete it like any own task.
@@ -341,13 +341,13 @@ public class TaskCrudPostgresTests
 
         // Abandon = clear the assignee on a task that is yours; it returns to the unassigned pool.
         var abandon = await member.PutAsJsonAsync($"api/tasks/{mine!.Id}", new UpdateTaskRequest(
-            "Mine for now", null, TaskStatus.Todo, null, null, 3, null, null, null));
+            "Mine for now", null, TaskStatus.Backlog, null, null, 3, null, null, null));
         abandon.StatusCode.Should().Be(HttpStatusCode.OK);
         (await abandon.Content.ReadFromJsonAsync<TaskDto>())!.AssignedUserId.Should().BeNull();
 
         // Someone else's task cannot be dropped by a Member.
         var drop = await member.PutAsJsonAsync($"api/tasks/{ownersTask!.Id}", new UpdateTaskRequest(
-            "Owner's task", null, TaskStatus.Todo, null, null, 3, null, null, null));
+            "Owner's task", null, TaskStatus.Backlog, null, null, 3, null, null, null));
         drop.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
@@ -363,14 +363,14 @@ public class TaskCrudPostgresTests
             "Owner's task", null, ownerId, null, 3, null))).Content.ReadFromJsonAsync<TaskDto>();
 
         var steal = await member.PutAsJsonAsync($"api/tasks/{created!.Id}", new UpdateTaskRequest(
-            "Owner's task", null, TaskStatus.Todo, memberId, null, 3, null, null, null));
+            "Owner's task", null, TaskStatus.Backlog, memberId, null, 3, null, null, null));
         steal.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         // Unassigned task: a member may claim it for themselves but not hand it to somebody else.
         var unassigned = await (await owner.PostAsJsonAsync($"api/teams/{teamId}/tasks", new CreateTaskRequest(
             "Free task", null, null, null, 3, null))).Content.ReadFromJsonAsync<TaskDto>();
         var give = await member.PutAsJsonAsync($"api/tasks/{unassigned!.Id}", new UpdateTaskRequest(
-            "Free task", null, TaskStatus.Todo, ownerId, null, 3, null, null, null));
+            "Free task", null, TaskStatus.Backlog, ownerId, null, 3, null, null, null));
         give.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 

@@ -82,7 +82,7 @@ public class ScoreAuditIntegrationTests
             TeamId = teamId,
             Team = team,
             Title = "Original Title",
-            Status = TaskStatus.Todo,
+            Status = TaskStatus.Backlog,
             ImpactScore = 5,
             CurrentUrgencyScore = 0.5,
         };
@@ -140,7 +140,7 @@ public class ScoreAuditIntegrationTests
             TeamId = teamId,
             Team = team,
             Title = "Task for Prioritization",
-            Status = TaskStatus.Todo,
+            Status = TaskStatus.Backlog,
             ImpactScore = 5,
             CurrentUrgencyScore = 0.3,
         };
@@ -204,7 +204,7 @@ public class ScoreAuditIntegrationTests
             taskResult.Id,
             "Updated Title",
             null,
-            TaskStatus.Todo,
+            TaskStatus.Backlog,
             null,
             null,
             8,

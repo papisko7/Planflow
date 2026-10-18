@@ -31,7 +31,7 @@ public class ScoreAuditLoggingTests
             TeamId = team.Id,
             Team = team,
             Title = "Test Task",
-            Status = TaskStatus.Todo,
+            Status = TaskStatus.Backlog,
             ImpactScore = 5,
             CurrentUrgencyScore = 0.0,
         };
@@ -59,7 +59,7 @@ public class ScoreAuditLoggingTests
             TeamId = team.Id,
             Team = team,
             Title = "Urgent Task",
-            Status = TaskStatus.Todo,
+            Status = TaskStatus.Backlog,
             DeadlineUtc = deadlineUtc,
             ImpactScore = 8,
             CurrentUrgencyScore = 0.0,
@@ -88,7 +88,7 @@ public class ScoreAuditLoggingTests
             TeamId = team.Id,
             Team = team,
             Title = "Blocking Task",
-            Status = TaskStatus.Todo,
+            Status = TaskStatus.Backlog,
             ImpactScore = 5,
         };
 
@@ -114,7 +114,7 @@ public class ScoreAuditLoggingTests
             TeamId = team.Id,
             Team = team,
             Title = "Multi-Trigger Task",
-            Status = TaskStatus.Todo,
+            Status = TaskStatus.Backlog,
             ImpactScore = 5,
         };
 
@@ -173,7 +173,7 @@ public class ScoreAuditLoggingTests
             TeamId = team.Id,
             Team = team,
             Title = "Overridden Task",
-            Status = TaskStatus.Todo,
+            Status = TaskStatus.Backlog,
             ImpactScore = 5,
             ManualUrgencyOverride = 0.8,
             ManualUrgencyOverrideExpiresAtUtc = expiryUtc,
@@ -200,7 +200,7 @@ public class ScoreAuditLoggingTests
             TeamId = team.Id,
             Team = team,
             Title = "Expired Override Task",
-            Status = TaskStatus.Todo,
+            Status = TaskStatus.Backlog,
             ImpactScore = 5,
             ManualUrgencyOverride = 0.9,
             ManualUrgencyOverrideExpiresAtUtc = expiryUtc,
@@ -226,7 +226,7 @@ public class ScoreAuditLoggingTests
             TeamId = team.Id,
             Team = team,
             Title = "Precision Test",
-            Status = TaskStatus.Todo,
+            Status = TaskStatus.Backlog,
             DeadlineUtc = deadlineUtc,
             ImpactScore = 7
         };
@@ -252,7 +252,7 @@ public class ScoreAuditLoggingTests
             TeamId = team.Id,
             Team = team,
             Title = "Default Trigger Task",
-            Status = TaskStatus.Todo,
+            Status = TaskStatus.Backlog,
             ImpactScore = 5,
         };
 
@@ -276,7 +276,7 @@ public class ScoreAuditLoggingTests
             TeamId = team.Id,
             Team = team,
             Title = "History Task",
-            Status = TaskStatus.Todo,
+            Status = TaskStatus.Backlog,
             ImpactScore = 5,
         };
 

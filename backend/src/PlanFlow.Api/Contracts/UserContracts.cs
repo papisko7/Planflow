@@ -8,3 +8,6 @@ public record ChangePasswordRequest(string CurrentPassword, string NewPassword, 
 
 /// <summary><paramref name="Code"/> is the 6-digit code from the confirmation e-mail.</summary>
 public record VerifyEmailRequest(string Code);
+
+/// <summary><paramref name="TimeZoneId"/> is an IANA name from the device, e.g. "Europe/Warsaw".</summary>
+public record UpdateTimeZoneRequest(string TimeZoneId);

@@ -43,7 +43,7 @@ public class AlertingJob : IJob
         var dedupeCutoffUtc = nowUtc - DedupeWindow;
 
         var candidateTasks = await _context.CalendarItems
-            .Where(t => t.Status != TaskStatus.Done && t.Status != TaskStatus.Cancelled)
+            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Cancelled)
             .Where(t => t.AssignedUserId != null)
             .Where(t => t.CurrentUrgencyScore >= UrgencyThreshold)
             .Select(t => new { t.Id, t.TeamId, t.AssignedUserId, t.Title, t.TaskType, DeadlineUtc =t.DeadlineUtc ?? t.StartUtc, t.CurrentUrgencyScore })

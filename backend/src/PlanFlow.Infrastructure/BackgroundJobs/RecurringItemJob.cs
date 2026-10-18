@@ -11,7 +11,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Infrastructure.BackgroundJobs;
 
 /// <summary>
-/// Renews recurring items. Every minute it looks for finished items that are still marked recurring, creates
+/// Renews recurring items. Every minute it looks for finished items (completed tasks, events that are over) that are still marked recurring, creates
 /// the next instance (see <see cref="RecurrenceScheduler"/>) and then clears the recurring flag on the finished one.
 /// That flag is the "already handled" marker: the new instance carries the recurrence on, so each cycle step has
 /// exactly one live link and a second run can never spawn a duplicate. When the cycle has ended (past
@@ -36,9 +36,14 @@ public class RecurringItemJob : IJob
         var cancellationToken = context.CancellationToken;
         var nowUtc = DateTime.UtcNow;
 
-        var finished = await _context.CalendarItems
-            .Where(t => t.IsRecurring && t.Status == TaskStatus.Done)
+        var recurring = await _context.CalendarItems
+            .Where(t => t.IsRecurring && (t.Status == TaskStatus.Completed || (t.TaskType == TaskType.Event && t.Status != TaskStatus.Cancelled)))
             .ToListAsync(cancellationToken);
+
+        // A Task is finished when completed; an Event has no "completed" status, so it is finished once it is over.
+        var finished = recurring
+            .Where(t => t.Status == TaskStatus.Completed || CalendarItemUrgencyScoreFactory.IsPastEvent(t, nowUtc))
+            .ToList();
 
         if (finished.Count == 0)
         {

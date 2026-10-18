@@ -54,7 +54,7 @@ public class TaskAssignmentTests
         await db.SaveChangesAsync();
 
         await Assert.ThrowsAsync<ValidationException>(() => new UpdateTaskCommandHandler(db, Cache, new PlanFlow.Application.Notifications.NotificationService(db)).Handle(
-            new UpdateTaskCommand(task.Id, "T", null, TaskStatus.Todo, stranger.Id, null, 1, null, null, null, owner.Id),
+            new UpdateTaskCommand(task.Id, "T", null, TaskStatus.Backlog, stranger.Id, null, 1, null, null, null, owner.Id),
             CancellationToken.None));
     }
 

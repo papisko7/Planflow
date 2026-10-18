@@ -20,7 +20,7 @@ import { selectOneNextAction } from '../utils/oneNextAction';
 import { groupTasksByUrgency } from '../utils/urgencyGrouping';
 import type { RootStackParamList, RootTabParamList } from '../navigation/types';
 import type { TaskDto, TaskWithTeam } from '../types/task';
-import { TaskStatus } from '../types/task';
+import { isFinishedStatus } from '../utils/taskStatus';
 
 type Shortcut = { testID: string; label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void };
 
@@ -51,7 +51,7 @@ export default function DashboardScreen() {
 
   // Finished / cancelled tasks and events that already took place are history, not "what needs attention" — they stay visible on the Items tab.
   const openTasks = useMemo(
-    () => tasks.filter((t) => t.status !== TaskStatus.Done && t.status !== TaskStatus.Cancelled && !isPastEvent(t)),
+    () => tasks.filter((t) => !isFinishedStatus(t.status) && !isPastEvent(t)),
     [tasks],
   );
   const stats = useMemo(() => computeDashboardStats(tasks), [tasks]);

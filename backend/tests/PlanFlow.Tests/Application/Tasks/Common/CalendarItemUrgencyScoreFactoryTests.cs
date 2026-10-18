@@ -22,7 +22,7 @@ public class CalendarItemUrgencyScoreFactoryTests
         Guid? blockedByTaskId = null,
         double? manualOverride = null,
         DateTime? overrideExpiresAt = null,
-        TaskStatus status = TaskStatus.Todo)
+        TaskStatus status = TaskStatus.Backlog)
     {
         return new CalendarItem
         {

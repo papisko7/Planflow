@@ -21,6 +21,12 @@ public class UrgencyScoreLog : BaseEntity
     public double? ImpactComponent { get; set; }
     public double UserOverrideComponent { get; set; }
 
+    /// <summary>The "time to the task's Start" component (algorithm v2); null on rows written by v1, which had no such component.</summary>
+    public double? ScheduledComponent { get; set; }
+
+    /// <summary>Which version of the weights/rules produced this row, so history before and after a weight change is never compared blindly. 1 = original weights.</summary>
+    public int AlgorithmVersion { get; set; } = 1;
+
     /// <summary>True when the task was waiting on an unfinished blocker, so its score was reduced.</summary>
     public bool IsBlocked { get; set; }
 

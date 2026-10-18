@@ -109,7 +109,7 @@ public class SyncCalendarJobTests
         Assert.Equal(team.Id, task.TeamId);
         Assert.Equal(user.Id, task.AssignedUserId);
         Assert.Equal("Thesis defense prep", task.Title);
-        Assert.Equal(TaskStatus.Todo, task.Status);
+        Assert.Equal(TaskStatus.Confirmed, task.Status);
         Assert.Equal(TaskType.Event, task.TaskType); // a calendar entry is an Event, not a Task
         Assert.Equal(deadline.AddHours(-1), task.StartUtc);
         Assert.Equal(deadline, task.EndUtc);
@@ -151,7 +151,7 @@ public class SyncCalendarJobTests
             TeamId = team.Id,
             AssignedUserId = user.Id,
             Title = "Old title",
-            Status = TaskStatus.Todo,
+            Status = TaskStatus.Backlog,
             DeadlineUtc = DateTime.UtcNow.AddDays(1),
             SourceCalendarIntegrationId = integration.Id,
             ExternalCalendarEventId = "event-1"
@@ -188,7 +188,7 @@ public class SyncCalendarJobTests
             TeamId = team.Id,
             AssignedUserId = user.Id,
             Title = "Meeting",
-            Status = TaskStatus.Todo,
+            Status = TaskStatus.Backlog,
             DeadlineUtc = DateTime.UtcNow.AddDays(1),
             SourceCalendarIntegrationId = integration.Id,
             ExternalCalendarEventId = "event-1"

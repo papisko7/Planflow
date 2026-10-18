@@ -273,7 +273,7 @@ public class TaskScheduleFieldsTests
 
         // Switching recurrence off clears the interval/end so stale values never linger.
         var updated = await new UpdateTaskCommandHandler(db, cache, notifications).Handle(
-            new UpdateTaskCommand(created.Id, "Standup", null, TaskStatus.Todo, null, Future.AddHours(1), 5, null, null, null, owner.Id,
+            new UpdateTaskCommand(created.Id, "Standup", null, TaskStatus.Backlog, null, Future.AddHours(1), 5, null, null, null, owner.Id,
                 TaskType.Task, null, 2.0, false, 24, Future.AddDays(30)),
             CancellationToken.None);
 
@@ -326,7 +326,7 @@ public class TaskScheduleFieldsTests
 
         // The caller still sends the old start along: a Task must not keep it.
         var updated = await new UpdateTaskCommandHandler(db, cache, notifications).Handle(
-            new UpdateTaskCommand(created.Id, "Meeting", null, TaskStatus.Todo, null, Future.AddHours(1), 5, null, null, null, owner.Id,
+            new UpdateTaskCommand(created.Id, "Meeting", null, TaskStatus.Backlog, null, Future.AddHours(1), 5, null, null, null, owner.Id,
                 TaskType.Task, Future, null, false, null, null, EndUtc: Future.AddHours(1)),
             CancellationToken.None);
 

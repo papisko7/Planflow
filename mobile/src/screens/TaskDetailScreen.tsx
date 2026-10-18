@@ -17,16 +17,9 @@ import { TeamRole, type TeamMemberDto } from '../types/team';
 import type { TaskDetailDto, TaskDto } from '../types/task';
 import { TaskStatus, TaskType } from '../types/task';
 import { ItemTypeBadge } from '../components/ItemTypeBadge';
+import { STATUS_LABEL } from '../utils/taskStatus';
 
 type LoadState = 'loading' | 'ready' | 'error';
-
-const STATUS_LABEL: Record<TaskStatus, string> = {
-  [TaskStatus.Todo]: 'To Do',
-  [TaskStatus.InProgress]: 'In Progress',
-  [TaskStatus.Blocked]: 'Blocked',
-  [TaskStatus.Done]: 'Done',
-  [TaskStatus.Cancelled]: 'Cancelled',
-};
 
 function formatDateTime(iso: string | null): string | null {
   if (!iso) return null;
@@ -126,7 +119,7 @@ export default function TaskDetailScreen() {
       await updateTask(
         task.id,
         task.teamId,
-        toUpdateRequest(task, { status: task.status === TaskStatus.Done ? TaskStatus.Todo : TaskStatus.Done }),
+        toUpdateRequest(task, { status: task.status === TaskStatus.Completed ? TaskStatus.Backlog : TaskStatus.Completed }),
       );
       await load(true);
     } catch (err) {
@@ -238,9 +231,12 @@ export default function TaskDetailScreen() {
             <Pressable testID="task-edit-button" style={styles.editButton} onPress={() => setEditing(true)}>
               <Text style={styles.editButtonText}>Edit</Text>
             </Pressable>
-            <Pressable testID="task-toggle-done-button" onPress={toggleDone}>
-              <Text style={styles.toggleText}>{task.status === TaskStatus.Done ? 'Mark as not done' : 'Mark as done'}</Text>
-            </Pressable>
+            {/* An event is not "done" — it is Confirmed / Tentative / Cancelled, changed in the edit form. */}
+            {isEvent ? null : (
+              <Pressable testID="task-toggle-done-button" onPress={toggleDone}>
+                <Text style={styles.toggleText}>{task.status === TaskStatus.Completed ? 'Mark as not done' : 'Mark as done'}</Text>
+              </Pressable>
+            )}
             <Pressable testID="task-delete-button" onPress={confirmDelete}>
               <Text style={styles.deleteText}>Delete</Text>
             </Pressable>

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import * as authService from '../../services/authService';
 import { TaskCard } from '../TaskCard';
-import { TaskStatus, type TaskDto } from '../../types/task';
+import { TaskStatus, TaskType, type TaskDto } from '../../types/task';
 import { PLAIN_TASK_FIELDS } from '../../test-fixtures';
 
 const task: TaskDto = {
@@ -10,7 +10,7 @@ const task: TaskDto = {
   assignedUserId: null,
   title: 'Write report',
   description: null,
-  status: TaskStatus.Todo,
+  status: TaskStatus.Backlog,
   deadlineUtc: null,
   impactScore: 1,
   blockedByTaskId: null,
@@ -108,7 +108,7 @@ describe('TaskCard long-press menu', () => {
   it('reopens a finished task on double tap, without opening it', async () => {
     jest.useFakeTimers();
     const onPress = jest.fn();
-    const done = { ...task, status: TaskStatus.Done };
+    const done = { ...task, status: TaskStatus.Completed };
     await render(<TaskCard task={done} onPress={onPress} actions={actions} />);
 
     await fireEvent.press(screen.getByTestId('task-card-t1'));
@@ -122,7 +122,7 @@ describe('TaskCard long-press menu', () => {
   });
 
   it('offers "Mark as not done" instead of "Mark as done" for a finished task', async () => {
-    const done = { ...task, status: TaskStatus.Done };
+    const done = { ...task, status: TaskStatus.Completed };
     await render(<TaskCard task={done} actions={actions} />);
 
     await fireEvent(screen.getByTestId('task-card-t1'), 'longPress');
@@ -132,6 +132,28 @@ describe('TaskCard long-press menu', () => {
 
     await fireEvent.press(screen.getByTestId('task-menu-reopen'));
     expect(actions.reopen).toHaveBeenCalledWith(done);
+  });
+
+  it('does not offer "Mark as done" for an event - an event is Confirmed / Tentative / Cancelled, never done', async () => {
+    const event = { ...task, taskType: TaskType.Event, status: TaskStatus.Confirmed };
+    await render(<TaskCard task={event} actions={actions} />);
+
+    await fireEvent(screen.getByTestId('task-card-t1'), 'longPress');
+
+    expect(screen.queryByTestId('task-menu-complete')).toBeNull();
+    expect(screen.queryByTestId('task-menu-reopen')).toBeNull();
+    expect(screen.getByTestId('task-menu-delete')).toBeTruthy();
+  });
+
+  it('opens an event at once on a single tap - there is no double-tap action to wait for', async () => {
+    const onPress = jest.fn();
+    const event = { ...task, taskType: TaskType.Event, status: TaskStatus.Confirmed };
+    await render(<TaskCard task={event} onPress={onPress} actions={actions} />);
+
+    await fireEvent.press(screen.getByTestId('task-card-t1'));
+
+    expect(onPress).toHaveBeenCalledWith(event);
+    expect(actions.complete).not.toHaveBeenCalled();
   });
 
   it('flags an item that still needs details (imported without impact), and only then', async () => {
