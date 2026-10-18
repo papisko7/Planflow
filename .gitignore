@@ -65,10 +65,5 @@ coverage/
 logs/
 *.log
 
-# Project Memory & Config
-CLAUDE.md
-Memory.md
-documents/Temat, Cel oraz Zakres Pracy Inżynierskiej - PlanFlow.md
-
 # Demo startup script state/logs
 scripts/.demo/
