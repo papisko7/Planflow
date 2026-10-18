@@ -42,6 +42,12 @@ public class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, TaskD
 
         _context.CalendarItems.Add(task);
 
+        // Alerts and guests are checked against the item as it will be stored (type, template, all-day and the dates are set above).
+        var reminders = TaskReminders.Resolve(request.Reminders ?? [], task);
+        TaskReminders.Replace(_context, task, reminders);
+        var participantIds = await TaskParticipants.ResolveAsync(_context, task, request.ParticipantUserIds ?? [], cancellationToken);
+        TaskParticipants.Replace(_context, task, participantIds);
+
         // A new task can already be blocked by an existing one, and that blocker may now inherit urgency from it.
         var changedTaskIds = await TeamUrgencyRecalculator.RecalculateTeamAsync(
             _context, task.TeamId, DateTime.UtcNow, ScoreTriggerSource.ManualCreate, task, cancellationToken);
@@ -53,11 +59,11 @@ public class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, TaskD
             ChangeType = TaskChangeType.Created
         });
 
-        await TaskNotifications.OnCreatedAsync(_context, _notifications, task, request.CreatedByUserId, cancellationToken);
+        await TaskNotifications.OnCreatedAsync(_context, _notifications, task, request.CreatedByUserId, participantIds, cancellationToken);
 
         await _context.SaveChangesAsync(cancellationToken);
         await TeamUrgencyRecalculator.InvalidateCachesAsync(_cache, task.TeamId, changedTaskIds, cancellationToken);
 
-        return TaskDto.FromEntity(task);
+        return TaskDto.FromEntity(task) with { ParticipantUserIds = participantIds };
     }
 }

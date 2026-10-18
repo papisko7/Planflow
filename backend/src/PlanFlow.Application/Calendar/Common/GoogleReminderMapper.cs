@@ -20,7 +20,7 @@ public static class GoogleReminderMapper
     public static IReadOnlyList<ItemReminder> Map(IEnumerable<int> minutesBeforeStart, bool isAllDay)
     {
         var result = new List<ItemReminder>();
-        var seen = new HashSet<(int?, int?, int?)>();
+        var seen = new HashSet<(Domain.Enums.ReminderAnchor, int?, int?, int?)>();
 
         foreach (var minutes in minutesBeforeStart)
         {

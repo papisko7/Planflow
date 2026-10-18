@@ -28,6 +28,8 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
     public async Task<TaskDto> Handle(UpdateTaskCommand request, CancellationToken cancellationToken)
     {
         var task = await _context.CalendarItems
+            .Include(t => t.Reminders)
+            .Include(t => t.Participants)
             .FirstOrDefaultAsync(t => t.Id == request.TaskId, cancellationToken)
             ?? throw new NotFoundException(nameof(CalendarItem), request.TaskId);
 
@@ -64,6 +66,20 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
         task.ManualUrgencyOverride = request.ManualUrgencyOverride;
         task.ManualUrgencyOverrideExpiresAtUtc = request.ManualUrgencyOverrideExpiresAtUtc;
 
+        // Alerts: an imported event's belong to Google (the next sync would overwrite ours), everything else to the person. A caller that
+        // sends no list (a quick action such as "done", an older app) leaves them as they are.
+        if (request.Reminders is not null && !(task.IsExternal && !task.IsGoogleTask))
+        {
+            TaskReminders.Replace(_context, task, TaskReminders.Resolve(request.Reminders, task));
+        }
+
+        // Guests / co-contractors: the same "no list = no change". The assignee is never also a participant, so handing the item to one of
+        // its participants quietly moves them from the list to the assignee.
+        var participantIds = request.ParticipantUserIds is null
+            ? task.Participants.Select(p => p.UserId).Where(id => id != task.AssignedUserId).ToList()
+            : await TaskParticipants.ResolveAsync(_context, task, request.ParticipantUserIds, cancellationToken);
+        var participantChanges = TaskParticipants.Replace(_context, task, participantIds);
+
         var nowUtc = DateTime.UtcNow;
         task.UpdatedAtUtc = nowUtc;
 
@@ -82,13 +98,14 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
                     : TaskChangeType.FieldUpdated
         });
 
-        await TaskNotifications.OnUpdatedAsync(_context, _notifications, task, before, request.UpdatedByUserId, cancellationToken);
+        await TaskNotifications.OnUpdatedAsync(
+            _context, _notifications, task, before, request.UpdatedByUserId, participantChanges, participantIds, cancellationToken);
 
         await _context.SaveChangesAsync(cancellationToken);
 
         await TeamUrgencyRecalculator.InvalidateCachesAsync(_cache, task.TeamId, changedTaskIds.Append(task.Id), cancellationToken);
 
-        return TaskDto.FromEntity(task);
+        return TaskDto.FromEntity(task) with { ParticipantUserIds = participantIds };
     }
 
     /// <summary>

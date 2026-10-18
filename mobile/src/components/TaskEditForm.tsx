@@ -5,10 +5,12 @@ import { colors, radius, spacing, typography } from '../theme/theme';
 import { AssigneePicker } from './AssigneePicker';
 import { DeadlinePicker } from './DeadlinePicker';
 import { DurationInput } from './DurationInput';
+import { ParticipantPicker } from './ParticipantPicker';
+import { RemindersEditor } from './RemindersEditor';
 import { ScheduleForm } from './ScheduleForm';
 import type { ApiError } from '../types/api';
 import type { TeamMemberDto } from '../types/team';
-import { TaskType, type ScheduleFields, type TaskDto } from '../types/task';
+import { TaskType, type ReminderDto, type ReminderInput, type ScheduleFields, type TaskDto } from '../types/task';
 import { formatWhen } from '../utils/itemDisplay';
 import {
   pickerToWireDay,
@@ -19,6 +21,7 @@ import {
   validateSchedule,
   wireDayToPicker,
 } from '../utils/schedule';
+import { fitReminders, toReminderInput, validateReminders, type ReminderContext } from '../utils/reminders';
 import { rulesFor } from '../utils/templateRules';
 import { normalizeStatus, STATUS_LABEL, statusesFor } from '../utils/taskStatus';
 
@@ -27,11 +30,13 @@ type Props = {
   members: TeamMemberDto[];
   // Owner/Admin may reassign; a Member keeps the task on themselves (the API rejects anything else).
   canAssign: boolean;
+  // The item's alerts as the detail view loaded them (the task itself does not carry them).
+  reminders?: ReminderDto[];
   onSaved: () => void;
   onCancel: () => void;
 };
 
-export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Props) {
+export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onCancel }: Props) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
   const [schedule, setSchedule] = useState<ScheduleFields>(() => scheduleForEditing(task));
@@ -52,7 +57,23 @@ export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Pr
   const [effort, setEffort] = useState<number | null>(task.estimatedEffortHours);
   const [start, setStart] = useState<string | null>(() => wireDayToPicker(task.startUtc));
   const [deadline, setDeadline] = useState<string | null>(() => wireDayToPicker(task.deadlineUtc));
+  const [alerts, setAlerts] = useState<ReminderInput[]>(() => (reminders ?? []).map(toReminderInput));
+  const [participants, setParticipants] = useState<string[]>(task.participantUserIds ?? []);
   const [error, setError] = useState<string | null>(null);
+
+  // An imported event's alerts and people are Google's (shown on the detail screen, not edited here); a task from Google Tasks has
+  // none in Google, so its alerts are the person's own.
+  const ownAlerts = rules.allowsAlerts && (!imported || googleTask);
+  const reminderContext: ReminderContext = {
+    taskType: schedule.taskType,
+    allowsAlerts: rules.allowsAlerts,
+    isAllDay: schedule.isAllDay,
+    hasStart: googleTask ? start !== null : schedule.startUtc !== null,
+    hasDeadline: googleTask ? (task.isDeadlineDefaulted ? deadline !== null : task.deadlineUtc !== null) : schedule.deadlineUtc !== null,
+  };
+  const shownAlerts = fitReminders(alerts, reminderContext);
+  const canInvite = members.length > 1 && (!imported || googleTask) && (schedule.taskType === TaskType.Task || rules.allowsGuests);
+  const shownParticipants = canInvite ? participants.filter((id) => id !== assignedUserId) : [];
 
   const save = async () => {
     const trimmedTitle = title.trim();
@@ -77,6 +98,11 @@ export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Pr
       setError(scheduleError);
       return;
     }
+    const alertsError = ownAlerts ? validateReminders(shownAlerts, reminderContext) : null;
+    if (alertsError) {
+      setError(alertsError);
+      return;
+    }
 
     setSaving(true);
     setError(null);
@@ -93,6 +119,8 @@ export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Pr
                 impactScore: rules.informational ? null : impactNumber,
                 estimatedEffortHours: rules.informational ? task.estimatedEffortHours : effort,
                 ...(googleTask ? { startUtc: startDay, deadlineUtc: deadlineDay } : {}),
+                ...(ownAlerts ? { reminders: shownAlerts } : {}),
+                ...(canInvite ? { participantUserIds: shownParticipants } : {}),
               }
             : {
                 title: trimmedTitle,
@@ -101,6 +129,8 @@ export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Pr
                 assignedUserId,
                 impactScore: rules.informational ? null : impactNumber,
                 ...scheduleForRequest(schedule),
+                ...(ownAlerts ? { reminders: shownAlerts } : {}),
+                ...(canInvite ? { participantUserIds: shownParticipants } : {}),
               },
         ),
       );
@@ -160,6 +190,10 @@ export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Pr
         </>
       )}
 
+      {ownAlerts ? (
+        <RemindersEditor value={shownAlerts} onChange={setAlerts} taskType={schedule.taskType} isAllDay={schedule.isAllDay} />
+      ) : null}
+
       {rules.informational ? null : (
         <>
           <Text style={styles.sectionTitle}>PlanFlow</Text>
@@ -214,6 +248,16 @@ export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Pr
 
       {canAssign && members.length > 1 ? (
         <AssigneePicker members={members} value={assignedUserId} onChange={setAssignedUserId} />
+      ) : null}
+
+      {canInvite ? (
+        <ParticipantPicker
+          members={members}
+          assigneeId={assignedUserId}
+          value={shownParticipants}
+          onChange={setParticipants}
+          label={schedule.taskType === TaskType.Task ? 'Co-contractors' : 'Guests'}
+        />
       ) : null}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}

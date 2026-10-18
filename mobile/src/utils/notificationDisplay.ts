@@ -22,6 +22,12 @@ export function notificationIcon(event: NotificationEvent): NotificationIcon {
       return { name: 'add-circle-outline', color: colors.primary };
     case NotificationEvent.TaskUrgent:
       return { name: 'flame-outline', color: colors.urgencyCritical };
+    case NotificationEvent.ItemReminder:
+      return { name: 'alarm-outline', color: colors.primary };
+    case NotificationEvent.ParticipantAdded:
+      return { name: 'people-circle-outline', color: colors.success };
+    case NotificationEvent.ParticipantRemoved:
+      return { name: 'people-circle-outline', color: colors.textMuted };
     case NotificationEvent.AddedToTeam:
     case NotificationEvent.TeamRoleChanged:
       return { name: 'people-outline', color: colors.success };

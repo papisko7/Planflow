@@ -5,6 +5,7 @@ using PlanFlow.Api.Common;
 using PlanFlow.Api.Contracts;
 using PlanFlow.Application.Tasks.Commands.CreateTask;
 using PlanFlow.Application.Tasks.Commands.DeleteTask;
+using PlanFlow.Application.Tasks.Commands.LeaveTask;
 using PlanFlow.Application.Tasks.Commands.UpdateTask;
 using PlanFlow.Application.Tasks.Queries.GetTaskDetail;
 using PlanFlow.Application.Tasks.Queries.GetTaskScoreHistory;
@@ -76,7 +77,9 @@ public class TasksController : ControllerBase
                 request.IsAllDay,
                 request.Location,
                 request.ColorKey,
-                request.IsBusy),
+                request.IsBusy,
+                request.Reminders,
+                request.ParticipantUserIds),
             cancellationToken);
 
         return CreatedAtAction(nameof(GetTask), new { taskId = task.Id }, task);
@@ -176,10 +179,29 @@ public class TasksController : ControllerBase
                 keepTemplate ? stored.IsAllDay : request.IsAllDay,
                 keepTemplate ? stored.Location : request.Location,
                 keepTemplate ? stored.ColorKey : request.ColorKey,
-                keepTemplate ? stored.IsBusy : request.IsBusy),
+                keepTemplate ? stored.IsBusy : request.IsBusy,
+                request.Reminders,
+                request.ParticipantUserIds),
             cancellationToken);
 
         return Ok(task);
+    }
+
+    // A guest of an event / co-contractor of a task steps out of it. Any member of the team can ask: the command only ever ends the
+    // caller's own participation (404 when they are not one), so nobody can remove somebody else this way.
+    [HttpDelete("api/tasks/{taskId:guid}/participants/me")]
+    [Authorize(Policy = nameof(Permission.ViewTasks))]
+    public async Task<IActionResult> LeaveTask(Guid taskId, CancellationToken cancellationToken)
+    {
+        var existing = await _sender.Send(new GetTaskDetailQuery(taskId), cancellationToken);
+
+        if (User.GetTeamId() != existing.Task.TeamId)
+        {
+            return Forbid();
+        }
+
+        await _sender.Send(new LeaveTaskCommand(taskId, User.GetUserId()), cancellationToken);
+        return NoContent();
     }
 
     [HttpDelete("api/tasks/{taskId:guid}")]

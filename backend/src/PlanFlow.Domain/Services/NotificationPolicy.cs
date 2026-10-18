@@ -47,7 +47,9 @@ public static class NotificationPolicy
         return evt switch
         {
             NotificationEvent.NewDeviceLogin => prefs.LoginAlerts != LoginNotificationMode.Off,
-            NotificationEvent.TaskAssignedToYou or NotificationEvent.TaskUnassigned => prefs.TaskAssignments,
+            NotificationEvent.TaskAssignedToYou or NotificationEvent.TaskUnassigned
+                or NotificationEvent.ParticipantAdded or NotificationEvent.ParticipantRemoved => prefs.TaskAssignments,
+            NotificationEvent.ItemReminder => prefs.ItemReminders,
             NotificationEvent.TaskChanged or NotificationEvent.TaskDeleted => prefs.TaskChanges,
             NotificationEvent.TeamTaskAdded => prefs.TeamTasks,
             NotificationEvent.TaskUrgent => prefs.TaskUrgency,
@@ -77,6 +79,7 @@ public static class NotificationPolicy
     {
         NotificationEvent.TaskAssignedToYou or NotificationEvent.TaskUnassigned or NotificationEvent.TaskChanged
             or NotificationEvent.TaskDeleted or NotificationEvent.TeamTaskAdded or NotificationEvent.TaskUrgent
+            or NotificationEvent.ItemReminder or NotificationEvent.ParticipantAdded or NotificationEvent.ParticipantRemoved
             or NotificationEvent.IncompleteItemsReminder => muteNotifications,
         NotificationEvent.ChatDigest => muteChat,
         _ => false

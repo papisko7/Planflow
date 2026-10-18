@@ -18,6 +18,7 @@ export interface NotificationPreferences {
   chatDigest: boolean;
   calendarIssues: boolean;
   incompleteItemsReminder: boolean;
+  itemReminders: boolean;
 }
 
 // The on/off switches (everything except loginAlerts), in the order they are shown.
@@ -37,6 +38,9 @@ export enum NotificationEvent {
   TaskDeleted = 13,
   TeamTaskAdded = 14,
   TaskUrgent = 15,
+  ItemReminder = 16,
+  ParticipantAdded = 17,
+  ParticipantRemoved = 18,
   AddedToTeam = 20,
   TeamRoleChanged = 21,
   RemovedFromTeam = 22,

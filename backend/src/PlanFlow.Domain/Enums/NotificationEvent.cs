@@ -18,6 +18,15 @@ public enum NotificationEvent
     TeamTaskAdded = 14,
     TaskUrgent = 15,
 
+    /// <summary>One of an item's own reminders ("30 minutes before the start") went off.</summary>
+    ItemReminder = 16,
+
+    /// <summary>You were invited to an event as a guest / to a task as a co-contractor.</summary>
+    ParticipantAdded = 17,
+
+    /// <summary>You were taken off an event / task you took part in as a guest / co-contractor.</summary>
+    ParticipantRemoved = 18,
+
     // Team membership
     AddedToTeam = 20,
     TeamRoleChanged = 21,

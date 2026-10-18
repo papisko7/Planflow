@@ -37,6 +37,7 @@ public class GetTasksByTeamQueryHandler : IRequestHandler<GetTasksByTeamQuery, I
             {
                 Item = t,
                 ListTitle = t.ExternalTaskList == null ? null : t.ExternalTaskList.Title,
+                ParticipantIds = t.Participants.OrderBy(p => p.CreatedAtUtc).Select(p => p.UserId),
                 Reason = t.UrgencyScoreLogs.OrderByDescending(l => l.CreatedAtUtc).Select(l => l.ReasonText).FirstOrDefault()
             })
             .ToListAsync(cancellationToken);
@@ -46,6 +47,7 @@ public class GetTasksByTeamQueryHandler : IRequestHandler<GetTasksByTeamQuery, I
             .Select(r => TaskDto.FromEntity(r.Item) with
             {
                 GoogleTaskListTitle = r.ListTitle,
+                ParticipantUserIds = r.ParticipantIds.ToList(),
                 ReasonText = CalendarItemUrgencyScoreFactory.IsRanked(r.Item) ? r.Reason : null
             })
             .ToList();

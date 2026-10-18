@@ -4,7 +4,7 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import { TaskEditForm } from '../components/TaskEditForm';
 import { UrgencyBreakdown } from '../components/UrgencyBreakdown';
 import { getCurrentUserId } from '../services/authService';
-import { deleteTask, getTask, getTeamTasks, updateTask } from '../services/taskService';
+import { deleteTask, getTask, getTeamTasks, leaveTask, updateTask } from '../services/taskService';
 import { getTeamMembers } from '../services/teamService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { formatDuration } from '../utils/duration';
@@ -116,6 +116,7 @@ export default function TaskDetailScreen() {
   const recurrence = formatRecurrence(task);
   const recurrenceEnd = formatDateTime(task.recurrenceEndsAtUtc);
   const createdDate = formatDateTime(task.createdAtUtc);
+  const participantIds = task.participantUserIds ?? [];
 
   // Same rule as the API: Owner/Admin act on any task, a Member only on tasks assigned to them.
   const myUserId = getCurrentUserId();
@@ -158,6 +159,19 @@ export default function TaskDetailScreen() {
   const abandon = () => changeAssignee(null, 'Failed to abandon the task.');
   const isMine = myUserId !== null && task.assignedUserId === myUserId;
 
+  // The guests of an event / co-contractors of a task, by name; a guest or co-contractor can step out of it (not edit it).
+  const participantNames = participantIds.map((id) => members.find((m) => m.userId === id)?.userDisplayName ?? 'Former member');
+  const isParticipant = myUserId !== null && participantIds.includes(myUserId);
+  const leave = async () => {
+    setActionError(null);
+    try {
+      await leaveTask(task.id, task.teamId);
+      await load(true);
+    } catch (err) {
+      setActionError((err as ApiError).message ?? 'Failed to leave.');
+    }
+  };
+
   const confirmDelete = () => {
     Alert.alert(`Delete "${task.title}"?`, undefined, [
       { text: 'Cancel', style: 'cancel' },
@@ -189,6 +203,7 @@ export default function TaskDetailScreen() {
             task={task}
             members={members}
             canAssign={isPrivileged}
+            reminders={detail.reminders}
             onCancel={() => setEditing(false)}
             onSaved={() => {
               setEditing(false);
@@ -231,18 +246,24 @@ export default function TaskDetailScreen() {
           {task.colorKey ? (
             <MetaItem label="Colour" value={colorHex(task.colorKey) ? colorLabel(task.colorKey) : formatColorKey(task.colorKey)} swatch={colorHex(task.colorKey)} />
           ) : null}
-          {reminders.length > 0 ? <MetaItem label="Reminders" value={reminders.map(formatReminder).join('\n')} /> : null}
+          {reminders.length > 0 ? <MetaItem label="Reminders" value={reminders.map((r) => formatReminder(r, task.taskType)).join('\n')} /> : null}
           {task.externalSettings ? <MetaItem label="Google settings" value={task.externalSettings} /> : null}
           {recurrence ? (
             <MetaItem label="Repeats" value={recurrenceEnd ? `${recurrence}, until ${recurrenceEnd}` : recurrence} />
           ) : null}
           {ranked ? <MetaItem label="Impact score" value={task.impactScore === null ? "Not rated" : String(task.impactScore)} /> : null}
           <MetaItem label="Assigned to" value={assigneeName} />
+          {participantNames.length > 0 ? <MetaItem label={isEvent ? 'Guests' : 'Co-contractors'} value={participantNames.join(', ')} /> : null}
         </View>
 
         {!task.assignedUserId && !editing ? (
           <Pressable testID="task-claim-button" style={styles.editButton} onPress={claim}>
             <Text style={styles.editButtonText}>Take over this task</Text>
+          </Pressable>
+        ) : null}
+        {isParticipant && !editing ? (
+          <Pressable testID="task-leave-button" style={styles.editButton} onPress={leave}>
+            <Text style={styles.editButtonText}>{isEvent ? 'Leave this event' : 'Leave this task'}</Text>
           </Pressable>
         ) : null}
         {isMine && !editing ? (

@@ -25,6 +25,9 @@ public class NotificationPreference : BaseEntity
     /// <summary>A task was assigned to you or taken away from you.</summary>
     public bool TaskAssignments { get; set; } = true;
 
+    /// <summary>The reminders ("alerts") set on your events and tasks, e.g. "30 minutes before".</summary>
+    public bool ItemReminders { get; set; } = true;
+
     /// <summary>Someone else edited or deleted a task assigned to you.</summary>
     public bool TaskChanges { get; set; } = true;
 

@@ -22,6 +22,7 @@ public class PlanFlowDbContext : DbContext, IApplicationDbContext
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
     public DbSet<CalendarItem> CalendarItems => Set<CalendarItem>();
     public DbSet<ItemReminder> ItemReminders => Set<ItemReminder>();
+    public DbSet<ItemParticipant> ItemParticipants => Set<ItemParticipant>();
     public DbSet<TaskHistory> TaskHistories => Set<TaskHistory>();
     public DbSet<UrgencyScoreLog> UrgencyScoreLogs => Set<UrgencyScoreLog>();
     public DbSet<CalendarIntegration> CalendarIntegrations => Set<CalendarIntegration>();

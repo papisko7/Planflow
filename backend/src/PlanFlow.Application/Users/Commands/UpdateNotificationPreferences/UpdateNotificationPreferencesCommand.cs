@@ -58,6 +58,7 @@ public class UpdateNotificationPreferencesCommandHandler : IRequestHandler<Updat
         preferences.ChatDigest = dto.ChatDigest;
         preferences.CalendarIssues = dto.CalendarIssues;
         preferences.IncompleteItemsReminder = dto.IncompleteItemsReminder;
+        preferences.ItemReminders = dto.ItemReminders;
         preferences.UpdatedAtUtc = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);

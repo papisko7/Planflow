@@ -140,4 +140,7 @@ public class CalendarItem : BaseEntity
     public ICollection<UrgencyScoreLog> UrgencyScoreLogs { get; set; } = new List<UrgencyScoreLog>();
     public ICollection<Alert> Alerts { get; set; } = new List<Alert>();
     public ICollection<ItemReminder> Reminders { get; set; } = new List<ItemReminder>();
+
+    /// <summary>Guests of an event / co-contractors of a task, besides <see cref="AssignedUserId"/>.</summary>
+    public ICollection<ItemParticipant> Participants { get; set; } = new List<ItemParticipant>();
 }

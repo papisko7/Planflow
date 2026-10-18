@@ -30,12 +30,28 @@ export enum EventTemplate {
   Birthday = 4,
 }
 
-// Mirrors PlanFlow.Application.Tasks.Common.ReminderDto. Offset form: offsetMinutes before the start.
+// Mirrors backend PlanFlow.Domain.Enums.ReminderAnchor (plain int on the wire): what a reminder counts back from.
+// An event's reminders always count from its start; a task may use its planned start or its deadline.
+export enum ReminderAnchor {
+  Start = 0,
+  Deadline = 1,
+}
+
+// Mirrors PlanFlow.Application.Tasks.Common.ReminderDto. Offset form: offsetMinutes before the anchor.
 // Day form: daysBefore whole days earlier, at timeOfDayMinutes after midnight. The fields of the other form are null.
 export interface ReminderDto {
   offsetMinutes: number | null;
   daysBefore: number | null;
   timeOfDayMinutes: number | null;
+  anchor?: ReminderAnchor; // absent on older servers: the start
+}
+
+// Mirrors PlanFlow.Application.Tasks.Common.ReminderInput: one alert as the form sends it (the same shape as ReminderDto, anchor always set).
+export interface ReminderInput {
+  offsetMinutes: number | null;
+  daysBefore: number | null;
+  timeOfDayMinutes: number | null;
+  anchor: ReminderAnchor;
 }
 
 // Mirrors PlanFlow.Application.Tasks.Common.TaskDto
@@ -81,6 +97,8 @@ export interface TaskDto {
   // The Google Tasks list an imported task belongs to (the Items tab groups such tasks by it); null for everything else.
   googleTaskListId: string | null;
   googleTaskListTitle: string | null;
+  // The guests of an event / co-contractors of a task (not the assignee), as user ids. Empty for older servers' rows.
+  participantUserIds: string[];
   // Latest "[Priority] why" sentence; only the team list endpoint fills it.
   reasonText?: string | null;
 }
@@ -104,7 +122,7 @@ export interface UrgencyScoreBreakdownDto {
 export interface TaskDetailDto {
   task: TaskDto;
   latestScoreBreakdown: UrgencyScoreBreakdownDto | null;
-  reminders?: ReminderDto[]; // imported from Google for now; absent on older servers
+  reminders?: ReminderDto[]; // the item's alerts (imported from Google for an event of Google's); absent on older servers
 }
 
 // The scheduling and template fields shared by the create and update requests (type, template, dates, effort, recurrence,
@@ -132,6 +150,8 @@ export interface CreateTaskRequest extends ScheduleFields {
   assignedUserId: string | null;
   impactScore: number | null;
   blockedByTaskId: string | null;
+  reminders?: ReminderInput[];
+  participantUserIds?: string[];
 }
 
 // Mirrors PlanFlow.Api.Contracts.UpdateTaskRequest
@@ -145,6 +165,9 @@ export interface UpdateTaskRequest extends ScheduleFields {
   manualUrgencyOverride: number | null;
   manualUrgencyOverrideExpiresAtUtc: string | null;
   useAiEnhancement: boolean;
+  // Both lists: left out = the server keeps what it has (quick actions send neither); a list - even an empty one - replaces it.
+  reminders?: ReminderInput[];
+  participantUserIds?: string[];
 }
 
 // A task plus the name of its team (resolved client-side from the teams list) for display.

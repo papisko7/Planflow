@@ -408,7 +408,7 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.ToTable("external_task_lists", (string)null);
                 });
 
-            modelBuilder.Entity("PlanFlow.Domain.Entities.ItemReminder", b =>
+            modelBuilder.Entity("PlanFlow.Domain.Entities.ItemParticipant", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -420,8 +420,45 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("Role")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("CalendarItemId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("item_participants", (string)null);
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.ItemReminder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Anchor")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("CalendarItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int?>("DaysBefore")
                         .HasColumnType("integer");
+
+                    b.Property<DateTime?>("LastFiredForUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int?>("OffsetMinutes")
                         .HasColumnType("integer");
@@ -523,6 +560,9 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IncompleteItemsReminder")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ItemReminders")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime?>("LastChatDigestSentAtUtc")
@@ -1026,6 +1066,25 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("CalendarIntegration");
                 });
 
+            modelBuilder.Entity("PlanFlow.Domain.Entities.ItemParticipant", b =>
+                {
+                    b.HasOne("PlanFlow.Domain.Entities.CalendarItem", "CalendarItem")
+                        .WithMany("Participants")
+                        .HasForeignKey("CalendarItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PlanFlow.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CalendarItem");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("PlanFlow.Domain.Entities.ItemReminder", b =>
                 {
                     b.HasOne("PlanFlow.Domain.Entities.CalendarItem", "CalendarItem")
@@ -1158,6 +1217,8 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("BlockedTasks");
 
                     b.Navigation("History");
+
+                    b.Navigation("Participants");
 
                     b.Navigation("Reminders");
 

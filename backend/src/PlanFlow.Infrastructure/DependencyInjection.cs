@@ -125,6 +125,7 @@ public static class DependencyInjection
             AddIntervalJob<SyncTasksJob>(quartz, "SyncTasksJob", TimeSpan.FromMinutes(5));
             AddIntervalJob<PrioritizationJob>(quartz, "PrioritizationJob", TimeSpan.FromHours(1));
             AddIntervalJob<AlertingJob>(quartz, "AlertingJob", TimeSpan.FromMinutes(1));
+            AddIntervalJob<ItemReminderJob>(quartz, "ItemReminderJob", TimeSpan.FromMinutes(1));
             AddIntervalJob<EmailOutboxJob>(quartz, "EmailOutboxJob", TimeSpan.FromSeconds(30));
             AddIntervalJob<PushDeliveryJob>(quartz, "PushDeliveryJob", TimeSpan.FromSeconds(10));
             AddIntervalJob<ChatDigestJob>(quartz, "ChatDigestJob", TimeSpan.FromMinutes(15));

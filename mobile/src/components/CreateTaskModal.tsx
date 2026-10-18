@@ -16,12 +16,15 @@ import { createTask } from '../services/taskService';
 import { getTeamMembers } from '../services/teamService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { AssigneePicker } from './AssigneePicker';
+import { ParticipantPicker } from './ParticipantPicker';
+import { RemindersEditor } from './RemindersEditor';
 import { ScheduleForm } from './ScheduleForm';
 import type { ApiError } from '../types/api';
 import { TeamRole, type TeamDto, type TeamMemberDto } from '../types/team';
-import { TaskType, type ScheduleFields, type TaskDto } from '../types/task';
+import { TaskType, type ReminderInput, type ScheduleFields, type TaskDto } from '../types/task';
 import { isFinishedStatus } from '../utils/taskStatus';
 import { emptySchedule, scheduleForRequest, validateSchedule } from '../utils/schedule';
+import { fitReminders, validateReminders, type ReminderContext } from '../utils/reminders';
 import { rulesFor } from '../utils/templateRules';
 
 type Props = {
@@ -49,6 +52,9 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
   const [impactScore, setImpactScore] = useState('');
   const [blockedByTaskId, setBlockedByTaskId] = useState<string | null>(null);
   const [assignedUserId, setAssignedUserId] = useState<string | null>(myUserId);
+  // Alerts and the people invited besides the assignee (guests of an event / co-contractors of a task).
+  const [reminders, setReminders] = useState<ReminderInput[]>([]);
+  const [participants, setParticipants] = useState<string[]>([]);
   const [members, setMembers] = useState<TeamMemberDto[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +68,8 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
     setImpactScore('');
     setBlockedByTaskId(null);
     setAssignedUserId(myUserId);
+    setReminders([]);
+    setParticipants([]);
     setError(null);
     const preferred = teams.find((t) => t.id === defaultTeamId) ?? teams[0];
     setTeamId(preferred?.id ?? null);
@@ -93,6 +101,19 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
   // What the chosen kind has: an Out of office / Focus time / Working location / Birthday item has no description (some),
   // no Impact and no blocker - those are PlanFlow's scoring fields and these kinds are not ranked.
   const rules = rulesFor(schedule.taskType, schedule.eventTemplate);
+  // Alerts that no longer fit after a change of kind are left out (and come back if the person switches back).
+  const reminderContext: ReminderContext = {
+    taskType: schedule.taskType,
+    allowsAlerts: rules.allowsAlerts,
+    isAllDay: schedule.isAllDay,
+    hasStart: schedule.startUtc !== null,
+    hasDeadline: schedule.deadlineUtc !== null,
+  };
+  const shownReminders = fitReminders(reminders, reminderContext);
+  // Guests of an event / co-contractors of a task need other people: not in a personal workspace, not for a kind without guests.
+  const assigneeId = canAssign ? assignedUserId : myUserId;
+  const canInvite = !team?.isPersonal && members.length > 1 && (schedule.taskType === TaskType.Task || rules.allowsGuests);
+  const shownParticipants = canInvite ? participants.filter((id) => id !== assigneeId) : [];
   const blockerChoices = rules.informational ? [] : tasks.filter(
     (t) => t.teamId === teamId && !isFinishedStatus(t.status),
   );
@@ -108,6 +129,11 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
       setError(scheduleError);
       return;
     }
+    const alertsError = validateReminders(shownReminders, reminderContext);
+    if (alertsError) {
+      setError(alertsError);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -120,6 +146,8 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
         ...scheduleForRequest(schedule),
         impactScore: !rules.informational && impactScore.trim() && !Number.isNaN(impact) ? impact : null, // empty = not rated
         blockedByTaskId: rules.informational ? null : blockedByTaskId,
+        reminders: shownReminders,
+        participantUserIds: shownParticipants,
       });
       onCreated();
       onClose();
@@ -128,7 +156,7 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
     } finally {
       setSubmitting(false);
     }
-  }, [teamId, title, description, schedule, rules, impactScore, blockedByTaskId, canAssign, assignedUserId, myUserId, onCreated, onClose]);
+  }, [teamId, title, description, schedule, rules, impactScore, blockedByTaskId, canAssign, assignedUserId, myUserId, shownReminders, shownParticipants, reminderContext, onCreated, onClose]);
 
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
@@ -158,6 +186,9 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
               />
             ) : null}
             <ScheduleForm value={schedule} onChange={setSchedule} isNew />
+            {rules.allowsAlerts ? (
+              <RemindersEditor value={shownReminders} onChange={setReminders} taskType={schedule.taskType} isAllDay={schedule.isAllDay} />
+            ) : null}
             {rules.informational ? null : (
               <>
                 <Text style={styles.sectionTitle}>PlanFlow</Text>
@@ -198,6 +229,16 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
             ) : null}
 
             {canAssign ? <AssigneePicker members={members} value={assignedUserId} onChange={setAssignedUserId} /> : null}
+
+            {canInvite ? (
+              <ParticipantPicker
+                members={members}
+                assigneeId={assigneeId}
+                value={shownParticipants}
+                onChange={setParticipants}
+                label={schedule.taskType === TaskType.Task ? 'Co-contractors' : 'Guests'}
+              />
+            ) : null}
 
             {blockerChoices.length > 0 ? (
               <View>

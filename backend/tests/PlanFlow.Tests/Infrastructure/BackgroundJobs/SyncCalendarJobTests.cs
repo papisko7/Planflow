@@ -841,6 +841,26 @@ public class SyncCalendarJobTests
     }
 
     [Fact]
+    public async Task Execute_ReminderThatStaysInGoogle_KeepsItsRow_AndItsMemoryOfHavingGoneOff()
+    {
+        var (context, _) = SetUp();
+        var start = DateTime.UtcNow.AddDays(1);
+        GoogleCalendarEvent Event(params int[] minutes) => new("e1", "Meeting", start, start.AddHours(1), false, ReminderMinutes: minutes);
+
+        await SyncAsync(context, Event(10, 60));
+        var ten = await context.ItemReminders.SingleAsync(r => r.OffsetMinutes == 10);
+        ten.LastFiredForUtc = start.AddMinutes(-10);
+        await context.SaveChangesAsync();
+
+        await SyncAsync(context, Event(10, 120)); // 60 became 120; 10 is untouched
+
+        var kept = await context.ItemReminders.SingleAsync(r => r.OffsetMinutes == 10);
+        Assert.Equal(ten.Id, kept.Id);
+        Assert.Equal(start.AddMinutes(-10), kept.LastFiredForUtc);
+        Assert.Equal([10, 120], context.ItemReminders.Select(r => r.OffsetMinutes!.Value).OrderBy(m => m));
+    }
+
+    [Fact]
     public async Task Execute_SyncThatSaysNothingAboutReminders_LeavesTheStoredOnesAlone()
     {
         var (context, _) = SetUp();

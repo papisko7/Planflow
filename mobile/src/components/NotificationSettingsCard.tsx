@@ -16,6 +16,7 @@ type SwitchRow = { key: NotificationSwitch; label: string; hint?: string };
 const SWITCH_ROWS: SwitchRow[] = [
   { key: 'taskAssignments', label: 'Item assigned to you or taken from you' },
   { key: 'taskChanges', label: 'Someone edits or deletes your item' },
+  { key: 'itemReminders', label: 'Reminders of your items', hint: 'The alerts you set on an event or task, e.g. "30 minutes before".' },
   { key: 'teamTasks', label: 'New item in your teams', hint: 'Added by an owner or admin, even when it is not yours. Can be noisy.' },
   { key: 'taskUrgency', label: 'Your item becomes urgent', hint: 'Due within 24 h or a jump in urgency. At most once a day per item.' },
   { key: 'teamMembership', label: 'Team changes', hint: 'You are added or removed, your role changes, or the team is deleted.' },

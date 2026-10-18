@@ -1,4 +1,5 @@
 using FluentValidation;
+using PlanFlow.Domain.Entities;
 using PlanFlow.Domain.Services;
 
 namespace PlanFlow.Application.Tasks.Common;
@@ -20,6 +21,12 @@ public interface ITaskScheduleFields
     string? Location { get; }
     string? ColorKey { get; }
     bool IsBusy { get; }
+
+    /// <summary>The item's alerts. Null = the caller says nothing about them: a new item gets none, an edited one keeps what it has.</summary>
+    IReadOnlyList<ReminderInput>? Reminders { get; }
+
+    /// <summary>The guests / co-contractors besides the assignee. Null = the caller says nothing about them (as with <see cref="Reminders"/>).</summary>
+    IReadOnlyList<Guid>? ParticipantUserIds { get; }
 }
 
 public static class TaskScheduleMapper
@@ -81,6 +88,20 @@ public abstract class TaskScheduleValidator<T> : AbstractValidator<T> where T : 
             .Must(ItemColors.IsValid).WithMessage("Unknown colour.");
         RuleFor(x => x.Location)
             .MaximumLength(TaskScheduleMapper.MaxLocationLength);
+
+        // Alerts: the shape of each one and the count are checked here; what the item can carry (all-day, deadline, template) is checked
+        // by TaskReminders.Resolve once the item as it will be stored is known.
+        RuleFor(x => x.Reminders)
+            .Must(list => list!.Count <= ItemReminder.MaxPerItem)
+            .When(x => x.Reminders is not null)
+            .WithMessage($"An item can have at most {ItemReminder.MaxPerItem} alerts.");
+        RuleForEach(x => x.Reminders)
+            .Must(reminder => TaskReminders.Problem(reminder) is null)
+            .WithMessage((_, reminder) => TaskReminders.Problem(reminder) ?? "Invalid alert.")
+            .When(x => x.Reminders is not null);
+        RuleForEach(x => x.ParticipantUserIds)
+            .NotEqual(Guid.Empty)
+            .When(x => x.ParticipantUserIds is not null);
 
         // An all-day event is stored as whole days: midnight UTC of the first day, and (exclusive, as in Google) midnight UTC of
         // the day after the last one. The form builds exactly that; anything else would show on the wrong day for other time zones.

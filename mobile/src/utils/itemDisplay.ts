@@ -1,4 +1,4 @@
-import { EventTemplate, TaskType, type ReminderDto, type TaskDto } from '../types/task';
+import { EventTemplate, ReminderAnchor, TaskType, type ReminderDto, type TaskDto } from '../types/task';
 import { formatDuration, INTERVAL_UNITS } from './duration';
 import { allDayDays, utcDay } from './schedule';
 
@@ -49,19 +49,25 @@ export function formatColorKey(key: string): string {
 
 const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`;
 
-// "10 minutes before" / "1 day before at 09:00" / "On the day at 09:00".
-export function formatReminder(reminder: ReminderDto): string {
+// "10 minutes before" / "1 day before at 09:00" / "On the day at 09:00". An event's alerts count from its start, which the
+// short wording leaves unsaid; a task's say what they count from: "2 days before the deadline", "1 hour before the start".
+export function formatReminder(reminder: ReminderDto, type: TaskType = TaskType.Event): string {
+  const fromDeadline = reminder.anchor === ReminderAnchor.Deadline;
+  const target = fromDeadline ? 'the deadline' : 'the start';
+  const suffix = fromDeadline || type === TaskType.Task ? ` ${target}` : '';
+
   if (reminder.offsetMinutes !== null) {
     const m = reminder.offsetMinutes;
-    if (m === 0) return 'At the start';
-    if (m % 1440 === 0) return `${plural(m / 1440, 'day')} before`;
-    if (m % 60 === 0) return `${plural(m / 60, 'hour')} before`;
-    return `${plural(m, 'minute')} before`;
+    if (m === 0) return `At ${target}`;
+    if (m % 1440 === 0) return `${plural(m / 1440, 'day')} before${suffix}`;
+    if (m % 60 === 0) return `${plural(m / 60, 'hour')} before${suffix}`;
+    return `${plural(m, 'minute')} before${suffix}`;
   }
   const days = reminder.daysBefore ?? 0;
   const minuteOfDay = reminder.timeOfDayMinutes ?? 0;
   const time = `${String(Math.floor(minuteOfDay / 60)).padStart(2, '0')}:${String(minuteOfDay % 60).padStart(2, '0')}`;
-  return `${days === 0 ? 'On the day' : `${plural(days, 'day')} before`} at ${time}`;
+  const day = days === 0 ? (suffix ? `On the ${fromDeadline ? 'deadline' : 'start'} day` : 'On the day') : `${plural(days, 'day')} before${suffix}`;
+  return `${day} at ${time}`;
 }
 
 // "every 2 d" / null when the item does not repeat.

@@ -106,6 +106,64 @@ public static class EmailTemplates
             $"Your {Noun(type)} \"{taskTitle}\" is now very urgent (urgency {urgencyScore:P0}).",
             dueUtc is null ? null : $"{DueLabel(type)}: {Format(dueUtc.Value)}."));
 
+    /// <summary>
+    /// One of an item's own alerts went off. The first paragraph is what the push and the inbox show, so it says what is coming and when
+    /// ("Event "Standup" starts in 30 minutes"); the second gives the exact moment (a whole-day item shows its date only).
+    /// </summary>
+    public static Func<string, EmailContent> ItemReminder(
+        string title, TaskType type, ReminderAnchor anchor, DateTime anchorUtc, bool isAllDay,
+        int? offsetMinutes, int? daysBefore) => name => EmailLayout.Build(
+        $"Reminder: {Clean(title)}",
+        name,
+        Lines(
+            $"{Capitalized(type)} \"{title}\" {ReminderVerb(type, anchor)} {ReminderLead(offsetMinutes, daysBefore)}.",
+            $"{ReminderMomentLabel(type, anchor)}: {(isAllDay ? anchorUtc.ToString("yyyy-MM-dd") + " (all day)" : Format(anchorUtc))}."));
+
+    public static Func<string, EmailContent> ParticipantAdded(string title, string teamName, string byName, DateTime? dueUtc, TaskType type, bool isAllDay = false) => name => EmailLayout.Build(
+        $"You were added to the {Noun(type)}: {Clean(title)}",
+        name,
+        Lines(
+            $"{byName} added you as a {RoleWord(type)} to the {Noun(type)} \"{title}\" in the team \"{teamName}\".",
+            dueUtc is null ? null : $"{DueLabel(type)}: {(isAllDay ? dueUtc.Value.ToString("yyyy-MM-dd") + " (all day)" : Format(dueUtc.Value))}."));
+
+    public static Func<string, EmailContent> ParticipantRemoved(string title, string teamName, string byName, TaskType type) => name => EmailLayout.Build(
+        $"You were taken off the {Noun(type)}: {Clean(title)}",
+        name,
+        Lines($"{byName} removed you as a {RoleWord(type)} from the {Noun(type)} \"{title}\" in the team \"{teamName}\"."));
+
+    /// <summary>A guest of an event, a co-contractor of a task.</summary>
+    public static string RoleWord(TaskType type) => type == TaskType.Event ? "guest" : "co-contractor";
+
+    private static string ReminderVerb(TaskType type, ReminderAnchor anchor) =>
+        anchor == ReminderAnchor.Deadline ? "is due" : type == TaskType.Event ? "starts" : "is planned to start";
+
+    private static string ReminderMomentLabel(TaskType type, ReminderAnchor anchor) =>
+        anchor == ReminderAnchor.Deadline ? "Deadline" : type == TaskType.Event ? "Starts" : "Planned start";
+
+    /// <summary>"in 30 minutes", "in 2 hours", "in 3 days", "tomorrow", "today": how far ahead a reminder looks, in the words of the form that made it.</summary>
+    public static string ReminderLead(int? offsetMinutes, int? daysBefore)
+    {
+        if (offsetMinutes is { } minutes)
+        {
+            return minutes switch
+            {
+                0 => "now",
+                _ when minutes % (24 * 60) == 0 => Plural(minutes / (24 * 60), "day"),
+                _ when minutes % 60 == 0 => Plural(minutes / 60, "hour"),
+                _ => Plural(minutes, "minute")
+            };
+        }
+
+        return daysBefore switch
+        {
+            0 or null => "today",
+            1 => "tomorrow",
+            var days => $"in {days} days"
+        };
+
+        static string Plural(int count, string unit) => $"in {count} {unit}{(count == 1 ? "" : "s")}";
+    }
+
     /// <summary>"task" or "event": the word notifications use for an item of the given type.</summary>
     public static string Noun(TaskType type) => type == TaskType.Event ? "event" : "task";
 

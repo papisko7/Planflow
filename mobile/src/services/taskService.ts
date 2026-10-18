@@ -64,6 +64,14 @@ export function updateTask(taskId: string, teamId: string, request: UpdateTaskRe
   });
 }
 
+// A guest of an event / co-contractor of a task steps out of it (only ever their own participation).
+export function leaveTask(taskId: string, teamId: string): Promise<void> {
+  return runInTeamContext(teamId, async () => {
+    await http.delete(`/api/tasks/${taskId}/participants/me`);
+    invalidateAllTasksCache();
+  });
+}
+
 export function deleteTask(taskId: string, teamId: string): Promise<void> {
   return runInTeamContext(teamId, async () => {
     await http.delete(`/api/tasks/${taskId}`);

@@ -16,6 +16,9 @@ export interface TemplateRules {
   location: LocationMode;
   allowsColor: boolean;
   allowsDescription: boolean;
+  // Alerts (reminders) and guests. A Task has alerts but no guests: it has co-contractors instead (see PlanFlow EventTemplateRules).
+  allowsAlerts: boolean;
+  allowsGuests: boolean;
   busy: BusyMode;
   // Informational items (Out of office, Focus time, ...) have no Impact / Effort / score: they are shown in the calendar only.
   informational: boolean;
@@ -29,6 +32,8 @@ const TASK: TemplateRules = {
   location: 'none',
   allowsColor: true,
   allowsDescription: true,
+  allowsAlerts: true,
+  allowsGuests: false,
   busy: 'none',
   informational: false,
 };
@@ -42,6 +47,8 @@ const EVENT_RULES: Record<EventTemplate, TemplateRules> = {
     location: 'text',
     allowsColor: true,
     allowsDescription: true,
+    allowsAlerts: true,
+    allowsGuests: true,
     busy: 'choice',
     informational: false,
   },
@@ -53,6 +60,8 @@ const EVENT_RULES: Record<EventTemplate, TemplateRules> = {
     location: 'none',
     allowsColor: true,
     allowsDescription: false,
+    allowsAlerts: false,
+    allowsGuests: false,
     busy: 'none',
     informational: true,
   },
@@ -64,6 +73,8 @@ const EVENT_RULES: Record<EventTemplate, TemplateRules> = {
     location: 'text',
     allowsColor: true,
     allowsDescription: true,
+    allowsAlerts: true,
+    allowsGuests: false,
     busy: 'alwaysBusy',
     informational: true,
   },
@@ -75,6 +86,8 @@ const EVENT_RULES: Record<EventTemplate, TemplateRules> = {
     location: 'workingLocation',
     allowsColor: false,
     allowsDescription: false,
+    allowsAlerts: false,
+    allowsGuests: false,
     busy: 'none',
     informational: true,
   },
@@ -86,6 +99,8 @@ const EVENT_RULES: Record<EventTemplate, TemplateRules> = {
     location: 'none',
     allowsColor: true,
     allowsDescription: false,
+    allowsAlerts: true,
+    allowsGuests: false,
     busy: 'none',
     informational: true,
   },

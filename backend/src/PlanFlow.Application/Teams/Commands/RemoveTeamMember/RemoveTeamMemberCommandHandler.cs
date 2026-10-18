@@ -67,6 +67,12 @@ public class RemoveTeamMemberCommandHandler : IRequestHandler<RemoveTeamMemberCo
             task.UpdatedAtUtc = nowUtc;
         }
 
+        // Someone who left the team no longer takes part in its events and tasks as a guest / co-contractor either.
+        var participations = await _context.ItemParticipants
+            .Where(p => p.CalendarItem.TeamId == request.TeamId && p.UserId == request.MemberUserId)
+            .ToListAsync(cancellationToken);
+        _context.ItemParticipants.RemoveRange(participations);
+
         _context.TeamMembers.Remove(target);
 
         // Leaving on your own needs no e-mail (the actor is never notified of their own action).

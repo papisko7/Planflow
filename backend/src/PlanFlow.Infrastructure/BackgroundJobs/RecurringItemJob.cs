@@ -37,6 +37,8 @@ public class RecurringItemJob : IJob
         var nowUtc = DateTime.UtcNow;
 
         var recurring = await _context.CalendarItems
+            .Include(t => t.Reminders)
+            .Include(t => t.Participants)
             .Where(t => t.IsRecurring && (t.Status == TaskStatus.Completed || (t.TaskType == TaskType.Event && t.Status != TaskStatus.Cancelled)))
             .ToListAsync(cancellationToken);
 
@@ -64,6 +66,7 @@ public class RecurringItemJob : IJob
 
             _context.CalendarItems.Add(next);
             _context.TaskHistories.Add(new TaskHistory { CalendarItemId = next.Id, ChangeType = TaskChangeType.Created });
+            CarryOverAlertsAndPeople(item, next);
             created.Add(next);
         }
 
@@ -85,5 +88,28 @@ public class RecurringItemJob : IJob
 
         _logger.LogInformation("RecurringItemJob created {Created} new instances and closed {Closed} cycles.",
             created.Count, finished.Count - created.Count);
+    }
+
+    /// <summary>
+    /// The next occurrence is the same meeting / chore: it keeps the alerts (as fresh ones, not yet gone off) and the people taking part.
+    /// </summary>
+    private void CarryOverAlertsAndPeople(CalendarItem finished, CalendarItem next)
+    {
+        foreach (var reminder in finished.Reminders)
+        {
+            _context.ItemReminders.Add(new ItemReminder
+            {
+                CalendarItemId = next.Id,
+                Anchor = reminder.Anchor,
+                OffsetMinutes = reminder.OffsetMinutes,
+                DaysBefore = reminder.DaysBefore,
+                TimeOfDayMinutes = reminder.TimeOfDayMinutes
+            });
+        }
+
+        foreach (var participant in finished.Participants)
+        {
+            _context.ItemParticipants.Add(new ItemParticipant { CalendarItemId = next.Id, UserId = participant.UserId, Role = participant.Role });
+        }
     }
 }

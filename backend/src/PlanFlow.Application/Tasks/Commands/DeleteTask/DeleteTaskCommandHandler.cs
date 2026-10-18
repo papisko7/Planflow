@@ -29,11 +29,17 @@ public class DeleteTaskCommandHandler : IRequestHandler<DeleteTaskCommand>
             .FirstOrDefaultAsync(t => t.Id == request.TaskId, cancellationToken)
             ?? throw new NotFoundException(nameof(CalendarItem), request.TaskId);
 
+        // The guests / co-contractors are told too; their rows go with the task (cascade), so they are read before the delete.
+        var participantIds = await _context.ItemParticipants.AsNoTracking()
+            .Where(p => p.CalendarItemId == task.Id)
+            .Select(p => p.UserId)
+            .ToListAsync(cancellationToken);
+
         // TaskHistory/UrgencyScoreLog rows cascade-delete with the task (see TaskHistoryConfiguration),
         // so no separate "Deleted" audit entry is written here — it would be removed in the same transaction.
         _context.CalendarItems.Remove(task);
 
-        await TaskNotifications.OnDeletedAsync(_context, _notifications, task, request.DeletedByUserId, cancellationToken);
+        await TaskNotifications.OnDeletedAsync(_context, _notifications, task, request.DeletedByUserId, participantIds, cancellationToken);
 
         await _context.SaveChangesAsync(cancellationToken);
 

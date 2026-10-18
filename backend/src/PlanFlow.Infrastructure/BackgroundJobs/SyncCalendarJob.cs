@@ -362,18 +362,23 @@ public class SyncCalendarJob : IJob
         return (created, updated);
     }
 
-    /// <summary>Swaps the item's reminders for Google's list, but only when the two really differ (the common case: nothing to write).</summary>
+    /// <summary>
+    /// Makes the item's reminders equal to Google's list, touching only what differs (the common case: nothing to write). A reminder that
+    /// stays keeps its row, and with it the memory of having already gone off, so an unrelated change in Google does not send it again.
+    /// </summary>
     private void ReplaceRemindersIfChanged(CalendarItem item, IReadOnlyList<ItemReminder> fromGoogle)
     {
-        var stored = item.Reminders.Select(r => r.Key).OrderBy(k => k).ToList();
-        var incoming = fromGoogle.Select(r => r.Key).OrderBy(k => k).ToList();
-        if (stored.SequenceEqual(incoming))
+        var wanted = fromGoogle.Select(r => r.Key).ToHashSet();
+        var stale = item.Reminders.Where(r => !wanted.Contains(r.Key)).ToList();
+        var storedKeys = item.Reminders.Select(r => r.Key).ToHashSet();
+        var missing = fromGoogle.Where(r => !storedKeys.Contains(r.Key)).ToList();
+        if (stale.Count == 0 && missing.Count == 0)
         {
             return;
         }
 
-        _context.ItemReminders.RemoveRange(item.Reminders.ToList());
-        foreach (var reminder in fromGoogle)
+        _context.ItemReminders.RemoveRange(stale);
+        foreach (var reminder in missing)
         {
             reminder.CalendarItemId = item.Id;
             _context.ItemReminders.Add(reminder);

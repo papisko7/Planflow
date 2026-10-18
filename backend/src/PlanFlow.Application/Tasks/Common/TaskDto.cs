@@ -9,6 +9,7 @@ namespace PlanFlow.Application.Tasks.Common;
 /// <see cref="IsDeadlineDefaulted"/> marks a Google task that had no due day (its deadline is a placeholder the user can still set).
 /// <see cref="GoogleTaskListId"/> / <see cref="GoogleTaskListTitle"/> name the Google Tasks list an imported task belongs to (the title is filled by the queries that load it).
 /// <see cref="ReasonText"/> is the latest urgency explanation; only the list query fills it (null elsewhere).
+/// <see cref="ParticipantUserIds"/> are the guests of an event / co-contractors of a task (not the assignee); empty when the entity was loaded without them.
 /// </summary>
 public record TaskDto(
     Guid Id,
@@ -46,7 +47,8 @@ public record TaskDto(
     bool IsDeadlineDefaulted = false,
     Guid? GoogleTaskListId = null,
     string? GoogleTaskListTitle = null,
-    string? ReasonText = null)
+    string? ReasonText = null,
+    IReadOnlyList<Guid>? ParticipantUserIds = null)
 {
     public static TaskDto FromEntity(CalendarItem task) => new(
         task.Id,
@@ -83,5 +85,6 @@ public record TaskDto(
         task.IsExternal,
         task.IsDeadlineDefaulted,
         task.ExternalTaskListId,
-        task.ExternalTaskList?.Title);
+        task.ExternalTaskList?.Title,
+        ParticipantUserIds: task.Participants.OrderBy(p => p.CreatedAtUtc).Select(p => p.UserId).ToList());
 }

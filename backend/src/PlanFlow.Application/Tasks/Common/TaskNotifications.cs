@@ -23,7 +23,8 @@ public record TaskSnapshot(
 internal static class TaskNotifications
 {
     public static async Task OnCreatedAsync(
-        IApplicationDbContext context, INotificationService notifications, CalendarItem task, Guid? actorUserId, CancellationToken cancellationToken)
+        IApplicationDbContext context, INotificationService notifications, CalendarItem task, Guid? actorUserId,
+        IReadOnlyList<Guid> participantIds, CancellationToken cancellationToken)
     {
         var teamName = await NotificationLookups.TeamNameAsync(context, task.TeamId, cancellationToken);
         var actorName = await NotificationLookups.UserNameAsync(context, actorUserId, cancellationToken);
@@ -36,6 +37,8 @@ internal static class TaskNotifications
                 task.TeamId, actorUserId, cancellationToken, task.Id);
         }
 
+        await NotifyParticipantsAddedAsync(notifications, task, participantIds, teamName, actorName, actorUserId, cancellationToken);
+
         // "An admin or owner added a task to my team": only Owner/Admin additions are announced to the whole team,
         // and the assignee already got the more specific mail above.
         var actorRole = await context.TeamMembers.AsNoTracking()
@@ -45,7 +48,7 @@ internal static class TaskNotifications
         if (actorRole is { } role && RoleDefinitions.HasPermission(role, Permission.EditAnyTask))
         {
             var others = await context.TeamMembers.AsNoTracking()
-                .Where(m => m.TeamId == task.TeamId && m.UserId != task.AssignedUserId)
+                .Where(m => m.TeamId == task.TeamId && m.UserId != task.AssignedUserId && !participantIds.Contains(m.UserId))
                 .Select(m => m.UserId)
                 .ToListAsync(cancellationToken);
 
@@ -56,12 +59,25 @@ internal static class TaskNotifications
         }
     }
 
+    /// <param name="participantChanges">Who joined / left the item in this save.</param>
+    /// <param name="participantIds">Everybody who takes part after the save (the ones who stayed hear about the edit too).</param>
     public static async Task OnUpdatedAsync(
         IApplicationDbContext context, INotificationService notifications, CalendarItem task, TaskSnapshot before,
-        Guid? actorUserId, CancellationToken cancellationToken)
+        Guid? actorUserId, ParticipantChanges participantChanges, IReadOnlyList<Guid> participantIds, CancellationToken cancellationToken)
     {
         var teamName = await NotificationLookups.TeamNameAsync(context, task.TeamId, cancellationToken);
         var actorName = await NotificationLookups.UserNameAsync(context, actorUserId, cancellationToken);
+
+        // Someone who just became the assignee (they were a participant before) is told about the assignment, not about "being removed".
+        await NotifyParticipantsAddedAsync(notifications, task, participantChanges.Added, teamName, actorName, actorUserId, cancellationToken);
+        var removedForReal = participantChanges.Removed.Where(id => id != task.AssignedUserId).ToList();
+        if (removedForReal.Count > 0)
+        {
+            await notifications.NotifyAsync(
+                NotificationEvent.ParticipantRemoved, removedForReal,
+                EmailTemplates.ParticipantRemoved(task.Title, teamName, actorName, task.TaskType),
+                task.TeamId, actorUserId, cancellationToken);
+        }
 
         if (before.AssignedUserId != task.AssignedUserId)
         {
@@ -84,30 +100,44 @@ internal static class TaskNotifications
             return;
         }
 
-        // Same assignee before and after: they hear about edits made by somebody else.
+        // Same assignee before and after: they hear about edits made by somebody else, and so do the people who were already taking part
+        // (someone just added has the invitation mail, which says everything).
+        var changes = DescribeChanges(before, task);
+        if (changes.Count == 0)
+        {
+            return;
+        }
+
+        var recipients = participantIds.Where(id => !participantChanges.Added.Contains(id)).ToList();
         if (task.AssignedUserId is { } assignee)
         {
-            var changes = DescribeChanges(before, task);
-            if (changes.Count > 0)
-            {
-                await notifications.NotifyAsync(
-                    NotificationEvent.TaskChanged, new[] { assignee },
-                    EmailTemplates.TaskChanged(task.Title, teamName, actorName, changes, task.TaskType),
-                    task.TeamId, actorUserId, cancellationToken, task.Id);
-            }
+            recipients.Add(assignee);
         }
+
+        await notifications.NotifyAsync(
+            NotificationEvent.TaskChanged, recipients,
+            EmailTemplates.TaskChanged(task.Title, teamName, actorName, changes, task.TaskType),
+            task.TeamId, actorUserId, cancellationToken, task.Id);
     }
 
+    /// <param name="participantIds">The guests / co-contractors the item had, who hear about its deletion like the assignee.</param>
     public static async Task OnDeletedAsync(
-        IApplicationDbContext context, INotificationService notifications, CalendarItem task, Guid? actorUserId, CancellationToken cancellationToken)
+        IApplicationDbContext context, INotificationService notifications, CalendarItem task, Guid? actorUserId,
+        IReadOnlyList<Guid> participantIds, CancellationToken cancellationToken)
     {
-        if (task.AssignedUserId is not { } assignee)
+        var recipients = participantIds.ToList();
+        if (task.AssignedUserId is { } assignee)
+        {
+            recipients.Add(assignee);
+        }
+
+        if (recipients.Count == 0)
         {
             return;
         }
 
         await notifications.NotifyAsync(
-            NotificationEvent.TaskDeleted, new[] { assignee },
+            NotificationEvent.TaskDeleted, recipients,
             EmailTemplates.TaskDeleted(
                 task.Title,
                 await NotificationLookups.TeamNameAsync(context, task.TeamId, cancellationToken),
@@ -115,6 +145,16 @@ internal static class TaskNotifications
                 task.TaskType),
             task.TeamId, actorUserId, cancellationToken);
     }
+
+    private static Task NotifyParticipantsAddedAsync(
+        INotificationService notifications, CalendarItem task, IReadOnlyList<Guid> addedIds, string teamName, string actorName,
+        Guid? actorUserId, CancellationToken cancellationToken) =>
+        addedIds.Count == 0
+            ? Task.CompletedTask
+            : notifications.NotifyAsync(
+                NotificationEvent.ParticipantAdded, addedIds,
+                EmailTemplates.ParticipantAdded(task.Title, teamName, actorName, task.DueUtc, task.TaskType, task.IsAllDay),
+                task.TeamId, actorUserId, cancellationToken, task.Id);
 
     /// <summary>One short phrase per changed field; an empty list means nothing worth an e-mail changed.</summary>
     internal static List<string> DescribeChanges(TaskSnapshot before, CalendarItem after)

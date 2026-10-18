@@ -37,11 +37,12 @@ public record UrgencyScoreBreakdownDto(
 /// <summary>
 /// One reminder of an item. Offset form: <see cref="OffsetMinutes"/> before the start. Day form: <see cref="DaysBefore"/> whole days
 /// before, at <see cref="TimeOfDayMinutes"/> after midnight. The fields of the other form are null.
+/// <see cref="Anchor"/> is what it counts back from (the start, or a task's deadline).
 /// </summary>
-public record ReminderDto(int? OffsetMinutes, int? DaysBefore, int? TimeOfDayMinutes)
+public record ReminderDto(int? OffsetMinutes, int? DaysBefore, int? TimeOfDayMinutes, ReminderAnchor Anchor = ReminderAnchor.Start)
 {
     public static ReminderDto FromEntity(ItemReminder reminder) =>
-        new(reminder.OffsetMinutes, reminder.DaysBefore, reminder.TimeOfDayMinutes);
+        new(reminder.OffsetMinutes, reminder.DaysBefore, reminder.TimeOfDayMinutes, reminder.Anchor);
 }
 
 /// <summary>Full detail view for a single task: the task itself, its latest urgency breakdown and its reminders.</summary>

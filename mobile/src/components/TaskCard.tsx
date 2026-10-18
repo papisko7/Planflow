@@ -59,6 +59,10 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
   const isUnassigned = !task.assignedUserId;
   // Only the current assignee can abandon a task (the API enforces the same).
   const isMine = !!task.assignedUserId && task.assignedUserId === getCurrentUserId();
+  // Guests of an event / co-contractors of a task: shown as a head count, or as "You" when the viewer is one of them.
+  const participantIds = task.participantUserIds ?? [];
+  const me = getCurrentUserId();
+  const takesPart = !!me && participantIds.includes(me);
   const pendingTap = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
     () => () => {
@@ -117,6 +121,11 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
         {templateLabel ? <Text testID={`item-template-${task.id}`} style={styles.metaText}>{templateLabel}</Text> : null}
         {task.teamName ? <Text style={styles.teamChip}>👥 {task.teamName}</Text> : null}
         {!task.assignedUserId ? <Text style={styles.metaText}>👤 Unassigned</Text> : null}
+        {participantIds.length > 0 ? (
+          <Text testID={`item-people-${task.id}`} style={styles.metaText}>
+            🤝 {takesPart ? (participantIds.length === 1 ? 'You' : `You +${participantIds.length - 1}`) : `${participantIds.length}`}
+          </Text>
+        ) : null}
         {when ? <Text style={styles.metaText}>{isEvent ? '🗓' : '📅'} {when}</Text> : null}
         {task.location ? <Text style={styles.metaText}>📍 {task.location}</Text> : null}
         {!isEvent && task.estimatedEffortHours !== null ? (
