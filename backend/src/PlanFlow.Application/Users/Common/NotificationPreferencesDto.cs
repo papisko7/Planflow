@@ -14,9 +14,10 @@ public record NotificationPreferencesDto(
     bool TaskUrgency,
     bool TeamMembership,
     bool ChatDigest,
-    bool CalendarIssues)
+    bool CalendarIssues,
+    bool IncompleteItemsReminder)
 {
     public static NotificationPreferencesDto FromEntity(NotificationPreference p) => new(
         p.EmailEnabled, p.PushEnabled, p.LoginAlerts, p.TaskAssignments, p.TaskChanges, p.TeamTasks,
-        p.TaskUrgency, p.TeamMembership, p.ChatDigest, p.CalendarIssues);
+        p.TaskUrgency, p.TeamMembership, p.ChatDigest, p.CalendarIssues, p.IncompleteItemsReminder);
 }

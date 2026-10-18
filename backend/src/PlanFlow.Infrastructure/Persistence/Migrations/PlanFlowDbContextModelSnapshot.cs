@@ -425,7 +425,13 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Property<bool>("EmailEnabled")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IncompleteItemsReminder")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime?>("LastChatDigestSentAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastIncompleteReminderSentAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("LoginAlerts")

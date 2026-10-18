@@ -34,4 +34,8 @@ describe('notificationIcon', () => {
   it('shows incomplete imported events with the calendar icon, not the generic bell', () => {
     expect(notificationIcon(NotificationEvent.CalendarItemsIncomplete).name).toBe('calendar-outline');
   });
+
+  it('gives the daily "items need details" reminder its own icon', () => {
+    expect(notificationIcon(NotificationEvent.IncompleteItemsReminder).name).toBe('alert-circle-outline');
+  });
 });

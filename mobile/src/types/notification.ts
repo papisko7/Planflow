@@ -17,6 +17,7 @@ export interface NotificationPreferences {
   teamMembership: boolean;
   chatDigest: boolean;
   calendarIssues: boolean;
+  incompleteItemsReminder: boolean;
 }
 
 // The on/off switches (everything except loginAlerts), in the order they are shown.
@@ -42,6 +43,7 @@ export enum NotificationEvent {
   TeamDeleted = 23,
   CalendarConnectionLost = 40,
   CalendarItemsIncomplete = 41,
+  IncompleteItemsReminder = 42,
 }
 
 // Mirrors PlanFlow.Application.Notifications.Inbox.NotificationDto

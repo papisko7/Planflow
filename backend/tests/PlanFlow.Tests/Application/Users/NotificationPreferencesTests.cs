@@ -21,6 +21,7 @@ public class NotificationPreferencesTests
         Assert.True(prefs.TaskAssignments);
         Assert.False(prefs.TeamTasks);
         Assert.False(prefs.ChatDigest);
+        Assert.True(prefs.IncompleteItemsReminder); // the daily reminder is on unless switched off
         Assert.Empty(db.NotificationPreferences); // reading does not create a row
     }
 
@@ -29,7 +30,7 @@ public class NotificationPreferencesTests
     {
         var db = TestDb.Create();
         var user = await TestDb.AddUserAsync(db);
-        var custom = new NotificationPreferencesDto(false, false, LoginNotificationMode.Off, false, true, true, false, false, true, false);
+        var custom = new NotificationPreferencesDto(false, false, LoginNotificationMode.Off, false, true, true, false, false, true, false, false);
 
         await new UpdateNotificationPreferencesCommandHandler(db)
             .Handle(new UpdateNotificationPreferencesCommand(user.Id, custom), CancellationToken.None);
@@ -47,10 +48,10 @@ public class NotificationPreferencesTests
         var user = await TestDb.AddUserAsync(db);
         var handler = new UpdateNotificationPreferencesCommandHandler(db);
         await handler.Handle(new UpdateNotificationPreferencesCommand(user.Id,
-            new NotificationPreferencesDto(true, true, LoginNotificationMode.NewDevice, true, true, false, true, true, false, true)), CancellationToken.None);
+            new NotificationPreferencesDto(true, true, LoginNotificationMode.NewDevice, true, true, false, true, true, false, true, true)), CancellationToken.None);
 
         await handler.Handle(new UpdateNotificationPreferencesCommand(user.Id,
-            new NotificationPreferencesDto(false, true, LoginNotificationMode.EveryLogin, true, true, false, true, true, false, true)), CancellationToken.None);
+            new NotificationPreferencesDto(false, true, LoginNotificationMode.EveryLogin, true, true, false, true, true, false, true, true)), CancellationToken.None);
 
         var row = Assert.Single(db.NotificationPreferences);
         Assert.False(row.EmailEnabled);
@@ -65,7 +66,7 @@ public class NotificationPreferencesTests
         var bob = await TestDb.AddUserAsync(db);
 
         await new UpdateNotificationPreferencesCommandHandler(db).Handle(new UpdateNotificationPreferencesCommand(ann.Id,
-            new NotificationPreferencesDto(false, true, LoginNotificationMode.Off, false, false, false, false, false, false, false)), CancellationToken.None);
+            new NotificationPreferencesDto(false, true, LoginNotificationMode.Off, false, false, false, false, false, false, false, false)), CancellationToken.None);
 
         var bobs = await new GetNotificationPreferencesQueryHandler(db).Handle(new GetNotificationPreferencesQuery(bob.Id), CancellationToken.None);
         Assert.True(bobs.EmailEnabled);
@@ -74,7 +75,7 @@ public class NotificationPreferencesTests
     [Fact]
     public void Validator_RejectsUnknownLoginMode()
     {
-        var bad = new NotificationPreferencesDto(true, true, (LoginNotificationMode)99, true, true, false, true, true, false, true);
+        var bad = new NotificationPreferencesDto(true, true, (LoginNotificationMode)99, true, true, false, true, true, false, true, true);
 
         var result = new UpdateNotificationPreferencesCommandValidator().Validate(new UpdateNotificationPreferencesCommand(Guid.NewGuid(), bad));
 

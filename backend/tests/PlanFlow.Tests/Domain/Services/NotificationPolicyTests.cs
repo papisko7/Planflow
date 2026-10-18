@@ -46,6 +46,36 @@ public class NotificationPolicyTests
     }
 
     [Fact]
+    public void DailyReminder_ReachesInboxAndPush_ButNeverTheMailbox()
+    {
+        var prefs = Defaults();
+        var evt = NotificationEvent.IncompleteItemsReminder;
+
+        Assert.False(NotificationPolicy.HasEmailForm(evt));
+        Assert.False(NotificationPolicy.IsAllowed(prefs, evt)); // e-mail on, category on - still no mail
+        Assert.True(NotificationPolicy.IsInboxAllowed(prefs, evt));
+        Assert.True(NotificationPolicy.IsPushAllowed(prefs, evt));
+    }
+
+    [Fact]
+    public void DailyReminder_HasItsOwnSwitch_ThatSilencesInboxAndPush()
+    {
+        var prefs = Defaults();
+        prefs.IncompleteItemsReminder = false;
+
+        Assert.False(NotificationPolicy.IsInboxAllowed(prefs, NotificationEvent.IncompleteItemsReminder));
+        Assert.False(NotificationPolicy.IsPushAllowed(prefs, NotificationEvent.IncompleteItemsReminder));
+        Assert.True(NotificationPolicy.IsInboxAllowed(prefs, NotificationEvent.CalendarItemsIncomplete)); // the import message is a separate category
+    }
+
+    [Fact]
+    public void DailyReminder_ItemsOfAMutedTeamAreLeftOut()
+    {
+        Assert.True(NotificationPolicy.IsMutedByTeam(NotificationEvent.IncompleteItemsReminder, muteNotifications: true, muteChat: false));
+        Assert.False(NotificationPolicy.IsMutedByTeam(NotificationEvent.IncompleteItemsReminder, muteNotifications: false, muteChat: true));
+    }
+
+    [Fact]
     public void Defaults_KeepNoisyMailsOff()
     {
         var prefs = Defaults();

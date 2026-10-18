@@ -21,6 +21,11 @@ const SWITCH_ROWS: SwitchRow[] = [
   { key: 'teamMembership', label: 'Team changes', hint: 'You are added or removed, your role changes, or the team is deleted.' },
   { key: 'chatDigest', label: 'Chat summary while you are offline', hint: 'One e-mail with the number of missed messages, at most once an hour (e-mail only).' },
   { key: 'calendarIssues', label: 'Google Calendar connection problems' },
+  {
+    key: 'incompleteItemsReminder',
+    label: 'Daily reminder about items that need details',
+    hint: 'One push a day, in the morning, listing items still missing impact or an end time. In the app and on the phone only.',
+  },
 ];
 
 const LOGIN_OPTIONS: { value: LoginNotificationMode; label: string }[] = [

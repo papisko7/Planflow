@@ -127,6 +127,7 @@ public static class DependencyInjection
             AddIntervalJob<PushDeliveryJob>(quartz, "PushDeliveryJob", TimeSpan.FromSeconds(10));
             AddIntervalJob<ChatDigestJob>(quartz, "ChatDigestJob", TimeSpan.FromMinutes(15));
             AddIntervalJob<RecurringItemJob>(quartz, "RecurringItemJob", TimeSpan.FromMinutes(1));
+            AddIntervalJob<IncompleteItemsReminderJob>(quartz, "IncompleteItemsReminderJob", TimeSpan.FromMinutes(15));
 
             var cleanupJobKey = new JobKey("CleanupJob");
             quartz.AddJob<CleanupJob>(opts => opts.WithIdentity(cleanupJobKey));

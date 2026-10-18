@@ -20,7 +20,7 @@ describe('SettingsScreen', () => {
     (getProfile as jest.Mock).mockResolvedValue({ id: 'u', email: 'ann@example.com', displayName: 'Ann', emailVerified: true });
     (getNotificationPreferences as jest.Mock).mockResolvedValue({
       emailEnabled: true, pushEnabled: true, loginAlerts: LoginNotificationMode.NewDevice,
-      taskAssignments: true, taskChanges: true, teamTasks: false, taskUrgency: true, teamMembership: true, chatDigest: false, calendarIssues: true,
+      taskAssignments: true, taskChanges: true, teamTasks: false, taskUrgency: true, teamMembership: true, chatDigest: false, calendarIssues: true, incompleteItemsReminder: true,
     });
     (getMyTeams as jest.Mock).mockResolvedValue([]);
     (isPinEnabled as jest.Mock).mockResolvedValue(true);
@@ -35,7 +35,7 @@ describe('SettingsScreen', () => {
     expect(screen.getByText('Credentials')).toBeTruthy();
     expect(screen.getByText('Notifications')).toBeTruthy();
     await waitFor(() => expect(screen.getByText('PIN login on')).toBeTruthy());
-    await waitFor(() => expect(screen.getByText('7 of 9 on')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('8 of 10 on')).toBeTruthy());
 
     expect(screen.queryByTestId('profile-name-input')).toBeNull();
     expect(screen.queryByTestId('pin-toggle')).toBeNull();

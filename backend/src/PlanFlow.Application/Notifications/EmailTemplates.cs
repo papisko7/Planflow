@@ -163,8 +163,6 @@ public static class EmailTemplates
     /// </summary>
     public static Func<string, EmailContent> CalendarItemsIncomplete(IReadOnlyList<string> titles) => name =>
     {
-        var listed = string.Join(", ", titles.Take(MaxListedTitles).Select(t => $"\"{Clean(t)}\""));
-        var more = titles.Count > MaxListedTitles ? $" and {titles.Count - MaxListedTitles} more" : "";
         var subject = titles.Count == 1
             ? "1 imported event needs your details"
             : $"{titles.Count} imported events need your details";
@@ -173,10 +171,28 @@ public static class EmailTemplates
             subject,
             name,
             Lines(
-                $"Imported from Google Calendar without enough data to rank {(titles.Count == 1 ? "it" : "them")}: {listed}{more}.",
+                $"Imported from Google Calendar without enough data to rank {(titles.Count == 1 ? "it" : "them")}: {ListTitles(titles)}.",
                 "Open each one in PlanFlow and fill in its impact — saving it clears this reminder. " +
                 "You can also add a line like \"[planflow] impact=8 effort=2h\" to the event's description in Google Calendar."));
     };
+
+    /// <summary>
+    /// The once-a-day reminder (inbox + push only): everything the user still has to complete, not just what the last import brought.
+    /// The first paragraph is what the notification shows, so it carries the names.
+    /// </summary>
+    public static Func<string, EmailContent> IncompleteItemsReminder(IReadOnlyList<string> titles) => name => EmailLayout.Build(
+        titles.Count == 1 ? "1 item needs your details" : $"{titles.Count} items need your details",
+        name,
+        Lines(
+            $"Waiting for details so {(titles.Count == 1 ? "it" : "they")} can be ranked: {ListTitles(titles)}.",
+            "Open each one in PlanFlow and fill in its impact — saving it clears this reminder."));
+
+    private static string ListTitles(IReadOnlyList<string> titles)
+    {
+        var listed = string.Join(", ", titles.Take(MaxListedTitles).Select(t => $"\"{Clean(t)}\""));
+        var more = titles.Count > MaxListedTitles ? $" and {titles.Count - MaxListedTitles} more" : "";
+        return listed + more;
+    }
 
     // ---------- helpers ----------
 

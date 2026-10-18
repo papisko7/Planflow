@@ -31,6 +31,7 @@ const defaults: NotificationPreferences = {
   teamMembership: true,
   chatDigest: false,
   calendarIssues: true,
+  incompleteItemsReminder: true,
 };
 
 const personal: TeamDto = { id: 'p', name: 'Me', description: null, memberCount: 1, isPersonal: true, muteNotifications: false, muteChat: false };
@@ -39,7 +40,7 @@ const squad: TeamDto = { id: 's', name: 'Squad', description: null, memberCount:
 // Everything sits in the collapsed Notifications section (the team mutes in a nested Teams one inside it);
 // these open them the way a user would.
 const openNotifications = async () => {
-  await waitFor(() => expect(screen.getByText(/ of 9 on/)).toBeTruthy()); // settings loaded
+  await waitFor(() => expect(screen.getByText(/ of 10 on/)).toBeTruthy()); // settings loaded
   await fireEvent.press(screen.getByTestId('notifications-section-header'));
 };
 const openTeams = () => fireEvent.press(screen.getByTestId('notif-teams-section-header'));
@@ -62,8 +63,8 @@ describe('NotificationSettingsCard', () => {
   it('is collapsed by default and summarises how many switches are on', async () => {
     await render(<NotificationSettingsCard />);
 
-    // push, e-mail and 7 categories; the defaults have teamTasks and chatDigest off
-    await waitFor(() => expect(screen.getByText('7 of 9 on')).toBeTruthy());
+    // push, e-mail and 8 categories; the defaults have teamTasks and chatDigest off
+    await waitFor(() => expect(screen.getByText('8 of 10 on')).toBeTruthy());
     expect(screen.queryByTestId('notif-master-switch')).toBeNull();
 
     await openNotifications();
@@ -87,6 +88,17 @@ describe('NotificationSettingsCard', () => {
 
     await waitFor(() => expect(mockedUpdate).toHaveBeenCalledWith({ ...defaults, teamTasks: true }));
     expect(screen.getByTestId('notif-switch-teamTasks').props.value).toBe(true);
+  });
+
+  it('has a switch for the daily reminder about incomplete items, on by default, that says it is in-app only', async () => {
+    await renderOpen();
+
+    expect(screen.getByTestId('notif-switch-incompleteItemsReminder').props.value).toBe(true);
+    expect(screen.getByText(/In the app and on the phone only/)).toBeTruthy();
+
+    await fireEvent(screen.getByTestId('notif-switch-incompleteItemsReminder'), 'valueChange', false);
+
+    await waitFor(() => expect(mockedUpdate).toHaveBeenCalledWith({ ...defaults, incompleteItemsReminder: false }));
   });
 
   it('switching e-mail off hides only the sign-in alerts - the categories still steer the inbox and push', async () => {

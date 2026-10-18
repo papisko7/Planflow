@@ -37,6 +37,24 @@ export async function markAllNotificationsRead(): Promise<void> {
   await http.post('/api/notifications/read-all');
 }
 
+// The ticked entries (the server ignores ids that are not yours).
+export async function markNotificationsRead(ids: string[]): Promise<void> {
+  await http.post('/api/notifications/read', { ids });
+}
+
+export async function deleteNotification(id: string): Promise<void> {
+  await http.delete(`/api/notifications/${id}`);
+}
+
+export async function deleteNotifications(ids: string[]): Promise<void> {
+  await http.post('/api/notifications/delete', { ids });
+}
+
+// "Clear all": the server keeps an entry whose push has not been delivered yet, so reload the list afterwards.
+export async function clearNotifications(): Promise<void> {
+  await http.delete('/api/notifications');
+}
+
 // ---------- push token of this phone ----------
 
 export async function registerPushToken(token: string, platform: string): Promise<void> {

@@ -114,11 +114,12 @@ public class NotificationApiTests : IClassFixture<CustomWebApplicationFactory>
         var defaults = await client.GetFromJsonAsync<System.Text.Json.JsonElement>("api/users/me/notification-preferences");
         Assert.True(defaults.GetProperty("emailEnabled").GetBoolean());
         Assert.False(defaults.GetProperty("teamTasks").GetBoolean());
+        Assert.True(defaults.GetProperty("incompleteItemsReminder").GetBoolean());
 
         var update = new
         {
             emailEnabled = false, loginAlerts = 1, taskAssignments = true, taskChanges = false, teamTasks = true,
-            taskUrgency = true, teamMembership = false, chatDigest = true, calendarIssues = false
+            taskUrgency = true, teamMembership = false, chatDigest = true, calendarIssues = false, incompleteItemsReminder = false
         };
         var put = await client.PutAsJsonAsync("api/users/me/notification-preferences", update);
         Assert.Equal(HttpStatusCode.OK, put.StatusCode);
@@ -128,6 +129,7 @@ public class NotificationApiTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(1, saved.GetProperty("loginAlerts").GetInt32());
         Assert.True(saved.GetProperty("teamTasks").GetBoolean());
         Assert.False(saved.GetProperty("teamMembership").GetBoolean());
+        Assert.False(saved.GetProperty("incompleteItemsReminder").GetBoolean());
     }
 
     [Fact]

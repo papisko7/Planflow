@@ -29,5 +29,8 @@ public enum NotificationEvent
 
     // Calendar
     CalendarConnectionLost = 40,
-    CalendarItemsIncomplete = 41
+    CalendarItemsIncomplete = 41,
+
+    /// <summary>The once-a-day push + inbox reminder about items that still lack data. Never e-mailed.</summary>
+    IncompleteItemsReminder = 42
 }

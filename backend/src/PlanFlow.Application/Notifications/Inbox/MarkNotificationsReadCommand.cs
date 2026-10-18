@@ -1,3 +1,4 @@
+using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PlanFlow.Application.Common.Exceptions;
@@ -26,6 +27,48 @@ public class MarkNotificationReadCommandHandler : IRequestHandler<MarkNotificati
         if (notification.ReadAtUtc is null)
         {
             notification.ReadAtUtc = DateTime.UtcNow;
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+}
+
+/// <summary>Marks the entries the user ticked in the app as read. Ids that are not the caller's are ignored, never reported.</summary>
+public record MarkSelectedNotificationsReadCommand(Guid UserId, IReadOnlyList<Guid> NotificationIds) : IRequest;
+
+public class MarkSelectedNotificationsReadCommandValidator : AbstractValidator<MarkSelectedNotificationsReadCommand>
+{
+    public MarkSelectedNotificationsReadCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.NotificationIds).NotEmpty().Must(ids => ids.Count <= NotificationBatch.MaxIds)
+            .WithMessage($"At most {NotificationBatch.MaxIds} notifications at once.");
+    }
+}
+
+public class MarkSelectedNotificationsReadCommandHandler : IRequestHandler<MarkSelectedNotificationsReadCommand>
+{
+    private readonly IApplicationDbContext _context;
+
+    public MarkSelectedNotificationsReadCommandHandler(IApplicationDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task Handle(MarkSelectedNotificationsReadCommand request, CancellationToken cancellationToken)
+    {
+        var ids = request.NotificationIds.Distinct().ToList();
+        var unread = await _context.Notifications
+            .Where(n => n.UserId == request.UserId && n.ReadAtUtc == null && ids.Contains(n.Id))
+            .ToListAsync(cancellationToken);
+
+        var now = DateTime.UtcNow;
+        foreach (var notification in unread)
+        {
+            notification.ReadAtUtc = now;
+        }
+
+        if (unread.Count > 0)
+        {
             await _context.SaveChangesAsync(cancellationToken);
         }
     }

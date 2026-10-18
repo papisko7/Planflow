@@ -49,6 +49,37 @@ public class NotificationsController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Marks the ticked entries as read.</summary>
+    [HttpPost("read")]
+    public async Task<IActionResult> MarkSelectedRead(NotificationIdsRequest request, CancellationToken cancellationToken)
+    {
+        await _sender.Send(new MarkSelectedNotificationsReadCommand(User.GetUserId(), request.Ids ?? new List<Guid>()), cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>Deletes the ticked entries.</summary>
+    [HttpPost("delete")]
+    public async Task<IActionResult> DeleteSelected(NotificationIdsRequest request, CancellationToken cancellationToken)
+    {
+        await _sender.Send(new DeleteSelectedNotificationsCommand(User.GetUserId(), request.Ids ?? new List<Guid>()), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        await _sender.Send(new DeleteNotificationCommand(User.GetUserId(), id), cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>"Clear all" - keeps only entries whose push has not been delivered yet.</summary>
+    [HttpDelete]
+    public async Task<IActionResult> Clear(CancellationToken cancellationToken)
+    {
+        await _sender.Send(new ClearNotificationsCommand(User.GetUserId()), cancellationToken);
+        return NoContent();
+    }
+
     /// <summary>Tells the server this phone can receive pushes. Safe to call on every sign-in.</summary>
     [HttpPut("push-token")]
     public async Task<IActionResult> RegisterPushToken(RegisterPushTokenRequest request, CancellationToken cancellationToken)

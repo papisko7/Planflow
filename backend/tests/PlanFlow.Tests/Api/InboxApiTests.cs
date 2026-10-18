@@ -169,6 +169,69 @@ public class InboxApiTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task Inbox_DeleteOne_DeleteTicked_MarkTickedRead_AndClearAll_WorkThroughTheApi()
+    {
+        var user = await SeedUserAsync("Cleaner");
+        var other = await SeedUserAsync("Other");
+        var ids = new List<Guid>();
+        Guid othersId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<PlanFlowDbContext>();
+            for (var i = 0; i < 5; i++)
+            {
+                var n = new Notification { UserId = user.Id, Event = NotificationEvent.TaskChanged, Title = $"n{i}", Body = "b", PushState = PushDeliveryState.Sent };
+                db.Notifications.Add(n);
+                ids.Add(n.Id);
+            }
+
+            var queued = new Notification { UserId = user.Id, Event = NotificationEvent.TaskChanged, Title = "queued", Body = "b", PushState = PushDeliveryState.Pending };
+            var theirs = new Notification { UserId = other.Id, Event = NotificationEvent.TaskChanged, Title = "theirs", Body = "b", PushState = PushDeliveryState.Sent };
+            db.Notifications.AddRange(queued, theirs);
+            othersId = theirs.Id;
+            await db.SaveChangesAsync();
+        }
+
+        var client = ClientFor(user);
+        var asOther = ClientFor(other);
+        async Task<int> InboxSizeAsync(HttpClient c) => (await c.GetFromJsonAsync<JsonElement>("api/notifications")).GetArrayLength();
+        Assert.Equal(6, await InboxSizeAsync(client));
+
+        // Mark two as read at once (a stranger's id in the list is ignored).
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsJsonAsync("api/notifications/read", new { ids = new[] { ids[0], ids[1], othersId } })).StatusCode);
+        Assert.Equal(4, (await client.GetFromJsonAsync<JsonElement>("api/notifications/unread-count")).GetProperty("count").GetInt32());
+        Assert.Equal(1, (await asOther.GetFromJsonAsync<JsonElement>("api/notifications/unread-count")).GetProperty("count").GetInt32());
+
+        // Delete one: mine goes (204), the stranger's looks like a missing one (404) and stays.
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"api/notifications/{ids[0]}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.DeleteAsync($"api/notifications/{othersId}")).StatusCode);
+        Assert.Equal(5, await InboxSizeAsync(client));
+        Assert.Equal(1, await InboxSizeAsync(asOther));
+
+        // Delete ticked ones; an empty selection is a 400, not a silent success.
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsJsonAsync("api/notifications/delete", new { ids = new[] { ids[1], ids[2] } })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("api/notifications/delete", new { ids = Array.Empty<Guid>() })).StatusCode);
+        Assert.Equal(3, await InboxSizeAsync(client));
+
+        // Clear all: everything goes except the entry whose push is still queued.
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync("api/notifications")).StatusCode);
+        var left = await client.GetFromJsonAsync<JsonElement>("api/notifications");
+        Assert.Equal("queued", Assert.Single(left.EnumerateArray()).GetProperty("title").GetString());
+        Assert.Equal(1, await InboxSizeAsync(asOther));
+    }
+
+    [Fact]
+    public async Task Inbox_NewEndpoints_RequireLogin()
+    {
+        var client = _factory.CreateClient();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.DeleteAsync("api/notifications")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.DeleteAsync($"api/notifications/{Guid.NewGuid()}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("api/notifications/delete", new { ids = new[] { Guid.NewGuid() } })).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("api/notifications/read", new { ids = new[] { Guid.NewGuid() } })).StatusCode);
+    }
+
+    [Fact]
     public async Task Preferences_IncludeThePushSwitch_OnByDefault()
     {
         var user = await SeedUserAsync("Prefs");
@@ -180,7 +243,7 @@ public class InboxApiTests : IClassFixture<CustomWebApplicationFactory>
         var update = new
         {
             emailEnabled = true, pushEnabled = false, loginAlerts = 0, taskAssignments = true, taskChanges = true, teamTasks = false,
-            taskUrgency = true, teamMembership = true, chatDigest = false, calendarIssues = true
+            taskUrgency = true, teamMembership = true, chatDigest = false, calendarIssues = true, incompleteItemsReminder = true
         };
         Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync("api/users/me/notification-preferences", update)).StatusCode);
 

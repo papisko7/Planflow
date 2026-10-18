@@ -22,7 +22,10 @@ public static class NotificationPolicy
 
     /// <summary>E-mail: mandatory mails always pass; the rest need the e-mail master switch and the category switch.</summary>
     public static bool IsAllowed(NotificationPreference prefs, NotificationEvent evt) =>
-        IsMandatory(evt) || (prefs.EmailEnabled && IsCategoryEnabled(prefs, evt));
+        IsMandatory(evt) || (HasEmailForm(evt) && prefs.EmailEnabled && IsCategoryEnabled(prefs, evt));
+
+    /// <summary>The daily "items need details" reminder lives in the app only: a mail every morning would be spam.</summary>
+    public static bool HasEmailForm(NotificationEvent evt) => evt != NotificationEvent.IncompleteItemsReminder;
 
     /// <summary>
     /// Whether this kind of event has an in-app form at all. Account/security mails carry codes and belong in the mailbox only,
@@ -52,6 +55,7 @@ public static class NotificationPolicy
                 or NotificationEvent.RemovedFromTeam or NotificationEvent.TeamDeleted => prefs.TeamMembership,
             NotificationEvent.ChatDigest => prefs.ChatDigest,
             NotificationEvent.CalendarConnectionLost or NotificationEvent.CalendarItemsIncomplete => prefs.CalendarIssues,
+            NotificationEvent.IncompleteItemsReminder => prefs.IncompleteItemsReminder,
             _ => false
         };
     }
@@ -72,7 +76,8 @@ public static class NotificationPolicy
     public static bool IsMutedByTeam(NotificationEvent evt, bool muteNotifications, bool muteChat) => evt switch
     {
         NotificationEvent.TaskAssignedToYou or NotificationEvent.TaskUnassigned or NotificationEvent.TaskChanged
-            or NotificationEvent.TaskDeleted or NotificationEvent.TeamTaskAdded or NotificationEvent.TaskUrgent => muteNotifications,
+            or NotificationEvent.TaskDeleted or NotificationEvent.TeamTaskAdded or NotificationEvent.TaskUrgent
+            or NotificationEvent.IncompleteItemsReminder => muteNotifications,
         NotificationEvent.ChatDigest => muteChat,
         _ => false
     };
