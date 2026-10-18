@@ -142,15 +142,8 @@ public class SyncCalendarJob : IJob
 
     private async Task<(int Created, int Updated)> SyncIntegrationAsync(CalendarIntegration integration, CancellationToken cancellationToken)
     {
-        // A synced task needs a TeamId (tasks are team-owned), but a calendar connection is
-        // per-user. Calendar events are personal, so they go into the user's personal team;
-        // accounts without one fall back to the earliest team they joined.
-        var destinationTeamId = await _context.TeamMembers
-            .Where(m => m.UserId == integration.UserId)
-            .OrderByDescending(m => m.Team.IsPersonal)
-            .ThenBy(m => m.JoinedAtUtc)
-            .Select(m => (Guid?)m.TeamId)
-            .FirstOrDefaultAsync(cancellationToken);
+        // Calendar events are personal, so they go into the user's personal team (see SyncDestination).
+        var destinationTeamId = await SyncDestination.FindTeamIdAsync(_context, integration.UserId, cancellationToken);
 
         if (destinationTeamId is null)
         {

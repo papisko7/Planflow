@@ -21,6 +21,7 @@ public interface IApplicationDbContext
     DbSet<Alert> Alerts { get; }
     DbSet<ChatMessage> ChatMessages { get; }
     DbSet<CalendarIntegration> CalendarIntegrations { get; }
+    DbSet<ExternalTaskList> ExternalTaskLists { get; }
     DbSet<NotificationPreference> NotificationPreferences { get; }
     DbSet<EmailOutboxMessage> EmailOutbox { get; }
     DbSet<OneTimeCode> OneTimeCodes { get; }

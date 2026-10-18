@@ -9,7 +9,7 @@ public class GoogleOAuthOptions
     /// <summary>Must exactly match a redirect URI registered on the Google OAuth client (e.g. https://api.planflow.dev/api/calendar/google/callback).</summary>
     public string RedirectUri { get; set; } = string.Empty;
 
-    public string Scopes { get; set; } = "openid email https://www.googleapis.com/auth/calendar.readonly";
+    public string Scopes { get; set; } = "openid email https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/tasks.readonly";
 
     public string AuthorizationEndpoint { get; set; } = "https://accounts.google.com/o/oauth2/v2/auth";
     public string TokenEndpoint { get; set; } = "https://oauth2.googleapis.com/token";

@@ -90,6 +90,13 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("GrantedScopes")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasDefaultValue("");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -97,6 +104,9 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("LastSyncedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastTasksSyncedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Provider")
@@ -181,6 +191,13 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<string>("ExternalTaskId")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid?>("ExternalTaskListId")
+                        .HasColumnType("uuid");
+
                     b.Property<int?>("ImpactScore")
                         .HasColumnType("integer");
 
@@ -259,11 +276,17 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.HasIndex("CurrentUrgencyScore")
                         .IsDescending();
 
+                    b.HasIndex("ExternalTaskListId");
+
                     b.HasIndex("TeamId");
 
                     b.HasIndex("SourceCalendarIntegrationId", "ExternalCalendarEventId")
                         .IsUnique()
-                        .HasFilter("\"SourceCalendarIntegrationId\" IS NOT NULL");
+                        .HasFilter("\"ExternalCalendarEventId\" IS NOT NULL");
+
+                    b.HasIndex("SourceCalendarIntegrationId", "ExternalTaskId")
+                        .IsUnique()
+                        .HasFilter("\"ExternalTaskId\" IS NOT NULL");
 
                     b.ToTable("calendar_items", (string)null);
                 });
@@ -350,6 +373,39 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.HasIndex("SentAtUtc", "NextAttemptAtUtc");
 
                     b.ToTable("email_outbox", (string)null);
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.ExternalTaskList", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CalendarIntegrationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CalendarIntegrationId", "ExternalId")
+                        .IsUnique();
+
+                    b.ToTable("external_task_lists", (string)null);
                 });
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.ItemReminder", b =>
@@ -911,6 +967,11 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .HasForeignKey("BlockedByTaskId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("PlanFlow.Domain.Entities.ExternalTaskList", "ExternalTaskList")
+                        .WithMany()
+                        .HasForeignKey("ExternalTaskListId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("PlanFlow.Domain.Entities.CalendarIntegration", "SourceCalendarIntegration")
                         .WithMany()
                         .HasForeignKey("SourceCalendarIntegrationId")
@@ -927,6 +988,8 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("AssignedUser");
 
                     b.Navigation("BlockedByTask");
+
+                    b.Navigation("ExternalTaskList");
 
                     b.Navigation("SourceCalendarIntegration");
 
@@ -950,6 +1013,17 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("SenderUser");
 
                     b.Navigation("Team");
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.ExternalTaskList", b =>
+                {
+                    b.HasOne("PlanFlow.Domain.Entities.CalendarIntegration", "CalendarIntegration")
+                        .WithMany()
+                        .HasForeignKey("CalendarIntegrationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CalendarIntegration");
                 });
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.ItemReminder", b =>

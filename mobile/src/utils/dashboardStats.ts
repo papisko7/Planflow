@@ -1,5 +1,5 @@
 import { TaskStatus, type TaskDto } from '../types/task';
-import { dueUtc, isPastEvent } from './schedule';
+import { dueMoment, isPastEvent } from './schedule';
 import { isFinishedStatus } from './taskStatus';
 import { isInformational } from './templateRules';
 
@@ -35,9 +35,8 @@ export function computeDashboardStats(tasks: TaskDto[], now: Date = new Date()):
     }
     if (!isOpen(task) || isPastEvent(task, now)) continue;
     open++;
-    const due = dueUtc(task);
-    if (!due) continue;
-    const deadline = new Date(due);
+    const deadline = dueMoment(task);
+    if (!deadline) continue;
     if (deadline.getTime() < now.getTime()) overdue++;
     else if (sameLocalDay(deadline, now)) dueToday++;
   }

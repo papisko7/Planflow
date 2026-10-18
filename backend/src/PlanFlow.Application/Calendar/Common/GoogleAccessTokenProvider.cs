@@ -1,3 +1,4 @@
+using PlanFlow.Application.Common.Exceptions;
 using PlanFlow.Application.Common.Interfaces;
 using PlanFlow.Domain.Entities;
 
@@ -44,6 +45,23 @@ public class GoogleAccessTokenProvider
     /// stored expiry says the token should still be valid (e.g. the user revoked and re-granted
     /// consent) — see <see cref="PlanFlow.Infrastructure.BackgroundJobs.SyncCalendarJob"/>.
     /// </summary>
+    /// <summary>
+    /// Runs one Google call with a valid token. If Google answers 401 although our stored expiry said the token was fine (consent revoked
+    /// and re-granted out of band), the token is refreshed and the call repeated exactly once; a second 401 propagates to the caller.
+    /// </summary>
+    public async Task<T> CallAsync<T>(CalendarIntegration integration, Func<string, Task<T>> call, CancellationToken cancellationToken)
+    {
+        var accessToken = await GetValidAccessTokenAsync(integration, cancellationToken);
+        try
+        {
+            return await call(accessToken);
+        }
+        catch (UnauthorizedException)
+        {
+            return await call(await RefreshAccessTokenAsync(integration, cancellationToken));
+        }
+    }
+
     public async Task<string> RefreshAccessTokenAsync(CalendarIntegration integration, CancellationToken cancellationToken)
     {
         var refreshToken = _tokenEncryptionService.Decrypt(integration.EncryptedRefreshToken);
@@ -51,6 +69,11 @@ public class GoogleAccessTokenProvider
 
         integration.EncryptedAccessToken = _tokenEncryptionService.Encrypt(refreshed.AccessToken);
         integration.AccessTokenExpiresAtUtc = DateTime.UtcNow.AddSeconds(refreshed.ExpiresInSeconds);
+        // Google lists the scopes the grant still covers; keeping them current is what tells the app whether Tasks may be read.
+        if (!string.IsNullOrWhiteSpace(refreshed.Scope))
+        {
+            integration.GrantedScopes = refreshed.Scope;
+        }
         integration.UpdatedAtUtc = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);

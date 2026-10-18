@@ -20,6 +20,7 @@ public class CalendarItemConfiguration : IEntityTypeConfiguration<CalendarItem>
         builder.Property(t => t.ExternalStatus).HasMaxLength(32);
         builder.Property(t => t.ExternalDescriptionHash).HasMaxLength(64); // hex SHA-256
         builder.Property(t => t.ExternalSettings).HasMaxLength(1000);
+        builder.Property(t => t.ExternalTaskId).HasMaxLength(512);
 
         // Dashboard's main query is "give me this team's tasks sorted by urgency" — both filter
         // and sort columns are indexed so Postgres can serve it without a full table scan.
@@ -27,12 +28,23 @@ public class CalendarItemConfiguration : IEntityTypeConfiguration<CalendarItem>
         builder.HasIndex(t => t.CurrentUrgencyScore)
             .IsDescending();
 
-        // SyncCalendarJob's idempotency key: re-running a sync must find the same task by
+        // SyncCalendarJob's idempotency key: re-running a sync must find the same item by
         // (integration, Google event ID) instead of creating a duplicate. Filtered so
-        // manually-created tasks (both columns null) never collide with each other.
+        // items without a Google event (manual ones and imported Google tasks) never collide with each other.
         builder.HasIndex(t => new { t.SourceCalendarIntegrationId, t.ExternalCalendarEventId })
             .IsUnique()
-            .HasFilter("\"SourceCalendarIntegrationId\" IS NOT NULL");
+            .HasFilter("\"ExternalCalendarEventId\" IS NOT NULL");
+
+        // The same guarantee for SyncTasksJob, keyed on the Google Tasks id.
+        builder.HasIndex(t => new { t.SourceCalendarIntegrationId, t.ExternalTaskId })
+            .IsUnique()
+            .HasFilter("\"ExternalTaskId\" IS NOT NULL");
+
+        // Deleting a list (it vanished in Google) keeps the tasks already imported from it; they just lose the group.
+        builder.HasOne(t => t.ExternalTaskList)
+            .WithMany()
+            .HasForeignKey(t => t.ExternalTaskListId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasOne(t => t.Team)
             .WithMany(team => team.CalendarItems)

@@ -36,13 +36,18 @@ public class GetTasksByTeamQueryHandler : IRequestHandler<GetTasksByTeamQuery, I
             .Select(t => new
             {
                 Item = t,
+                ListTitle = t.ExternalTaskList == null ? null : t.ExternalTaskList.Title,
                 Reason = t.UrgencyScoreLogs.OrderByDescending(l => l.CreatedAtUtc).Select(l => l.ReasonText).FirstOrDefault()
             })
             .ToListAsync(cancellationToken);
 
         // An informational item (Out of office, ...) has no score and so no "why"; an old log from before it was one must not show.
         var result = rows
-            .Select(r => TaskDto.FromEntity(r.Item) with { ReasonText = CalendarItemUrgencyScoreFactory.IsRanked(r.Item) ? r.Reason : null })
+            .Select(r => TaskDto.FromEntity(r.Item) with
+            {
+                GoogleTaskListTitle = r.ListTitle,
+                ReasonText = CalendarItemUrgencyScoreFactory.IsRanked(r.Item) ? r.Reason : null
+            })
             .ToList();
         await _cache.SetAsync(cacheKey, result, CacheKeys.TeamTasksTtl, cancellationToken);
         return result;

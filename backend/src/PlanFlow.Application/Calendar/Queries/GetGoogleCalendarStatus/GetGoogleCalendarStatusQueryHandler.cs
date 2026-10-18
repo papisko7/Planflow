@@ -22,6 +22,7 @@ public class GetGoogleCalendarStatusQueryHandler : IRequestHandler<GetGoogleCale
 
         return integration is null
             ? new GoogleCalendarStatusDto(false, null, null)
-            : new GoogleCalendarStatusDto(true, integration.ExternalAccountEmail, integration.LastSyncedAtUtc);
+            : new GoogleCalendarStatusDto(
+                true, integration.ExternalAccountEmail, integration.LastSyncedAtUtc, integration.HasTasksScope, integration.LastTasksSyncedAtUtc);
     }
 }

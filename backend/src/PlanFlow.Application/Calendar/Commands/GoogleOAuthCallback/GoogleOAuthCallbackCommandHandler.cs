@@ -72,6 +72,8 @@ public class GoogleOAuthCallbackCommandHandler : IRequestHandler<GoogleOAuthCall
         }
 
         integration.AccessTokenExpiresAtUtc = DateTime.UtcNow.AddSeconds(tokenResult.ExpiresInSeconds);
+        // What the user actually agreed to on the consent screen (they can untick Google Tasks); decides whether Tasks are synced.
+        integration.GrantedScopes = tokenResult.Scope;
         integration.IsActive = true;
         integration.UpdatedAtUtc = DateTime.UtcNow;
 

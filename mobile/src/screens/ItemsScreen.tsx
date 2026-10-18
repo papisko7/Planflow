@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useScrollToTop } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AccordionSection } from '../components/AccordionSection';
 import { CreateTaskModal } from '../components/CreateTaskModal';
 import { Fab } from '../components/Fab';
 import { TaskCard } from '../components/TaskCard';
@@ -70,6 +71,19 @@ export default function ItemsScreen() {
             <Text testID={`items-section-${row.key.replace('header-', '')}`} style={styles.sectionHeader}>
               {row.title} · {row.count}
             </Text>
+          ) : row.type === 'group' ? (
+            // A Google Tasks list: collapsed until opened, so a long import does not push your own tasks off the screen.
+            <View style={styles.group}>
+              <AccordionSection
+                testID={row.key}
+                title={row.title}
+                summary={`${row.items.length} ${row.items.length === 1 ? 'task' : 'tasks'} · Google Tasks`}
+              >
+                {row.items.map((task) => (
+                  <TaskCard key={task.id} task={task} onPress={onTaskPress} actions={taskActions} />
+                ))}
+              </AccordionSection>
+            </View>
           ) : (
             <TaskCard task={row.item} onPress={onTaskPress} actions={taskActions} />
           )
@@ -146,6 +160,7 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: colors.primaryMuted, borderColor: colors.primary },
   tabText: { ...typography.body, color: colors.textMuted },
   tabTextActive: { ...typography.body, color: colors.primary, fontWeight: '600' },
+  group: { marginHorizontal: spacing.lg, marginTop: spacing.sm },
   sectionHeader: {
     ...typography.body,
     fontWeight: '700',

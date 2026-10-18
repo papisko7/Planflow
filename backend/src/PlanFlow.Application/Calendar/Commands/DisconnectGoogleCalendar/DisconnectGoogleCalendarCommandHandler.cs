@@ -29,6 +29,7 @@ public class DisconnectGoogleCalendarCommandHandler : IRequestHandler<Disconnect
         integration.IsActive = false;
         integration.EncryptedAccessToken = string.Empty;
         integration.EncryptedRefreshToken = string.Empty;
+        integration.GrantedScopes = string.Empty;
         integration.UpdatedAtUtc = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);

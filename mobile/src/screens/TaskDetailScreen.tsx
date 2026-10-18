@@ -11,7 +11,7 @@ import { formatDuration } from '../utils/duration';
 import { colorHex, colorLabel } from '../utils/palette';
 import { formatColorKey, formatRecurrence, formatReminder, TEMPLATE_LABEL } from '../utils/itemDisplay';
 import { formatDay } from '../utils/dateUtils';
-import { allDayDays, toUpdateRequest } from '../utils/schedule';
+import { allDayDays, toUpdateRequest, utcDay } from '../utils/schedule';
 import { isInformational } from '../utils/templateRules';
 import type { RootStackParamList } from '../navigation/types';
 import type { ApiError } from '../types/api';
@@ -26,6 +26,11 @@ type LoadState = 'loading' | 'ready' | 'error';
 function formatDateTime(iso: string | null): string | null {
   if (!iso) return null;
   return new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+// A whole-day value (a Google task is due on a DAY, stored as midnight UTC of it) shows as that date, never as a clock time.
+function formatStoredDay(iso: string | null): string | null {
+  return iso ? formatDay(utcDay(iso).toISOString()) : null;
 }
 
 export default function TaskDetailScreen() {
@@ -97,8 +102,9 @@ export default function TaskDetailScreen() {
   const { task, latestScoreBreakdown } = detail;
   const reminders = detail.reminders ?? [];
   const isEvent = task.taskType === TaskType.Event;
-  const dueDate = formatDateTime(task.deadlineUtc);
-  const plannedStart = isEvent ? null : formatDateTime(task.startUtc);
+  const wholeDayTask = !isEvent && task.isAllDay;
+  const dueDate = wholeDayTask ? formatStoredDay(task.deadlineUtc) : formatDateTime(task.deadlineUtc);
+  const plannedStart = isEvent ? null : wholeDayTask ? formatStoredDay(task.startUtc) : formatDateTime(task.startUtc);
   const ranked = !isInformational(task);
   // An all-day event reads "Oct 19, 2026 · all day" instead of 12:00 AM - 11:59 PM.
   // (For an imported all-day event the end shown is its LAST day, not the midnight after it that is stored.)
@@ -213,12 +219,13 @@ export default function TaskDetailScreen() {
           ) : (
             <>
               {plannedStart ? <MetaItem label="Planned start" value={plannedStart} /> : null}
-              {dueDate ? <MetaItem label="Due" value={dueDate} /> : null}
+              {dueDate ? <MetaItem label="Due" value={task.isDeadlineDefaulted ? `${dueDate} (not set in Google)` : dueDate} /> : null}
               {task.estimatedEffortHours !== null ? (
                 <MetaItem label="Estimated effort" value={formatDuration(task.estimatedEffortHours)} />
               ) : null}
             </>
           )}
+          {task.googleTaskListTitle ? <MetaItem label="Google Tasks list" value={task.googleTaskListTitle} /> : null}
           {task.location ? <MetaItem label="Location" value={task.location} /> : null}
           {isEvent && task.eventTemplate === EventTemplate.Default ? <MetaItem label="Show as" value={task.isBusy ? 'Busy' : 'Free'} /> : null}
           {task.colorKey ? (

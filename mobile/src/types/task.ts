@@ -76,6 +76,11 @@ export interface TaskDto {
   // Imported from Google Calendar: Google owns its title, time, place, description, colour and template (the server ignores
   // edits to them), so the edit form shows those read-only.
   isExternal: boolean;
+  // A Google task with no due day in Google: its deadline is a placeholder ("tomorrow") that the user may still set.
+  isDeadlineDefaulted: boolean;
+  // The Google Tasks list an imported task belongs to (the Items tab groups such tasks by it); null for everything else.
+  googleTaskListId: string | null;
+  googleTaskListTitle: string | null;
   // Latest "[Priority] why" sentence; only the team list endpoint fills it.
   reasonText?: string | null;
 }

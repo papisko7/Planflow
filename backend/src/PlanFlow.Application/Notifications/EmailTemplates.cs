@@ -177,6 +177,25 @@ public static class EmailTemplates
     };
 
     /// <summary>
+    /// The Google Tasks twin of <see cref="CalendarItemsIncomplete"/>: a task import brings only a title and a due day, so every new task
+    /// waits for its impact and effort before it can be ranked properly.
+    /// </summary>
+    public static Func<string, EmailContent> GoogleTasksIncomplete(IReadOnlyList<string> titles) => name =>
+    {
+        var subject = titles.Count == 1
+            ? "1 imported task needs your details"
+            : $"{titles.Count} imported tasks need your details";
+
+        return EmailLayout.Build(
+            subject,
+            name,
+            Lines(
+                $"Imported from Google Tasks without enough data to rank {(titles.Count == 1 ? "it" : "them")}: {ListTitles(titles)}.",
+                "Open each one in PlanFlow and fill in its impact and effort — saving it clears this reminder. " +
+                "You can also add a line like \"[planflow] impact=8 effort=2h\" to the task's details in Google Tasks."));
+    };
+
+    /// <summary>
     /// The once-a-day reminder (inbox + push only): everything the user still has to complete, not just what the last import brought.
     /// The first paragraph is what the notification shows, so it carries the names.
     /// </summary>

@@ -119,3 +119,118 @@ describe('TaskEditForm', () => {
     });
   });
 });
+
+// Step 7.5.3: a task imported from Google Tasks. Google owns its title, notes and due day; the user plans it (start, effort, impact).
+describe('TaskEditForm - task from Google Tasks', () => {
+  const googleTask: TaskDto = {
+    ...base,
+    taskType: TaskType.Task,
+    status: TaskStatus.Backlog,
+    title: 'Write chapter 3',
+    description: 'Check the sources',
+    isExternal: true,
+    isAllDay: true,
+    isDataIncomplete: true,
+    startUtc: '2030-10-18T00:00:00.000Z',
+    endUtc: null,
+    deadlineUtc: '2030-10-25T00:00:00.000Z',
+    googleTaskListId: 'l1',
+    googleTaskListTitle: 'My Tasks',
+  };
+  const tomorrowAsWireDay = () => {
+    const now = new Date();
+    return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() + 1)).toISOString();
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedUpdateTask.mockResolvedValue({} as never);
+  });
+
+  it('explains it comes from Google Tasks, shows its title read-only and offers start, effort and impact', async () => {
+    await form(googleTask);
+
+    expect(screen.getByText(/Imported from Google Tasks/)).toBeTruthy();
+    expect(screen.getByText('Write chapter 3')).toBeTruthy();
+    expect(screen.queryByTestId('edit-task-title-input')).toBeNull();
+    expect(screen.queryByTestId('edit-task-description-input')).toBeNull();
+    expect(screen.getByTestId('task-start-picker-button')).toBeTruthy();
+    expect(screen.getByTestId('effort-input')).toBeTruthy();
+    expect(screen.getByTestId('edit-task-impact-input')).toBeTruthy();
+    expect(screen.queryByTestId('deadline-picker-button')).toBeNull(); // the due day is Google's
+  });
+
+  it('saving resends the stored days untouched and the effort and impact the user typed', async () => {
+    await form(googleTask);
+
+    await fireEvent.changeText(screen.getByTestId('effort-input'), '3');
+    await fireEvent.changeText(screen.getByTestId('edit-task-impact-input'), '7');
+    await fireEvent.press(screen.getByTestId('edit-task-save'));
+
+    await waitFor(() => expect(mockedUpdateTask).toHaveBeenCalled());
+    expect(mockedUpdateTask.mock.calls[0][2]).toMatchObject({
+      taskType: TaskType.Task,
+      startUtc: '2030-10-18T00:00:00.000Z', // a whole day, stored as midnight UTC whatever the phone's zone
+      deadlineUtc: '2030-10-25T00:00:00.000Z',
+      estimatedEffortHours: 3,
+      impactScore: 7,
+      isAllDay: true,
+    });
+  });
+
+  it('a new start is sent as the picked day at midnight UTC', async () => {
+    await form({ ...googleTask, startUtc: null });
+
+    await fireEvent.press(screen.getByTestId('task-start-picker-button'));
+    await fireEvent.press(screen.getByTestId('task-start-picker-quick-tomorrow'));
+    await fireEvent.press(screen.getByTestId('task-start-picker-set'));
+    await fireEvent.press(screen.getByTestId('edit-task-save'));
+
+    await waitFor(() => expect(mockedUpdateTask).toHaveBeenCalled());
+    expect(mockedUpdateTask.mock.calls[0][2]).toMatchObject({ startUtc: tomorrowAsWireDay() });
+  });
+
+  it('refuses a start after the due day and does not call the server', async () => {
+    await form({ ...googleTask, startUtc: '2030-11-01T00:00:00.000Z' });
+
+    await fireEvent.press(screen.getByTestId('edit-task-save'));
+
+    expect(screen.getByText('The start must not be after the deadline.')).toBeTruthy();
+    expect(mockedUpdateTask).not.toHaveBeenCalled();
+  });
+
+  it('refuses an effort of zero', async () => {
+    await form(googleTask);
+
+    await fireEvent.changeText(screen.getByTestId('effort-input'), '0');
+    await fireEvent.press(screen.getByTestId('edit-task-save'));
+
+    expect(screen.getByText(/Effort must be greater than 0/)).toBeTruthy();
+    expect(mockedUpdateTask).not.toHaveBeenCalled();
+  });
+
+  it('a task with no due day in Google lets the user set the placeholder deadline', async () => {
+    await form({ ...googleTask, isDeadlineDefaulted: true, startUtc: null, deadlineUtc: '2030-10-19T00:00:00.000Z' });
+
+    await fireEvent.press(screen.getByTestId('deadline-picker-button'));
+    await fireEvent.press(screen.getByTestId('deadline-picker-quick-tomorrow'));
+    await fireEvent.press(screen.getByTestId('deadline-picker-set'));
+    await fireEvent.press(screen.getByTestId('edit-task-save'));
+
+    await waitFor(() => expect(mockedUpdateTask).toHaveBeenCalled());
+    expect(mockedUpdateTask.mock.calls[0][2]).toMatchObject({ deadlineUtc: tomorrowAsWireDay() });
+  });
+
+  it('an imported calendar event can get an effort estimate too, and keeps its Google schedule', async () => {
+    await form({ ...base, isExternal: true, isDataIncomplete: true });
+
+    expect(screen.queryByTestId('task-start-picker-button')).toBeNull(); // events have no planned start of their own
+    await fireEvent.changeText(screen.getByTestId('effort-input'), '2');
+    await fireEvent.press(screen.getByTestId('edit-task-save'));
+
+    await waitFor(() => expect(mockedUpdateTask).toHaveBeenCalled());
+    expect(mockedUpdateTask.mock.calls[0][2]).toMatchObject({
+      estimatedEffortHours: 2, startUtc: '2030-10-19T09:00:00.000Z', endUtc: '2030-10-19T10:00:00.000Z',
+    });
+  });
+});

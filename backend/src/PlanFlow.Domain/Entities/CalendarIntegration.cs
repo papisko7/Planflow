@@ -29,5 +29,17 @@ public class CalendarIntegration : BaseEntity
     /// <i>enter</i> the window as time passes, so a full fetch is repeated once a day (and covers anything a poll missed).
     /// </summary>
     public DateTime? LastFullSyncAtUtc { get; set; }
+
+    /// <summary>When the Google Tasks job last started a poll for this account. The next poll asks only for tasks changed since then; null = nothing imported yet.</summary>
+    public DateTime? LastTasksSyncedAtUtc { get; set; }
+
+    /// <summary>Space-separated OAuth scopes Google reported at the last consent/refresh. An account connected before Google Tasks existed lacks the tasks scope and must reconnect.</summary>
+    public string GrantedScopes { get; set; } = string.Empty;
+
     public bool IsActive { get; set; } = true;
+
+    public const string TasksScope = "https://www.googleapis.com/auth/tasks.readonly";
+
+    /// <summary>True when the user agreed (on the consent screen) to let PlanFlow read their Google Tasks.</summary>
+    public bool HasTasksScope => GrantedScopes.Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains(TasksScope);
 }

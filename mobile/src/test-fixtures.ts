@@ -20,4 +20,7 @@ export const PLAIN_TASK_FIELDS = {
   isAllDay: false,
   externalSettings: null,
   isExternal: false,
+  isDeadlineDefaulted: false,
+  googleTaskListId: null,
+  googleTaskListTitle: null,
 } satisfies Partial<TaskDto>;

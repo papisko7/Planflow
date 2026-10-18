@@ -12,6 +12,7 @@ public class CalendarIntegrationConfiguration : IEntityTypeConfiguration<Calenda
         builder.HasKey(c => c.Id);
 
         builder.Property(c => c.ExternalAccountId).IsRequired();
+        builder.Property(c => c.GrantedScopes).IsRequired().HasMaxLength(1000).HasDefaultValue(string.Empty);
 
         // The sync job's idempotency key: re-running a sync for the same external account
         // must upsert, never duplicate the link.

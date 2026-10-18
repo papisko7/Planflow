@@ -5,6 +5,9 @@ export type GoogleCalendarStatus = {
   connected: boolean;
   email: string | null;
   lastSyncedAtUtc: string | null;
+  // False for an account connected before Google Tasks existed (or one that declined that permission): it must reconnect.
+  tasksConnected: boolean;
+  lastTasksSyncedAtUtc: string | null;
 };
 
 export async function getGoogleCalendarStatus(): Promise<GoogleCalendarStatus> {

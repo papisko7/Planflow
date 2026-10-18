@@ -44,6 +44,10 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
             // Google owns the title, time, place, description, colour and template of an imported item (the next sync would overwrite
             // them), so only PlanFlow's own fields are taken from the request: effort here, impact / status / assignee below.
             task.EstimatedEffortHours = request.EstimatedEffortHours;
+            if (task.IsGoogleTask)
+            {
+                ApplyGoogleTaskPlanning(task, request);
+            }
         }
         else
         {
@@ -86,4 +90,27 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
 
         return TaskDto.FromEntity(task);
     }
+
+    /// <summary>
+    /// What a Google task lets PlanFlow decide. Google Tasks has no planned start, so it is the user's (kept as a whole day, like the deadline).
+    /// A task with no due day in Google got a placeholder deadline ("tomorrow"); until the user saves it, that deadline is theirs to set.
+    /// Saving confirms the item, so the placeholder flag goes either way.
+    /// </summary>
+    private static void ApplyGoogleTaskPlanning(CalendarItem task, UpdateTaskCommand request)
+    {
+        task.StartUtc = request.StartUtc is { } start ? WholeDay(start) : null;
+        if (task.IsDeadlineDefaulted && request.DeadlineUtc is { } deadline)
+        {
+            task.DeadlineUtc = WholeDay(deadline);
+        }
+        task.IsDeadlineDefaulted = false;
+
+        // A task never starts after its deadline (the validator checks the request; this guards the stored deadline, which wins).
+        if (task.StartUtc > task.DeadlineUtc)
+        {
+            task.StartUtc = task.DeadlineUtc;
+        }
+    }
+
+    private static DateTime WholeDay(DateTime value) => DateTime.SpecifyKind(value.Date, DateTimeKind.Utc);
 }

@@ -148,3 +148,37 @@ describe('TaskDetailScreen - scoring', () => {
     expect(screen.queryByText('Planned start')).toBeNull();
   });
 });
+
+// Step 7.5.3: a task imported from Google Tasks is due on a DAY (stored as midnight UTC), so it is shown as a date, never as a clock time.
+describe('TaskDetailScreen - task from Google Tasks', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const googleTask = (over: Partial<TaskDto> = {}): TaskDto =>
+    importedEvent({
+      taskType: TaskType.Task,
+      status: TaskStatus.Backlog,
+      isExternal: true,
+      isAllDay: true,
+      startUtc: '2026-10-18T00:00:00Z',
+      endUtc: null,
+      deadlineUtc: '2026-10-25T00:00:00Z',
+      googleTaskListTitle: 'My Tasks',
+      ...over,
+    });
+  const day = (d: number) => new Date(2026, 9, d).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+  it('shows the due day and the planned start as dates, and the Google list it came from', async () => {
+    await showDetail({ task: googleTask(), latestScoreBreakdown: null });
+
+    expect(screen.getByText(day(25))).toBeTruthy();
+    expect(screen.getByText(day(18))).toBeTruthy();
+    expect(screen.getByText('Google Tasks list')).toBeTruthy();
+    expect(screen.getByText('My Tasks')).toBeTruthy();
+  });
+
+  it('says when the deadline is only a placeholder because Google had no due day', async () => {
+    await showDetail({ task: googleTask({ isDeadlineDefaulted: true }), latestScoreBreakdown: null });
+
+    expect(screen.getByText(`${day(25)} (not set in Google)`)).toBeTruthy();
+  });
+});

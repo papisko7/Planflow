@@ -32,13 +32,14 @@ public class CalendarController : ControllerBase
     public async Task<ActionResult<GoogleCalendarStatusDto>> Status(CancellationToken cancellationToken)
         => Ok(await _sender.Send(new GetGoogleCalendarStatusQuery(User.GetUserId()), cancellationToken));
 
-    /// <summary>Runs the sync job right now instead of waiting for the 5-minute poll (the job syncs all connected accounts).</summary>
+    /// <summary>Runs the calendar and the tasks sync jobs right now instead of waiting for the 5-minute poll (each job syncs all connected accounts).</summary>
     [HttpPost("sync")]
     [Authorize]
     public async Task<IActionResult> SyncNow(CancellationToken cancellationToken)
     {
         var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
         await scheduler.TriggerJob(new JobKey("SyncCalendarJob"), cancellationToken);
+        await scheduler.TriggerJob(new JobKey("SyncTasksJob"), cancellationToken);
         return Accepted();
     }
 

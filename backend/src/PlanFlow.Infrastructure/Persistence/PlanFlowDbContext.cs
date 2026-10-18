@@ -25,6 +25,7 @@ public class PlanFlowDbContext : DbContext, IApplicationDbContext
     public DbSet<TaskHistory> TaskHistories => Set<TaskHistory>();
     public DbSet<UrgencyScoreLog> UrgencyScoreLogs => Set<UrgencyScoreLog>();
     public DbSet<CalendarIntegration> CalendarIntegrations => Set<CalendarIntegration>();
+    public DbSet<ExternalTaskList> ExternalTaskLists => Set<ExternalTaskList>();
     public DbSet<Alert> Alerts => Set<Alert>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();

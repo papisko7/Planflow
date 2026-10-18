@@ -118,11 +118,22 @@ public class CalendarItem : BaseEntity
     public Guid? SourceCalendarIntegrationId { get; set; }
     public CalendarIntegration? SourceCalendarIntegration { get; set; }
 
+    /// <summary>Google Tasks id this item was imported from (a Task, never an Event); null for everything else. With <see cref="SourceCalendarIntegrationId"/> it is the idempotency key SyncTasksJob upserts on.</summary>
+    public string? ExternalTaskId { get; set; }
+
+    /// <summary>The Google Tasks list the item belongs to; the app shows imported tasks grouped by it.</summary>
+    public Guid? ExternalTaskListId { get; set; }
+    public ExternalTaskList? ExternalTaskList { get; set; }
+
     /// <summary>
-    /// True for an item imported from Google. Google owns its title, time, place, description, colour and template (a sync overwrites
-    /// them), so the app lets the user change only the PlanFlow fields (impact, effort, status, assignee...). Derived, not stored.
+    /// True for an item imported from Google (Calendar or Tasks). Google owns its title, time, place, description, colour and template
+    /// (a sync overwrites them), so the app lets the user change only the PlanFlow fields (impact, effort, status, assignee...).
+    /// Derived, not stored.
     /// </summary>
-    public bool IsExternal => ExternalCalendarEventId is not null;
+    public bool IsExternal => ExternalCalendarEventId is not null || ExternalTaskId is not null;
+
+    /// <summary>True for a task imported from Google Tasks. Its planned start belongs to PlanFlow (Google Tasks has no such field).</summary>
+    public bool IsGoogleTask => ExternalTaskId is not null;
 
     public ICollection<CalendarItem> BlockedTasks { get; set; } = new List<CalendarItem>();
     public ICollection<TaskHistory> History { get; set; } = new List<TaskHistory>();

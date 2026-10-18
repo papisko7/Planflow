@@ -61,7 +61,7 @@ describe('buildRows', () => {
   it('All puts a heading with a count above the Tasks and above the Events', () => {
     const rows = buildRows([soon, task1, task2], 'all');
 
-    expect(rows.map((r) => (r.type === 'header' ? `${r.title} ${r.count}` : r.item.id))).toEqual([
+    expect(rows.map((r) => (r.type === 'header' ? `${r.title} ${r.count}` : r.type === 'item' ? r.item.id : r.key))).toEqual([
       'Tasks 2', 'task1', 'task2', 'Events 1', 'soon',
     ]);
   });
@@ -74,5 +74,51 @@ describe('buildRows', () => {
   it('the Tasks and Events tabs are plain lists without headings', () => {
     expect(buildRows([soon, task1], 'tasks').map((r) => r.type)).toEqual(['item']);
     expect(buildRows([soon, task1], 'events').map((r) => r.type)).toEqual(['item']);
+  });
+});
+
+// Step 7.5.3: tasks imported from Google Tasks are grouped under their list instead of being mixed in with your own.
+describe('buildRows with Google Tasks lists', () => {
+  const own = item({ id: 'own' });
+  const google = (id: string, listId: string | null, listTitle: string | null, over: Partial<TaskDto> = {}) =>
+    item({ id, isExternal: true, isAllDay: true, googleTaskListId: listId, googleTaskListTitle: listTitle, ...over });
+  const shop1 = google('shop1', 'l-shop', 'Shopping');
+  const shop2 = google('shop2', 'l-shop', 'Shopping');
+  const work = google('work1', 'l-work', 'Work');
+  const meeting = item({ id: 'meeting', taskType: TaskType.Event, isExternal: true, startUtc: inHours(5) }); // a Google CALENDAR event
+
+  it('puts your own tasks first, then one group per list in alphabetical order, keeping the urgency order inside a group', () => {
+    const rows = buildRows([work, shop2, own, shop1], 'tasks');
+
+    expect(rows.map((r) => r.type)).toEqual(['item', 'group', 'group']);
+    const groups = rows.filter((r) => r.type === 'group');
+    expect(groups.map((g) => g.title)).toEqual(['Shopping', 'Work']);
+    expect(groups[0].items.map((i) => i.id)).toEqual(['shop2', 'shop1']);
+    expect(groups[0].key).toBe('google-list-l-shop');
+  });
+
+  it('the All tab keeps the groups inside the Tasks section; imported calendar events stay plain events', () => {
+    const rows = buildRows([own, shop1, work, meeting], 'all');
+
+    expect(rows.map((r) => (r.type === 'header' ? r.title : r.type === 'item' ? r.item.id : r.title))).toEqual([
+      'Tasks', 'own', 'Shopping', 'Work', 'Events', 'meeting',
+    ]);
+    expect(rows.find((r) => r.type === 'header' && r.title === 'Tasks')).toMatchObject({ count: 3 }); // own + both lists' tasks
+  });
+
+  it('the Events tab never shows groups', () => {
+    expect(buildRows([own, shop1, meeting], 'events').map((r) => r.type)).toEqual(['item']);
+  });
+
+  it('a task whose list is gone from Google lands in a generic "Google Tasks" group', () => {
+    const orphan = google('orphan', null, null);
+
+    const rows = buildRows([orphan], 'tasks');
+
+    expect(rows).toEqual([{ type: 'group', key: 'google-list-unlisted', title: 'Google Tasks', items: [orphan] }]);
+  });
+
+  it('counts imported tasks as tasks', () => {
+    expect(countByTab([own, shop1, meeting])).toEqual({ all: 3, tasks: 2, events: 1 });
   });
 });

@@ -16,7 +16,8 @@ type Props = { onSynced: () => void };
 // The sync job runs in the background after the POST returns, so give it a moment before reloading tasks.
 const SYNC_SETTLE_MS = 3000;
 
-// Top-of-calendar strip: "Connect Google" when not linked, otherwise "Connected as … / Sync now / Disconnect".
+// Top-of-calendar strip: "Connect Google" when not linked, otherwise "Connected as … / Sync now / Disconnect". An account linked before
+// Google Tasks existed (or one that declined that permission) is also offered a one-tap reconnect that asks for the Tasks permission.
 export function GoogleCalendarBanner({ onSynced }: Props) {
   const [status, setStatus] = useState<GoogleCalendarStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -78,6 +79,20 @@ export function GoogleCalendarBanner({ onSynced }: Props) {
           {status.lastSyncedAtUtc && (
             <Text style={styles.hint}>Last sync: {new Date(status.lastSyncedAtUtc).toLocaleString()}</Text>
           )}
+          {status.tasksConnected ? (
+            <Text testID="google-tasks-status" style={styles.hint}>
+              ✅ Google Tasks{status.lastTasksSyncedAtUtc ? `: last sync ${new Date(status.lastTasksSyncedAtUtc).toLocaleString()}` : ': waiting for the first sync'}
+            </Text>
+          ) : (
+            <View style={styles.reconnect}>
+              <Text testID="google-tasks-reconnect-notice" style={styles.hint}>
+                Google Tasks isn't connected. Reconnect and allow access to your tasks to see them in PlanFlow.
+              </Text>
+              <Pressable testID="google-tasks-reconnect" style={styles.button} onPress={connect} disabled={busy}>
+                <Text style={styles.buttonText}>Reconnect for Google Tasks</Text>
+              </Pressable>
+            </View>
+          )}
           <View style={styles.row}>
             <Pressable style={styles.button} onPress={() => run(syncNow)} disabled={busy}>
               <Text style={styles.buttonText}>Sync now</Text>
@@ -95,7 +110,7 @@ export function GoogleCalendarBanner({ onSynced }: Props) {
           </Pressable>
         </>
       )}
-      {busy && <ActivityIndicator color={colors.primary} />}
+      {busy && <ActivityIndicator testID="google-banner-busy" color={colors.primary} />}
       {error && <Text style={styles.error}>{error}</Text>}
     </View>
   );
@@ -113,6 +128,7 @@ const styles = StyleSheet.create({
   text: { ...typography.body, color: colors.primary },
   hint: { ...typography.body, fontSize: 12, color: colors.textMuted },
   row: { flexDirection: 'row', gap: spacing.sm },
+  reconnect: { gap: spacing.xs },
   button: {
     backgroundColor: colors.primary,
     paddingVertical: spacing.sm,

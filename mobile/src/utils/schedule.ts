@@ -172,6 +172,19 @@ export function dueUtc(item: Pick<TaskDto, 'taskType' | 'deadlineUtc' | 'startUt
   return item.taskType === TaskType.Event ? item.startUtc : item.deadlineUtc;
 }
 
+// The moment an item's due time really runs out for the person looking at it. A timed item: its stored moment. A whole-day Task
+// (e.g. from Google Tasks, due "Oct 20"): the END of that day, so it is not overdue while the day is still running. A whole-day Event:
+// the beginning of its first day.
+export function dueMoment(
+  item: Pick<TaskDto, 'taskType' | 'deadlineUtc' | 'startUtc'> & { isAllDay?: boolean },
+): Date | null {
+  const due = dueUtc(item);
+  if (!due) return null;
+  if (!item.isAllDay) return new Date(due);
+  const day = utcDay(due);
+  return item.taskType === TaskType.Event ? day : new Date(addDays(day, 1).getTime() - 1);
+}
+
 // An Event whose end (or start + 1h when it has no end) has passed is history: the backend scores it 0 and it
 // never counts as open work. A Task is never "past" - an overdue Task stays urgent.
 export function isPastEvent(
@@ -223,6 +236,15 @@ export function scheduleForRequest(raw: ScheduleFields): ScheduleFields {
   return { ...s, startUtc: utcMidnight(first), endUtc: utcMidnight(addDays(last < first ? first : last, 1)) };
 }
 
+// A whole-day value (stored as midnight UTC of its date) <-> the local timestamp the date pickers work with (the end of that local day).
+export const wireDayToPicker = (iso: string | null): string | null => (iso ? composeDeadline(utcDay(iso), null) : null);
+export const pickerToWireDay = (iso: string | null): string | null => (iso ? utcMidnight(new Date(iso)) : null);
+
+// The effort rule shared by the create/edit forms (the same bound as the backend validator).
+export function validateEffort(hours: number | null): string | null {
+  return hours !== null && !(hours > 0 && hours <= MAX_HOURS) ? 'Effort must be greater than 0 and at most one year.' : null;
+}
+
 // Client-side twin of the backend validator, so the user gets a message before the round trip.
 // `isNew` adds the create-only rules (a new item may not already be in the past).
 export function validateSchedule(raw: ScheduleFields, isNew: boolean): string | null {
@@ -230,9 +252,8 @@ export function validateSchedule(raw: ScheduleFields, isNew: boolean): string | 
   const isEvent = s.taskType === TaskType.Event;
   const now = Date.now();
 
-  if (s.estimatedEffortHours !== null && !(s.estimatedEffortHours > 0 && s.estimatedEffortHours <= MAX_HOURS)) {
-    return 'Effort must be greater than 0 and at most one year.';
-  }
+  const effortError = validateEffort(s.estimatedEffortHours);
+  if (effortError) return effortError;
 
   if (isEvent) {
     if (!s.startUtc) return 'An event needs a start time.';

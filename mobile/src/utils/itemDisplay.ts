@@ -1,19 +1,21 @@
 import { EventTemplate, TaskType, type ReminderDto, type TaskDto } from '../types/task';
 import { formatDuration, INTERVAL_UNITS } from './duration';
-import { allDayDays } from './schedule';
+import { allDayDays, utcDay } from './schedule';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const shortDate = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 const clock = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 
-// Where an item sits in time, for cards: a Task shows its deadline day, an Event shows its range
+// Where an item sits in time, for cards: a Task shows its deadline day (a whole-day one - e.g. from Google Tasks - is read as the date it
+// stores, wherever the viewer is), an Event shows its range
 // ("Oct 5 · 14:00-15:00", "Oct 5 · all day", or "Oct 5 14:00 - Oct 6 10:00" when it spans days).
 export function formatWhen(
   item: Pick<TaskDto, 'taskType' | 'deadlineUtc' | 'startUtc' | 'endUtc'> & { isAllDay?: boolean },
 ): string | null {
   if (item.taskType !== TaskType.Event) {
-    return item.deadlineUtc ? shortDate(new Date(item.deadlineUtc)) : null;
+    if (!item.deadlineUtc) return null;
+    return shortDate(item.isAllDay ? utcDay(item.deadlineUtc) : new Date(item.deadlineUtc));
   }
   if (!item.startUtc) return null;
   const days = allDayDays(item);

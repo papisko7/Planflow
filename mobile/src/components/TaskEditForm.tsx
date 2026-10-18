@@ -3,12 +3,22 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { updateTask } from '../services/taskService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { AssigneePicker } from './AssigneePicker';
+import { DeadlinePicker } from './DeadlinePicker';
+import { DurationInput } from './DurationInput';
 import { ScheduleForm } from './ScheduleForm';
 import type { ApiError } from '../types/api';
 import type { TeamMemberDto } from '../types/team';
-import type { ScheduleFields, TaskDto } from '../types/task';
+import { TaskType, type ScheduleFields, type TaskDto } from '../types/task';
 import { formatWhen } from '../utils/itemDisplay';
-import { scheduleForEditing, scheduleForRequest, toUpdateRequest, validateSchedule } from '../utils/schedule';
+import {
+  pickerToWireDay,
+  scheduleForEditing,
+  scheduleForRequest,
+  toUpdateRequest,
+  validateEffort,
+  validateSchedule,
+  wireDayToPicker,
+} from '../utils/schedule';
 import { rulesFor } from '../utils/templateRules';
 import { normalizeStatus, STATUS_LABEL, statusesFor } from '../utils/taskStatus';
 
@@ -35,6 +45,13 @@ export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Pr
   // An item imported from Google: Google owns its title, time, place, description and colour (the next sync would overwrite
   // them, and the server ignores edits), so they are shown read-only here; what PlanFlow adds stays editable.
   const imported = task.isExternal;
+  // A task from Google Tasks: Google owns its title, notes and due day; PlanFlow adds when to start, effort and impact.
+  const googleTask = imported && task.taskType === TaskType.Task;
+  // An imported item keeps Google's schedule, but the effort (and, for a Google task, the start) are PlanFlow's own to set.
+  // A Google task's days are stored as midnight UTC; the date pickers work with local timestamps, hence the conversions.
+  const [effort, setEffort] = useState<number | null>(task.estimatedEffortHours);
+  const [start, setStart] = useState<string | null>(() => wireDayToPicker(task.startUtc));
+  const [deadline, setDeadline] = useState<string | null>(() => wireDayToPicker(task.deadlineUtc));
   const [error, setError] = useState<string | null>(null);
 
   const save = async () => {
@@ -50,7 +67,12 @@ export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Pr
       return;
     }
 
-    const scheduleError = imported ? null : validateSchedule(schedule, false);
+    const startDay = pickerToWireDay(start);
+    const deadlineDay = task.isDeadlineDefaulted ? pickerToWireDay(deadline) : task.deadlineUtc;
+    const scheduleError = imported
+      ? validateEffort(effort) ??
+        (googleTask && startDay && deadlineDay && startDay > deadlineDay ? 'The start must not be after the deadline.' : null)
+      : validateSchedule(schedule, false);
     if (scheduleError) {
       setError(scheduleError);
       return;
@@ -65,7 +87,13 @@ export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Pr
         toUpdateRequest(
           task,
           imported
-            ? { status, assignedUserId, impactScore: rules.informational ? null : impactNumber }
+            ? {
+                status,
+                assignedUserId,
+                impactScore: rules.informational ? null : impactNumber,
+                estimatedEffortHours: rules.informational ? task.estimatedEffortHours : effort,
+                ...(googleTask ? { startUtc: startDay, deadlineUtc: deadlineDay } : {}),
+              }
             : {
                 title: trimmedTitle,
                 description: rules.allowsDescription ? description.trim() || null : null,
@@ -99,7 +127,9 @@ export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Pr
         <>
           <View testID="edit-task-imported-notice" style={styles.notice}>
             <Text style={styles.noticeText}>
-              Imported from Google Calendar. Its title, time, place, description and colour are edited there; here you set what PlanFlow adds.
+              {googleTask
+                ? 'Imported from Google Tasks. Its title, notes and due day are edited there; here you plan it: when to start, how long it takes and how much it matters.'
+                : 'Imported from Google Calendar. Its title, time, place, description and colour are edited there; here you set what PlanFlow adds.'}
             </Text>
           </View>
           <Text style={styles.readOnlyTitle}>{task.title}</Text>
@@ -142,6 +172,27 @@ export function TaskEditForm({ task, members, canAssign, onSaved, onCancel }: Pr
             value={impact}
             onChangeText={setImpact}
           />
+          {imported ? (
+            <>
+              <DurationInput testID="effort" label="Estimated effort (optional)" hours={effort} onChange={setEffort} />
+              {googleTask ? (
+                <>
+                  <DeadlinePicker
+                    testIDPrefix="task-start-picker"
+                    label="Start"
+                    allowAllDay={false}
+                    dateOnly
+                    value={start}
+                    onChange={setStart}
+                  />
+                  {task.isDeadlineDefaulted ? (
+                    // Google had no due day, so the deadline is only a placeholder ("tomorrow"): it can be set here until the item is saved.
+                    <DeadlinePicker label="Deadline" optional={false} allowAllDay={false} dateOnly value={deadline} onChange={setDeadline} />
+                  ) : null}
+                </>
+              ) : null}
+            </>
+          ) : null}
         </>
       )}
 

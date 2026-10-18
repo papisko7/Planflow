@@ -6,6 +6,8 @@ namespace PlanFlow.Application.Tasks.Common;
 /// Flat projection of a <see cref="CalendarItem"/> returned to callers outside the Application layer,
 /// so handlers never leak EF Core-tracked entities across the CQRS boundary.
 /// <see cref="IsExternal"/> marks an item imported from Google (its Google-owned fields are read-only in the app).
+/// <see cref="IsDeadlineDefaulted"/> marks a Google task that had no due day (its deadline is a placeholder the user can still set).
+/// <see cref="GoogleTaskListId"/> / <see cref="GoogleTaskListTitle"/> name the Google Tasks list an imported task belongs to (the title is filled by the queries that load it).
 /// <see cref="ReasonText"/> is the latest urgency explanation; only the list query fills it (null elsewhere).
 /// </summary>
 public record TaskDto(
@@ -41,6 +43,9 @@ public record TaskDto(
     bool IsAllDay,
     string? ExternalSettings,
     bool IsExternal,
+    bool IsDeadlineDefaulted = false,
+    Guid? GoogleTaskListId = null,
+    string? GoogleTaskListTitle = null,
     string? ReasonText = null)
 {
     public static TaskDto FromEntity(CalendarItem task) => new(
@@ -75,5 +80,8 @@ public record TaskDto(
         task.IsBusy,
         task.IsAllDay,
         task.ExternalSettings,
-        task.IsExternal);
+        task.IsExternal,
+        task.IsDeadlineDefaulted,
+        task.ExternalTaskListId,
+        task.ExternalTaskList?.Title);
 }

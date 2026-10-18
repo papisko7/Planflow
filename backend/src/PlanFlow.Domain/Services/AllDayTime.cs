@@ -20,6 +20,10 @@ public static class AllDayTime
         return DateTime.SpecifyKind(TimeZoneInfo.ConvertTimeToUtc(local, zone), DateTimeKind.Utc);
     }
 
+    /// <summary>The calendar day it is right now in <paramref name="zone"/>, in the stored all-day form (midnight UTC of that date, read literally).</summary>
+    public static DateTime LiteralToday(DateTime nowUtc, TimeZoneInfo zone) =>
+        DateTime.SpecifyKind(TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(nowUtc, DateTimeKind.Utc), zone).Date, DateTimeKind.Utc);
+
     /// <summary>The user's zone, or UTC when none is known or the name is not recognised on this machine.</summary>
     public static TimeZoneInfo ZoneOrUtc(string? timeZoneId) =>
         !string.IsNullOrWhiteSpace(timeZoneId) && TimeZoneInfo.TryFindSystemTimeZoneById(timeZoneId, out var zone)
