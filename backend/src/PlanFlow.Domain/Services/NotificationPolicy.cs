@@ -51,7 +51,7 @@ public static class NotificationPolicy
             NotificationEvent.AddedToTeam or NotificationEvent.TeamRoleChanged
                 or NotificationEvent.RemovedFromTeam or NotificationEvent.TeamDeleted => prefs.TeamMembership,
             NotificationEvent.ChatDigest => prefs.ChatDigest,
-            NotificationEvent.CalendarConnectionLost => prefs.CalendarIssues,
+            NotificationEvent.CalendarConnectionLost or NotificationEvent.CalendarItemsIncomplete => prefs.CalendarIssues,
             _ => false
         };
     }

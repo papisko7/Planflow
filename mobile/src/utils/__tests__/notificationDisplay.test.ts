@@ -30,4 +30,8 @@ describe('notificationIcon', () => {
       expect(notificationIcon(event).name).toBeTruthy();
     }
   });
+
+  it('shows incomplete imported events with the calendar icon, not the generic bell', () => {
+    expect(notificationIcon(NotificationEvent.CalendarItemsIncomplete).name).toBe('calendar-outline');
+  });
 });

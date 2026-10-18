@@ -34,6 +34,7 @@ public class NotificationPolicyTests
     [InlineData(NotificationEvent.RemovedFromTeam)]
     [InlineData(NotificationEvent.TeamDeleted)]
     [InlineData(NotificationEvent.CalendarConnectionLost)]
+    [InlineData(NotificationEvent.CalendarItemsIncomplete)]
     public void MasterSwitchOff_SilencesEveryOptionalMail(NotificationEvent evt)
     {
         var prefs = Defaults();

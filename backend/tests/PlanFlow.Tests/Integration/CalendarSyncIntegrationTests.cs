@@ -90,13 +90,14 @@ public class CalendarSyncIntegrationTests
     private static IGoogleOAuthClient BuildOAuthClient(StubHttpMessageHandler handler) =>
         new GoogleOAuthClient(new HttpClient(handler), Options.Create(OAuthOptions));
 
-    private static string SingleEventBody(string id, string title, DateTime startUtc, DateTime endUtc, bool cancelled = false) =>
+    private static string SingleEventBody(string id, string title, DateTime startUtc, DateTime endUtc, bool cancelled = false, string description = "") =>
         $$"""
         {
           "items": [
             {
               "id": "{{id}}",
               "summary": "{{title}}",
+              "description": "{{description}}",
               "status": "{{(cancelled ? "cancelled" : "confirmed")}}",
               "start": { "dateTime": "{{startUtc:o}}" },
               "end": { "dateTime": "{{endUtc:o}}" }
@@ -142,7 +143,7 @@ public class CalendarSyncIntegrationTests
 
         var deadline = DateTime.UtcNow.AddDays(3);
         var calendarHandler = new StubHttpMessageHandler()
-            .Enqueue(HttpStatusCode.OK, SingleEventBody("event-1", "Thesis defense prep", deadline.AddHours(-1), deadline));
+            .Enqueue(HttpStatusCode.OK, SingleEventBody("event-1", "Thesis defense prep", deadline.AddHours(-1), deadline, description: "Rehearse<br>[planflow] impact=8 effort=90min"));
         var (calendarClient, calendarProvider) = BuildCalendarClient(calendarHandler);
         using var _ = calendarProvider;
 
@@ -152,7 +153,14 @@ public class CalendarSyncIntegrationTests
         var task = await context.CalendarItems.SingleAsync();
         Assert.Equal(team.Id, task.TeamId);
         Assert.Equal("Thesis defense prep", task.Title);
-        Assert.Equal(deadline, task.DeadlineUtc);
+        // The real client carries start, end and description over the wire; the job maps them onto an Event.
+        Assert.Equal(TaskType.Event, task.TaskType);
+        Assert.Equal(deadline.AddHours(-1), task.StartUtc);
+        Assert.Equal(deadline, task.EndUtc);
+        Assert.Equal("Rehearse\n[planflow] impact=8 effort=90min", task.Description);
+        Assert.Equal(8, task.ImpactScore);
+        Assert.Equal(1.5, task.EstimatedEffortHours);
+        Assert.False(task.IsDataIncomplete);
         Assert.Equal(integration.Id, task.SourceCalendarIntegrationId);
         Assert.Single(calendarHandler.Requests);
     }

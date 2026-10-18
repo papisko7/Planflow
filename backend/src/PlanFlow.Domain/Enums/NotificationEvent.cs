@@ -28,5 +28,6 @@ public enum NotificationEvent
     ChatDigest = 30,
 
     // Calendar
-    CalendarConnectionLost = 40
+    CalendarConnectionLost = 40,
+    CalendarItemsIncomplete = 41
 }

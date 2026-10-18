@@ -67,7 +67,8 @@ public class GoogleCalendarClient : IGoogleCalendarClient
                 item.Summary,
                 item.Start?.ToUtc(),
                 item.End?.ToUtc(),
-                item.Status == "cancelled"))
+                item.Status == "cancelled",
+                item.Description))
             .ToList();
     }
 
@@ -77,6 +78,7 @@ public class GoogleCalendarClient : IGoogleCalendarClient
     private record GoogleEventItem(
         [property: JsonPropertyName("id")] string Id,
         [property: JsonPropertyName("summary")] string? Summary,
+        [property: JsonPropertyName("description")] string? Description,
         [property: JsonPropertyName("status")] string? Status,
         [property: JsonPropertyName("start")] GoogleEventDateTime? Start,
         [property: JsonPropertyName("end")] GoogleEventDateTime? End);

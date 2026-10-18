@@ -195,6 +195,7 @@ export default function TaskDetailScreen() {
         <View style={styles.badgeRow}>
           <Text style={styles.statusBadge}>{STATUS_LABEL[task.status]}</Text>
           <ItemTypeBadge testID="task-type-badge" type={task.taskType} />
+          {task.isDataIncomplete ? <Text testID="needs-details-badge" style={styles.overrideBadge}>⚠ Needs details</Text> : null}
           {task.manualUrgencyOverride !== null ? <Text style={styles.overrideBadge}>Manual override</Text> : null}
         </View>
         {task.description ? <Text style={styles.description}>{task.description}</Text> : null}

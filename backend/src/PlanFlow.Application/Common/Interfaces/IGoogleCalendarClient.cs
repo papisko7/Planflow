@@ -6,10 +6,11 @@ namespace PlanFlow.Application.Common.Interfaces;
 /// </summary>
 /// <param name="Id">Google's event ID — the idempotency key SyncCalendarJob upserts <see cref="PlanFlow.Domain.Entities.CalendarItem"/> rows on.</param>
 /// <param name="Title">Event summary/title; null for events with no title set.</param>
-/// <param name="StartUtc">Event start; null for an all-day event with no timed start.</param>
-/// <param name="EndUtc">Event end, used as the mapped task's deadline (falls back to <see cref="StartUtc"/> when absent).</param>
+/// <param name="StartUtc">Event start (an all-day event starts at midnight UTC of its date); null only for malformed or cancelled events.</param>
+/// <param name="EndUtc">Event end; null when Google sends none, which marks the imported item as incomplete.</param>
 /// <param name="IsCancelled">True when the event's status is "cancelled" — Google's soft-delete signal.</param>
-public record GoogleCalendarEvent(string Id, string? Title, DateTime? StartUtc, DateTime? EndUtc, bool IsCancelled);
+/// <param name="Description">The event description exactly as Google sends it (may be HTML); null when empty. Carries the optional <c>[planflow]</c> line.</param>
+public record GoogleCalendarEvent(string Id, string? Title, DateTime? StartUtc, DateTime? EndUtc, bool IsCancelled, string? Description = null);
 
 /// <summary>
 /// Talks to Google Calendar's REST API (events.list). Declared in Application so SyncCalendarJob

@@ -15,7 +15,8 @@ namespace PlanFlow.Infrastructure.BackgroundJobs;
 
 /// <summary>
 /// Polls every active Google Calendar connection every 5 minutes and upserts Google events into
-/// <see cref="CalendarItem"/> rows. Idempotency comes from the unique (SourceCalendarIntegrationId,
+/// <see cref="CalendarItem"/> rows of type Event (start–end), reading an optional <c>[planflow]</c> line for impact/effort and
+/// flagging events that still lack data. Idempotency comes from the unique (SourceCalendarIntegrationId,
 /// ExternalCalendarEventId) pair enforced in <c>CalendarItemConfiguration</c> — re-running the job
 /// never creates duplicates, it just finds and updates the same row.
 ///
@@ -97,7 +98,7 @@ public class SyncCalendarJob : IJob
         }
 
         _logger.LogInformation(
-            "SyncCalendarJob run complete: {SyncedAccounts} account(s) synced, {FailedAccounts} failed, {Created} task(s) created, {Updated} task(s) updated.",
+            "SyncCalendarJob run complete: {SyncedAccounts} account(s) synced, {FailedAccounts} failed, {Created} item(s) created, {Updated} item(s) updated.",
             syncedAccounts, failedAccounts, totalCreated, totalUpdated);
     }
 
@@ -160,6 +161,7 @@ public class SyncCalendarJob : IJob
         var created = 0;
         var updated = 0;
         var affectedTeamIds = new HashSet<Guid>();
+        var incompleteItems = new List<CalendarItem>(); // newly imported events that still need the user's details
 
         foreach (var calendarEvent in events)
         {
@@ -181,27 +183,64 @@ public class SyncCalendarJob : IJob
                 continue;
             }
 
-            var deadlineUtc = calendarEvent.EndUtc ?? calendarEvent.StartUtc;
+            if (calendarEvent.StartUtc is null)
+            {
+                // An event with no start cannot be placed on the timeline (Google always sends one for live events).
+                _logger.LogWarning("Skipping Google event {EventId} of integration {IntegrationId}: it has no start time.",
+                    calendarEvent.Id, integration.Id);
+                continue;
+            }
+
+            // The optional "[planflow] impact=8 effort=2h" line (title or description) supplies data Google has no field for.
+            var description = PlanflowTagParser.ToPlainText(calendarEvent.Description);
+            var tag = PlanflowTagParser.Parse(calendarEvent.Title, description);
+            var title = string.IsNullOrWhiteSpace(calendarEvent.Title) ? string.Empty : PlanflowTagParser.StripFromTitle(calendarEvent.Title);
 
             if (task is null)
             {
+                // A calendar entry is a fixed-time happening, so it is imported as an Event (start–end), never as a Task.
                 task = new CalendarItem
                 {
                     TeamId = destinationTeamId.Value,
                     AssignedUserId = integration.UserId,
-                    Title = string.IsNullOrWhiteSpace(calendarEvent.Title) ? "(untitled Google Calendar event)" : calendarEvent.Title,
+                    Title = title.Length == 0 ? "(untitled Google Calendar event)" : title,
+                    Description = description,
                     Status = TaskStatus.Todo,
-                    DeadlineUtc = deadlineUtc,
+                    TaskType = TaskType.Event,
+                    StartUtc = calendarEvent.StartUtc,
+                    EndUtc = calendarEvent.EndUtc,
+                    ImpactScore = tag?.ImpactScore,
+                    EstimatedEffortHours = tag?.EffortHours,
                     SourceCalendarIntegrationId = integration.Id,
                     ExternalCalendarEventId = calendarEvent.Id
                 };
+                task.IsDataIncomplete = IsMissingData(task, nowUtc);
                 _context.CalendarItems.Add(task);
                 created++;
+
+                if (task.IsDataIncomplete)
+                {
+                    incompleteItems.Add(task);
+                }
             }
             else
             {
-                task.Title = string.IsNullOrWhiteSpace(calendarEvent.Title) ? task.Title : calendarEvent.Title;
-                task.DeadlineUtc = deadlineUtc;
+                task.Title = title.Length == 0 ? task.Title : title;
+                task.Description = description;
+                // Also converts rows imported before events existed (they were Tasks with a deadline) on their next change.
+                task.TaskType = TaskType.Event;
+                task.StartUtc = calendarEvent.StartUtc;
+                task.EndUtc = calendarEvent.EndUtc;
+                task.DeadlineUtc = null;
+                // A tag in Google wins over what is stored; a missing tag never erases what the user filled in.
+                task.ImpactScore = tag?.ImpactScore ?? task.ImpactScore;
+                task.EstimatedEffortHours = tag?.EffortHours ?? task.EstimatedEffortHours;
+                // The flag is raised once, at import. A later sync only lowers it (the data arrived), so an event the user
+                // chose to leave without impact is not flagged and announced again after every edit in Google.
+                if (task.IsDataIncomplete && !IsMissingData(task, nowUtc))
+                {
+                    task.IsDataIncomplete = false;
+                }
                 if (task.Status == TaskStatus.Cancelled)
                 {
                     // Google un-cancelled a previously-cancelled event (e.g. the organizer restored it).
@@ -212,6 +251,18 @@ public class SyncCalendarJob : IJob
             }
 
             affectedTeamIds.Add(task.TeamId);
+        }
+
+        if (incompleteItems.Count > 0)
+        {
+            // One message per run listing every newly imported event that needs details (inbox + push + e-mail by preference),
+            // saved in the same transaction as the events themselves. A single event opens directly when tapped.
+            await _notifications.NotifyAsync(
+                NotificationEvent.CalendarItemsIncomplete,
+                new[] { integration.UserId },
+                EmailTemplates.CalendarItemsIncomplete(incompleteItems.Select(i => i.Title).ToList()),
+                cancellationToken: cancellationToken,
+                taskId: incompleteItems.Count == 1 ? incompleteItems[0].Id : null);
         }
 
         integration.LastSyncedAtUtc = nowUtc;
@@ -231,4 +282,11 @@ public class SyncCalendarJob : IJob
 
         return (created, updated);
     }
+
+    /// <summary>
+    /// An imported event is "incomplete" when the ranking lacks data only the user can add: no impact (Google has no such field —
+    /// it can come from the <c>[planflow]</c> tag) or no end time. An event that is already over is never flagged: nothing to rank.
+    /// </summary>
+    private static bool IsMissingData(CalendarItem item, DateTime nowUtc) =>
+        (item.ImpactScore is null || item.EndUtc is null) && (item.EndUtc is null || item.EndUtc > nowUtc);
 }

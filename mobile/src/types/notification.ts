@@ -41,6 +41,7 @@ export enum NotificationEvent {
   RemovedFromTeam = 22,
   TeamDeleted = 23,
   CalendarConnectionLost = 40,
+  CalendarItemsIncomplete = 41,
 }
 
 // Mirrors PlanFlow.Application.Notifications.Inbox.NotificationDto

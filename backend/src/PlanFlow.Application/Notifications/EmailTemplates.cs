@@ -154,6 +154,30 @@ public static class EmailTemplates
             $"PlanFlow can no longer read the Google Calendar of {accountEmail}, so new events are not being imported.",
             "Open Settings → Google Calendar and connect it again."));
 
+    /// <summary>How many names the message lists before it says "and N more" — a first import can bring dozens of events.</summary>
+    private const int MaxListedTitles = 10;
+
+    /// <summary>
+    /// Sent after a Google Calendar import left some events without the data the ranking needs (no impact, no end time).
+    /// The first paragraph (it becomes the inbox/push text) lists the events by name; the second says how to fix them.
+    /// </summary>
+    public static Func<string, EmailContent> CalendarItemsIncomplete(IReadOnlyList<string> titles) => name =>
+    {
+        var listed = string.Join(", ", titles.Take(MaxListedTitles).Select(t => $"\"{Clean(t)}\""));
+        var more = titles.Count > MaxListedTitles ? $" and {titles.Count - MaxListedTitles} more" : "";
+        var subject = titles.Count == 1
+            ? "1 imported event needs your details"
+            : $"{titles.Count} imported events need your details";
+
+        return EmailLayout.Build(
+            subject,
+            name,
+            Lines(
+                $"Imported from Google Calendar without enough data to rank {(titles.Count == 1 ? "it" : "them")}: {listed}{more}.",
+                "Open each one in PlanFlow and fill in its impact — saving it clears this reminder. " +
+                "You can also add a line like \"[planflow] impact=8 effort=2h\" to the event's description in Google Calendar."));
+    };
+
     // ---------- helpers ----------
 
     private static IReadOnlyList<string> Lines(params string?[] lines) => lines.Where(l => l is not null).Select(l => l!).ToList();

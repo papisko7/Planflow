@@ -110,7 +110,10 @@ public class SyncCalendarJobTests
         Assert.Equal(user.Id, task.AssignedUserId);
         Assert.Equal("Thesis defense prep", task.Title);
         Assert.Equal(TaskStatus.Todo, task.Status);
-        Assert.Equal(deadline, task.DeadlineUtc);
+        Assert.Equal(TaskType.Event, task.TaskType); // a calendar entry is an Event, not a Task
+        Assert.Equal(deadline.AddHours(-1), task.StartUtc);
+        Assert.Equal(deadline, task.EndUtc);
+        Assert.Null(task.DeadlineUtc);
         Assert.Equal(integration.Id, task.SourceCalendarIntegrationId);
         Assert.Equal("event-1", task.ExternalCalendarEventId);
         Assert.True(context.UrgencyScoreLogs.Any(l => l.CalendarItemId == task.Id && l.TriggerSource == ScoreTriggerSource.CalendarSync));
@@ -167,7 +170,10 @@ public class SyncCalendarJobTests
         Assert.Equal(1, await context.CalendarItems.CountAsync());
         var task = await context.CalendarItems.SingleAsync();
         Assert.Equal("Updated title", task.Title);
-        Assert.Equal(newDeadline, task.DeadlineUtc);
+        Assert.Equal(newDeadline.AddHours(-1), task.StartUtc);
+        Assert.Equal(newDeadline, task.EndUtc);
+        Assert.Equal(TaskType.Event, task.TaskType); // a row imported before 7.4 (a Task with a deadline) becomes an Event
+        Assert.Null(task.DeadlineUtc);
     }
 
     [Fact]
@@ -342,5 +348,222 @@ public class SyncCalendarJobTests
         await job.Execute(CreateJobContext().Object);
 
         calendarClient.Verify(c => c.ListEventsAsync(It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // ---------- step 7.4: Event import, [planflow] tag, IsDataIncomplete ----------
+
+    private static Mock<IGoogleCalendarClient> ClientReturning(params GoogleCalendarEvent[] events)
+    {
+        var client = new Mock<IGoogleCalendarClient>();
+        client.Setup(c => c.ListEventsAsync(It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(events);
+        return client;
+    }
+
+    [Fact]
+    public async Task Execute_TaggedEvent_ImportsDescriptionImpactAndEffort_AndIsNotIncomplete()
+    {
+        var context = CreateInMemoryContext();
+        var (user, _) = SeedUserWithTeam(context);
+        SeedActiveIntegration(context, user.Id);
+        var start = DateTime.UtcNow.AddDays(2);
+
+        var client = ClientReturning(new GoogleCalendarEvent(
+            "event-1", "Sprint review [planflow] impact=6", start, start.AddHours(1), IsCancelled: false,
+            Description: "Agenda<br>[planflow] impact=8 effort=2h<br>Bring laptop"));
+        await CreateJob(context, client).Execute(CreateJobContext().Object);
+
+        var item = await context.CalendarItems.SingleAsync();
+        Assert.Equal(TaskType.Event, item.TaskType);
+        Assert.Equal("Sprint review", item.Title);                 // the tag is not part of the visible title
+        Assert.Equal("Agenda\n[planflow] impact=8 effort=2h\nBring laptop", item.Description);
+        Assert.Equal(6, item.ImpactScore);                         // title tag wins over the description tag
+        Assert.Equal(2, item.EstimatedEffortHours);
+        Assert.False(item.IsDataIncomplete);
+        Assert.Empty(context.Notifications);                       // nothing to remind about
+    }
+
+    [Fact]
+    public async Task Execute_UntaggedEvents_AreFlaggedAndOneNotificationListsTheirNames()
+    {
+        var context = CreateInMemoryContext();
+        var (user, _) = SeedUserWithTeam(context);
+        SeedActiveIntegration(context, user.Id);
+        var start = DateTime.UtcNow.AddDays(2);
+
+        var client = ClientReturning(
+            new GoogleCalendarEvent("e1", "Dentist", start, start.AddHours(1), IsCancelled: false),
+            new GoogleCalendarEvent("e2", "Gym", start, start.AddHours(1), IsCancelled: false),
+            new GoogleCalendarEvent("e3", "Complete one", start, start.AddHours(1), IsCancelled: false, Description: "[planflow] impact=5"));
+        await CreateJob(context, client).Execute(CreateJobContext().Object);
+
+        Assert.Equal(new[] { "Dentist", "Gym" }, context.CalendarItems.Where(i => i.IsDataIncomplete).Select(i => i.Title).OrderBy(t => t));
+
+        var inbox = Assert.Single(context.Notifications);
+        Assert.Equal(NotificationEvent.CalendarItemsIncomplete, inbox.Event);
+        Assert.Equal(user.Id, inbox.UserId);
+        Assert.Contains("\"Dentist\"", inbox.Body);
+        Assert.Contains("\"Gym\"", inbox.Body);
+        Assert.DoesNotContain("Complete one", inbox.Body);
+        Assert.Null(inbox.TaskId);                                  // several items: nothing single to open
+
+        var mail = Assert.Single(context.EmailOutbox);
+        Assert.Equal("2 imported events need your details", mail.Subject);
+    }
+
+    [Fact]
+    public async Task Execute_SingleIncompleteEvent_NotificationOpensThatItem()
+    {
+        var context = CreateInMemoryContext();
+        var (user, _) = SeedUserWithTeam(context);
+        SeedActiveIntegration(context, user.Id);
+        var start = DateTime.UtcNow.AddDays(1);
+
+        await CreateJob(context, ClientReturning(new GoogleCalendarEvent("e1", "Dentist", start, start.AddHours(1), IsCancelled: false)))
+            .Execute(CreateJobContext().Object);
+
+        var item = await context.CalendarItems.SingleAsync();
+        Assert.Equal(item.Id, (await context.Notifications.SingleAsync()).TaskId);
+    }
+
+    [Fact]
+    public async Task Execute_LongList_ShowsTenNamesAndCountsTheRest()
+    {
+        var context = CreateInMemoryContext();
+        var (user, _) = SeedUserWithTeam(context);
+        SeedActiveIntegration(context, user.Id);
+        var start = DateTime.UtcNow.AddDays(1);
+
+        var events = Enumerable.Range(1, 13)
+            .Select(i => new GoogleCalendarEvent($"e{i}", $"Event {i}", start, start.AddHours(1), IsCancelled: false))
+            .ToArray();
+        await CreateJob(context, ClientReturning(events)).Execute(CreateJobContext().Object);
+
+        var body = (await context.Notifications.SingleAsync()).Body;
+        Assert.Contains("\"Event 10\"", body);
+        Assert.DoesNotContain("\"Event 11\"", body);
+        Assert.Contains("and 3 more", body);
+    }
+
+    [Fact]
+    public async Task Execute_ResyncOfAnAlreadyFlaggedEvent_DoesNotNotifyAgain()
+    {
+        var context = CreateInMemoryContext();
+        var (user, _) = SeedUserWithTeam(context);
+        SeedActiveIntegration(context, user.Id);
+        var start = DateTime.UtcNow.AddDays(1);
+        var job = CreateJob(context, ClientReturning(new GoogleCalendarEvent("e1", "Dentist", start, start.AddHours(1), IsCancelled: false)));
+
+        await job.Execute(CreateJobContext().Object);
+        await job.Execute(CreateJobContext().Object);
+
+        Assert.Single(context.Notifications);
+        Assert.True((await context.CalendarItems.SingleAsync()).IsDataIncomplete); // still waiting for the user
+    }
+
+    [Fact]
+    public async Task Execute_TagAddedInGoogleLater_FillsTheDataAndClearsTheFlag()
+    {
+        var context = CreateInMemoryContext();
+        var (user, _) = SeedUserWithTeam(context);
+        SeedActiveIntegration(context, user.Id);
+        var start = DateTime.UtcNow.AddDays(1);
+
+        await CreateJob(context, ClientReturning(new GoogleCalendarEvent("e1", "Dentist", start, start.AddHours(1), IsCancelled: false)))
+            .Execute(CreateJobContext().Object);
+        await CreateJob(context, ClientReturning(new GoogleCalendarEvent("e1", "Dentist", start, start.AddHours(1), IsCancelled: false, Description: "[planflow] impact=7")))
+            .Execute(CreateJobContext().Object);
+
+        var item = await context.CalendarItems.SingleAsync();
+        Assert.Equal(7, item.ImpactScore);
+        Assert.False(item.IsDataIncomplete);
+    }
+
+    [Fact]
+    public async Task Execute_GoogleUpdateAfterTheUserFilledItIn_KeepsTheUsersImpactAndDoesNotReflag()
+    {
+        var context = CreateInMemoryContext();
+        var (user, team) = SeedUserWithTeam(context);
+        var integration = SeedActiveIntegration(context, user.Id);
+        var start = DateTime.UtcNow.AddDays(1);
+        context.CalendarItems.Add(new CalendarItem
+        {
+            TeamId = team.Id, AssignedUserId = user.Id, Title = "Dentist", TaskType = TaskType.Event,
+            StartUtc = start, EndUtc = start.AddHours(1), ImpactScore = 9, IsDataIncomplete = false, // saved by the user
+            SourceCalendarIntegrationId = integration.Id, ExternalCalendarEventId = "e1"
+        });
+        await context.SaveChangesAsync();
+
+        // Google reports a change (new title) and has no tag.
+        await CreateJob(context, ClientReturning(new GoogleCalendarEvent("e1", "Dentist (moved)", start, start.AddHours(1), IsCancelled: false)))
+            .Execute(CreateJobContext().Object);
+
+        var item = await context.CalendarItems.SingleAsync();
+        Assert.Equal("Dentist (moved)", item.Title);
+        Assert.Equal(9, item.ImpactScore);
+        Assert.False(item.IsDataIncomplete);
+        Assert.Empty(context.Notifications);
+    }
+
+    [Fact]
+    public async Task Execute_EventWithoutEndTime_IsFlaggedEvenWhenImpactIsGiven()
+    {
+        var context = CreateInMemoryContext();
+        var (user, _) = SeedUserWithTeam(context);
+        SeedActiveIntegration(context, user.Id);
+
+        await CreateJob(context, ClientReturning(new GoogleCalendarEvent(
+                "e1", "Open-ended", DateTime.UtcNow.AddDays(1), EndUtc: null, IsCancelled: false, Description: "[planflow] impact=4")))
+            .Execute(CreateJobContext().Object);
+
+        var item = await context.CalendarItems.SingleAsync();
+        Assert.Null(item.EndUtc);
+        Assert.True(item.IsDataIncomplete);
+    }
+
+    [Fact]
+    public async Task Execute_EventThatAlreadyEnded_IsNotFlagged()
+    {
+        var context = CreateInMemoryContext();
+        var (user, _) = SeedUserWithTeam(context);
+        SeedActiveIntegration(context, user.Id);
+        var start = DateTime.UtcNow.AddDays(-2);
+
+        await CreateJob(context, ClientReturning(new GoogleCalendarEvent("e1", "Past meeting", start, start.AddHours(1), IsCancelled: false)))
+            .Execute(CreateJobContext().Object);
+
+        Assert.False((await context.CalendarItems.SingleAsync()).IsDataIncomplete); // over: nothing left to rank
+        Assert.Empty(context.Notifications);
+    }
+
+    [Fact]
+    public async Task Execute_EventWithoutStart_IsSkipped()
+    {
+        var context = CreateInMemoryContext();
+        var (user, _) = SeedUserWithTeam(context);
+        SeedActiveIntegration(context, user.Id);
+
+        await CreateJob(context, ClientReturning(new GoogleCalendarEvent("e1", "No start", StartUtc: null, EndUtc: null, IsCancelled: false)))
+            .Execute(CreateJobContext().Object);
+
+        Assert.Empty(context.CalendarItems);
+    }
+
+    [Fact]
+    public async Task Execute_CalendarIssuesSwitchedOff_NoNotificationIsQueuedButTheFlagStays()
+    {
+        var context = CreateInMemoryContext();
+        var (user, _) = SeedUserWithTeam(context);
+        SeedActiveIntegration(context, user.Id);
+        context.NotificationPreferences.Add(new NotificationPreference { UserId = user.Id, CalendarIssues = false });
+        await context.SaveChangesAsync();
+        var start = DateTime.UtcNow.AddDays(1);
+
+        await CreateJob(context, ClientReturning(new GoogleCalendarEvent("e1", "Dentist", start, start.AddHours(1), IsCancelled: false)))
+            .Execute(CreateJobContext().Object);
+
+        Assert.True((await context.CalendarItems.SingleAsync()).IsDataIncomplete);
+        Assert.Empty(context.Notifications);
+        Assert.Empty(context.EmailOutbox);
     }
 }

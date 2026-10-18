@@ -29,6 +29,7 @@ export function notificationIcon(event: NotificationEvent): NotificationIcon {
     case NotificationEvent.TeamDeleted:
       return { name: 'people-outline', color: colors.danger };
     case NotificationEvent.CalendarConnectionLost:
+    case NotificationEvent.CalendarItemsIncomplete:
       return { name: 'calendar-outline', color: colors.urgencyHigh };
     default:
       return { name: 'notifications-outline', color: colors.primary };

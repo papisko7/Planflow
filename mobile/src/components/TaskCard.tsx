@@ -110,6 +110,7 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
           <Text style={styles.metaText}>⏱ {formatDuration(task.estimatedEffortHours)}</Text>
         ) : null}
         {recurrence ? <Text style={styles.metaText}>🔁 {recurrence}</Text> : null}
+        {task.isDataIncomplete ? <Text testID={`needs-details-${task.id}`} style={[styles.metaText, styles.blockedText]}>⚠ Needs details</Text> : null}
         {task.blockedByTaskId ? <Text style={[styles.metaText, styles.blockedText]}>⛔ Blocked</Text> : null}
         {task.manualUrgencyOverride !== null ? <Text style={styles.metaText}>✋ Manual override</Text> : null}
       </View>

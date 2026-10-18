@@ -133,4 +133,12 @@ describe('TaskCard long-press menu', () => {
     await fireEvent.press(screen.getByTestId('task-menu-reopen'));
     expect(actions.reopen).toHaveBeenCalledWith(done);
   });
+
+  it('flags an item that still needs details (imported without impact), and only then', async () => {
+    await render(<TaskCard task={{ ...task, isDataIncomplete: true }} />);
+    expect(screen.getByTestId('needs-details-t1')).toBeTruthy();
+
+    await render(<TaskCard task={{ ...task, id: 't2', isDataIncomplete: false }} />);
+    expect(screen.queryByTestId('needs-details-t2')).toBeNull();
+  });
 });

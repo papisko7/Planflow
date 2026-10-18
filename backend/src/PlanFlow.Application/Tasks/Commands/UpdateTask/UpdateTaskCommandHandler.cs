@@ -45,6 +45,7 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
         task.UseAiEnhancement = request.UseAiEnhancement;
         task.ImpactScore = request.ImpactScore;
         task.BlockedByTaskId = request.BlockedByTaskId;
+        task.IsDataIncomplete = false; // the user has looked at this item and saved it: the "please complete" reminder is done
         task.ManualUrgencyOverride = request.ManualUrgencyOverride;
         task.ManualUrgencyOverrideExpiresAtUtc = request.ManualUrgencyOverrideExpiresAtUtc;
 
