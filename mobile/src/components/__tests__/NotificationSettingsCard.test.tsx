@@ -45,6 +45,7 @@ const openNotifications = async () => {
   await fireEvent.press(screen.getByTestId('notifications-section-header'));
 };
 const openTeams = () => fireEvent.press(screen.getByTestId('notif-teams-section-header'));
+const openTeam = (id: string) => fireEvent.press(screen.getByTestId(`notif-team-${id}-header`));
 
 async function renderOpen() {
   await render(<NotificationSettingsCard />);
@@ -153,13 +154,23 @@ describe('NotificationSettingsCard', () => {
   it('lists only real teams for muting (not the personal workspace) and saves a mute', async () => {
     await renderOpen();
     await openTeams();
+    expect(screen.queryByTestId('notif-team-tasks-s')).toBeNull(); // each team is its own accordion, collapsed until opened
+    await openTeam('s');
 
     expect(screen.getByTestId('notif-team-tasks-s')).toBeTruthy();
-    expect(screen.queryByTestId('notif-team-tasks-p')).toBeNull();
+    expect(screen.queryByTestId('notif-team-p-header')).toBeNull();
 
     await fireEvent(screen.getByTestId('notif-team-chat-s'), 'valueChange', true);
 
     await waitFor(() => expect(mockedTeamUpdate).toHaveBeenCalledWith('s', { muteNotifications: false, muteChat: true }));
+  });
+
+  it('a collapsed team says what is muted in it', async () => {
+    mockedTeams.mockResolvedValue([personal, { ...squad, muteNotifications: true, muteChat: false }]);
+    await renderOpen();
+    await openTeams();
+
+    expect(screen.getByText('Items muted')).toBeTruthy();
   });
 
   it('counts muted teams in the collapsed Teams header', async () => {

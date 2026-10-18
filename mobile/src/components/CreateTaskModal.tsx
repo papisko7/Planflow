@@ -16,16 +16,19 @@ import { createTask } from '../services/taskService';
 import { getTeamMembers } from '../services/teamService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { AssigneePicker } from './AssigneePicker';
+import { ListPicker } from './ListPicker';
 import { ParticipantPicker } from './ParticipantPicker';
 import { RemindersEditor } from './RemindersEditor';
 import { ScheduleForm } from './ScheduleForm';
 import type { ApiError } from '../types/api';
 import { TeamRole, type TeamDto, type TeamMemberDto } from '../types/team';
 import { TaskType, type ReminderInput, type ScheduleFields, type TaskDto } from '../types/task';
+import { ItemListKind } from '../types/itemList';
+import { collapseSeries } from '../utils/seriesGrouping';
 import { isFinishedStatus } from '../utils/taskStatus';
 import { emptySchedule, scheduleForRequest, validateSchedule } from '../utils/schedule';
 import { fitReminders, validateReminders, type ReminderContext } from '../utils/reminders';
-import { rulesFor } from '../utils/templateRules';
+import { isInformational, rulesFor } from '../utils/templateRules';
 
 type Props = {
   visible: boolean;
@@ -51,6 +54,7 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
   const [schedule, setSchedule] = useState<ScheduleFields>(() => emptySchedule(defaultType));
   const [impactScore, setImpactScore] = useState('');
   const [blockedByTaskId, setBlockedByTaskId] = useState<string | null>(null);
+  const [itemListId, setItemListId] = useState<string | null>(null);
   const [assignedUserId, setAssignedUserId] = useState<string | null>(myUserId);
   // Alerts and the people invited besides the assignee (guests of an event / co-contractors of a task).
   const [reminders, setReminders] = useState<ReminderInput[]>([]);
@@ -67,6 +71,7 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
     setSchedule(emptySchedule(defaultType));
     setImpactScore('');
     setBlockedByTaskId(null);
+    setItemListId(null);
     setAssignedUserId(myUserId);
     setReminders([]);
     setParticipants([]);
@@ -114,9 +119,11 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
   const assigneeId = canAssign ? assignedUserId : myUserId;
   const canInvite = !team?.isPersonal && members.length > 1 && (schedule.taskType === TaskType.Task || rules.allowsGuests);
   const shownParticipants = canInvite ? participants.filter((id) => id !== assigneeId) : [];
-  const blockerChoices = rules.informational ? [] : tasks.filter(
-    (t) => t.teamId === teamId && !isFinishedStatus(t.status),
-  );
+  // Only items that can really hold something up: not finished, not informational (a birthday, a day off, ...), and a repeating series
+  // once (its next occurrence) instead of a copy for every date.
+  const blockerChoices = rules.informational
+    ? []
+    : collapseSeries(tasks.filter((t) => t.teamId === teamId && !isFinishedStatus(t.status) && !isInformational(t)));
 
   const submit = useCallback(async () => {
     const finalTitle = title.trim() || rules.defaultTitle;
@@ -148,6 +155,7 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
         blockedByTaskId: rules.informational ? null : blockedByTaskId,
         reminders: shownReminders,
         participantUserIds: shownParticipants,
+        itemListId,
       });
       onCreated();
       onClose();
@@ -156,7 +164,7 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
     } finally {
       setSubmitting(false);
     }
-  }, [teamId, title, description, schedule, rules, impactScore, blockedByTaskId, canAssign, assignedUserId, myUserId, shownReminders, shownParticipants, reminderContext, onCreated, onClose]);
+  }, [teamId, title, description, schedule, rules, impactScore, blockedByTaskId, itemListId, canAssign, assignedUserId, myUserId, shownReminders, shownParticipants, reminderContext, onCreated, onClose]);
 
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
@@ -215,6 +223,7 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
                       onPress={() => {
                         setTeamId(t.id);
                         setBlockedByTaskId(null);
+                        setItemListId(null);
                         setAssignedUserId(myUserId);
                       }}
                       style={[styles.chip, teamId === t.id ? styles.chipActive : null]}
@@ -227,6 +236,13 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
                 </View>
               </View>
             ) : null}
+
+            <ListPicker
+              teamId={teamId}
+              kind={schedule.taskType === TaskType.Event ? ItemListKind.MeetingList : ItemListKind.TaskList}
+              value={itemListId}
+              onChange={setItemListId}
+            />
 
             {canAssign ? <AssigneePicker members={members} value={assignedUserId} onChange={setAssignedUserId} /> : null}
 

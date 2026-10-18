@@ -938,4 +938,107 @@ public class SyncCalendarJobTests
         Assert.Null(integration.LastSyncedAtUtc);       // so the next run repeats the full pass
         Assert.Null(integration.LastFullSyncAtUtc);
     }
+
+    // --- clean-up of items beyond the import window (step 7.5.11) ---
+
+    private static CalendarItem ImportedItem(PlanFlowDbContext context, CalendarIntegration integration, string eventId, DateTime start, string? seriesId = "birthday-series")
+    {
+        var item = new CalendarItem
+        {
+            TeamId = context.Teams.Single().Id,
+            AssignedUserId = integration.UserId,
+            Title = "Anna's birthday",
+            TaskType = TaskType.Event,
+            Status = TaskStatus.Confirmed,
+            StartUtc = start,
+            EndUtc = start.AddDays(1),
+            IsAllDay = true,
+            SeriesId = seriesId,
+            SourceCalendarIntegrationId = integration.Id,
+            ExternalCalendarEventId = eventId
+        };
+        context.CalendarItems.Add(item);
+        context.SaveChanges();
+        return item;
+    }
+
+    [Fact]
+    public async Task Execute_FullPass_DeletesImportedItemsBeyondTheWindow_AndKeepsTheOthers()
+    {
+        var (context, integration) = SetUp();
+        var inside = ImportedItem(context, integration, "in-window", Midnight(30));
+        var past = ImportedItem(context, integration, "past", Midnight(-400));
+        ImportedItem(context, integration, "far-1", Midnight(IGoogleCalendarClient.WindowDays + 5));
+        ImportedItem(context, integration, "far-2", Midnight(365 * 3));
+        // An item of the person's own that happens to be far ahead is not Google's to clean up.
+        var own = new CalendarItem { TeamId = context.Teams.Single().Id, Title = "Retirement party", TaskType = TaskType.Event, Status = TaskStatus.Confirmed, StartUtc = Midnight(2000) };
+        context.CalendarItems.Add(own);
+        await context.SaveChangesAsync();
+
+        await SyncAsync(context); // the first run is a full pass
+
+        var left = (await context.CalendarItems.ToListAsync()).Select(i => i.Id).ToHashSet();
+        Assert.Equal(new HashSet<Guid> { inside.Id, past.Id, own.Id }, left);
+    }
+
+    [Fact]
+    public async Task Execute_FullPass_TreatsAnOldImportedTaskByItsDeadline()
+    {
+        var (context, integration) = SetUp();
+        // Rows imported before events existed were Tasks with a deadline and no start.
+        var old = ImportedItem(context, integration, "legacy", Midnight(1000));
+        old.TaskType = TaskType.Task;
+        old.StartUtc = null;
+        old.EndUtc = null;
+        old.DeadlineUtc = Midnight(1000);
+        await context.SaveChangesAsync();
+
+        await SyncAsync(context);
+
+        Assert.Empty(context.CalendarItems);
+    }
+
+    [Fact]
+    public async Task Execute_FullPass_KeepsAnItemGoogleMovedIntoTheWindowInThisVeryPass()
+    {
+        var (context, integration) = SetUp();
+        var far = ImportedItem(context, integration, "moved", Midnight(IGoogleCalendarClient.WindowDays + 40));
+        var newStart = Midnight(10);
+
+        await SyncAsync(context, new GoogleCalendarEvent("moved", "Anna's birthday", newStart, newStart.AddDays(1), IsCancelled: false, IsAllDay: true));
+
+        var kept = await context.CalendarItems.SingleAsync();
+        Assert.Equal(far.Id, kept.Id);
+        Assert.Equal(newStart, kept.StartUtc);
+    }
+
+    [Fact]
+    public async Task Execute_IncrementalPoll_LeavesFarItemsAlone()
+    {
+        var (context, integration) = SetUp();
+        integration.LastSyncedAtUtc = DateTime.UtcNow.AddMinutes(-5);
+        integration.LastFullSyncAtUtc = DateTime.UtcNow.AddHours(-2); // the full pass was recent: this run is only a poll
+        await context.SaveChangesAsync();
+        ImportedItem(context, integration, "far", Midnight(IGoogleCalendarClient.WindowDays + 5));
+
+        await SyncAsync(context);
+
+        Assert.Single(context.CalendarItems);
+    }
+
+    [Fact]
+    public async Task Execute_FullPass_DropsTheBlockerLinkOfAnItemItDeletes()
+    {
+        var (context, integration) = SetUp();
+        var far = ImportedItem(context, integration, "far", Midnight(IGoogleCalendarClient.WindowDays + 5));
+        var mine = new CalendarItem { TeamId = far.TeamId, Title = "Prepare", TaskType = TaskType.Task, DeadlineUtc = Midnight(3), BlockedByTaskId = far.Id };
+        context.CalendarItems.Add(mine);
+        await context.SaveChangesAsync();
+
+        await SyncAsync(context);
+
+        var kept = await context.CalendarItems.SingleAsync();
+        Assert.Equal(mine.Id, kept.Id);
+        Assert.Null(kept.BlockedByTaskId);
+    }
 }

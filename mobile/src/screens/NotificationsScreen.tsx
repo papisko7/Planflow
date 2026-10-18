@@ -14,6 +14,7 @@ import {
   markNotificationsRead,
 } from '../services/notificationService';
 import { colors, radius, spacing, typography } from '../theme/theme';
+import { DOUBLE_TAP_MS } from '../utils/gestures';
 import { notificationIcon, timeAgo } from '../utils/notificationDisplay';
 import type { RootStackParamList } from '../navigation/types';
 import type { ApiError } from '../types/api';
@@ -23,7 +24,7 @@ const PAGE_SIZE = 30;
 
 // The in-app inbox: everything PlanFlow told you, newest first.
 // Tap opens the item it is about (and marks the entry read). Swipe right deletes, swipe left marks read.
-// Long-press ticks entries: then tapping ticks more, and the bar at the bottom reads or deletes them all at once.
+// A long press or a quick double tap ticks an entry: then tapping ticks more, and the bar at the bottom reads or deletes them all at once.
 export default function NotificationsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [items, setItems] = useState<InboxNotification[]>([]);
@@ -34,6 +35,14 @@ export default function NotificationsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const loadingMoreRef = useRef(false);
+  // The first tap of a possible double tap: the entry opens only if no second tap follows within DOUBLE_TAP_MS.
+  const pendingTap = useRef<{ id: string; timer: ReturnType<typeof setTimeout>; open: () => void } | null>(null);
+  useEffect(
+    () => () => {
+      if (pendingTap.current) clearTimeout(pendingTap.current.timer);
+    },
+    [],
+  );
 
   const selecting = selected.size > 0;
 
@@ -184,6 +193,29 @@ export default function NotificationsScreen() {
     }
   };
 
+  const onRowPress = (notification: InboxNotification) => {
+    if (selecting) {
+      toggle(notification.id);
+      return;
+    }
+    const pending = pendingTap.current;
+    if (pending && pending.id === notification.id) {
+      clearTimeout(pending.timer);
+      pendingTap.current = null;
+      toggle(notification.id); // the second tap: start ticking with this one
+      return;
+    }
+    if (pending) {
+      clearTimeout(pending.timer); // another entry was tapped before the wait ran out: the earlier one opens now
+      pending.open();
+    }
+    const timer = setTimeout(() => {
+      pendingTap.current = null;
+      open(notification);
+    }, DOUBLE_TAP_MS);
+    pendingTap.current = { id: notification.id, timer, open: () => open(notification) };
+  };
+
   // While ticking, the phone's back button first leaves the ticking mode instead of the screen.
   useEffect(() => {
     if (!selecting) return undefined;
@@ -278,7 +310,7 @@ export default function NotificationsScreen() {
               <Pressable
                 testID={`notification-${item.id}`}
                 style={[styles.row, item.isRead ? null : styles.rowUnread, ticked ? styles.rowTicked : null]}
-                onPress={() => (selecting ? toggle(item.id) : open(item))}
+                onPress={() => onRowPress(item)}
                 onLongPress={() => toggle(item.id)}
                 delayLongPress={350}
               >

@@ -46,6 +46,12 @@ public class CalendarItemConfiguration : IEntityTypeConfiguration<CalendarItem>
             .HasForeignKey(t => t.ExternalTaskListId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        // Deleting one of the team's own lists keeps its items; they just lose the grouping.
+        builder.HasOne(t => t.ItemList)
+            .WithMany()
+            .HasForeignKey(t => t.ItemListId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasOne(t => t.Team)
             .WithMany(team => team.CalendarItems)
             .HasForeignKey(t => t.TeamId)

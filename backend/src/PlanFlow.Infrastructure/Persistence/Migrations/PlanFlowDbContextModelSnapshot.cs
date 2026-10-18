@@ -219,6 +219,9 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsRecurring")
                         .HasColumnType("boolean");
 
+                    b.Property<Guid?>("ItemListId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Location")
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
@@ -277,6 +280,8 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .IsDescending();
 
                     b.HasIndex("ExternalTaskListId");
+
+                    b.HasIndex("ItemListId");
 
                     b.HasIndex("TeamId");
 
@@ -406,6 +411,41 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("external_task_lists", (string)null);
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.ItemList", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("TeamId");
+
+                    b.ToTable("item_lists", (string)null);
                 });
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.ItemParticipant", b =>
@@ -1012,6 +1052,11 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ExternalTaskListId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("PlanFlow.Domain.Entities.ItemList", "ItemList")
+                        .WithMany()
+                        .HasForeignKey("ItemListId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("PlanFlow.Domain.Entities.CalendarIntegration", "SourceCalendarIntegration")
                         .WithMany()
                         .HasForeignKey("SourceCalendarIntegrationId")
@@ -1030,6 +1075,8 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("BlockedByTask");
 
                     b.Navigation("ExternalTaskList");
+
+                    b.Navigation("ItemList");
 
                     b.Navigation("SourceCalendarIntegration");
 
@@ -1064,6 +1111,24 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("CalendarIntegration");
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.ItemList", b =>
+                {
+                    b.HasOne("PlanFlow.Domain.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PlanFlow.Domain.Entities.Team", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Team");
                 });
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.ItemParticipant", b =>

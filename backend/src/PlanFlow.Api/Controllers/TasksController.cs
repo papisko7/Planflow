@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PlanFlow.Api.Common;
 using PlanFlow.Api.Contracts;
+using PlanFlow.Application.Tasks.Commands.BulkTasks;
 using PlanFlow.Application.Tasks.Commands.CreateTask;
 using PlanFlow.Application.Tasks.Commands.DeleteTask;
 using PlanFlow.Application.Tasks.Commands.LeaveTask;
@@ -79,10 +80,55 @@ public class TasksController : ControllerBase
                 request.ColorKey,
                 request.IsBusy,
                 request.Reminders,
-                request.ParticipantUserIds),
+                request.ParticipantUserIds,
+                request.ItemListId),
             cancellationToken);
 
         return CreatedAtAction(nameof(GetTask), new { taskId = task.Id }, task);
+    }
+
+    // Bulk actions: the selection bar of the lists and "Clear". Team-scoped like the list/create routes. The permission is checked per
+    // item inside the handler (Owner/Admin: any item; a Member: only the ones assigned to them) and the items it left alone are reported back.
+    [HttpPost("api/teams/{teamId:guid}/tasks/bulk-delete")]
+    [Authorize(Policy = nameof(Permission.DeleteOwnTask))]
+    public async Task<IActionResult> BulkDelete(Guid teamId, BulkTasksRequest request, CancellationToken cancellationToken)
+    {
+        if (User.GetTeamId() != teamId)
+        {
+            return Forbid();
+        }
+
+        var result = await _sender.Send(
+            new BulkDeleteTasksCommand(teamId, request.TaskIds, User.GetUserId(), User.HasPermission(Permission.DeleteTask)), cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("api/teams/{teamId:guid}/tasks/bulk-status")]
+    [Authorize(Policy = nameof(Permission.EditOwnTask))]
+    public async Task<IActionResult> BulkSetStatus(Guid teamId, BulkStatusRequest request, CancellationToken cancellationToken)
+    {
+        if (User.GetTeamId() != teamId)
+        {
+            return Forbid();
+        }
+
+        var result = await _sender.Send(
+            new BulkSetStatusCommand(teamId, request.TaskIds, request.Status, User.GetUserId(), User.HasPermission(Permission.EditAnyTask)), cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("api/teams/{teamId:guid}/tasks/bulk-move")]
+    [Authorize(Policy = nameof(Permission.EditOwnTask))]
+    public async Task<IActionResult> BulkMoveToList(Guid teamId, BulkMoveRequest request, CancellationToken cancellationToken)
+    {
+        if (User.GetTeamId() != teamId)
+        {
+            return Forbid();
+        }
+
+        var result = await _sender.Send(
+            new BulkMoveToListCommand(teamId, request.TaskIds, request.ItemListId, User.GetUserId(), User.HasPermission(Permission.EditAnyTask)), cancellationToken);
+        return Ok(result);
     }
 
     // Single-task routes below don't carry a {teamId} in the URL, so the [Authorize(Policy=...)]
@@ -181,7 +227,8 @@ public class TasksController : ControllerBase
                 keepTemplate ? stored.ColorKey : request.ColorKey,
                 keepTemplate ? stored.IsBusy : request.IsBusy,
                 request.Reminders,
-                request.ParticipantUserIds),
+                request.ParticipantUserIds,
+                keepStored ? stored.ItemListId : request.ItemListId),
             cancellationToken);
 
         return Ok(task);

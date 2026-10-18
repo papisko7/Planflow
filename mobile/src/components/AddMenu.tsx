@@ -6,11 +6,12 @@ type Props = {
   onClose: () => void;
   onNewTask: () => void;
   onNewTeam: () => void;
+  onNewList?: () => void;
 };
 
-// What the Dashboard "+" opens: pick whether to add a task or a team. Close first, then run the choice,
+// What the Dashboard "+" opens: pick whether to add an item, a list (of tasks or meetings) or a team. Close first, then run the choice,
 // so the next sheet never opens underneath this one.
-export function AddMenu({ visible, onClose, onNewTask, onNewTeam }: Props) {
+export function AddMenu({ visible, onClose, onNewTask, onNewTeam, onNewList }: Props) {
   const run = (action: () => void) => () => {
     onClose();
     action();
@@ -23,6 +24,11 @@ export function AddMenu({ visible, onClose, onNewTask, onNewTeam }: Props) {
           <Pressable testID="add-menu-task" style={styles.item} onPress={run(onNewTask)}>
             <Text style={styles.itemText}>New item</Text>
           </Pressable>
+          {onNewList ? (
+            <Pressable testID="add-menu-list" style={styles.item} onPress={run(onNewList)}>
+              <Text style={styles.itemText}>New list</Text>
+            </Pressable>
+          ) : null}
           <Pressable testID="add-menu-team" style={styles.item} onPress={run(onNewTeam)}>
             <Text style={styles.itemText}>New team</Text>
           </Pressable>

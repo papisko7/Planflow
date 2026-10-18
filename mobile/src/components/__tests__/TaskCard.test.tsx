@@ -77,48 +77,104 @@ describe('TaskCard long-press menu', () => {
     expect(screen.queryByTestId('task-menu-delete')).toBeNull();
   });
 
-  it('marks an open task as done on double tap, without opening it', async () => {
+  // Step 7.5.11: the double tap no longer completes a task - it ticks the card and starts the selection mode.
+  it('ticks the card on a double tap (starting the selection mode), without opening it or completing it', async () => {
     jest.useFakeTimers();
     const onPress = jest.fn();
-    await render(<TaskCard task={task} onPress={onPress} actions={actions} />);
+    const onToggleSelect = jest.fn();
+    await render(<TaskCard task={task} onPress={onPress} actions={actions} onToggleSelect={onToggleSelect} />);
 
     await fireEvent.press(screen.getByTestId('task-card-t1'));
     await fireEvent.press(screen.getByTestId('task-card-t1'));
     jest.advanceTimersByTime(500);
 
-    expect(actions.complete).toHaveBeenCalledWith(task);
+    expect(onToggleSelect).toHaveBeenCalledTimes(1);
+    expect(onToggleSelect).toHaveBeenCalledWith(task);
     expect(onPress).not.toHaveBeenCalled();
+    expect(actions.complete).not.toHaveBeenCalled();
+    expect(actions.reopen).not.toHaveBeenCalled();
     jest.useRealTimers();
   });
 
   it('opens the task on a single tap after the double-tap window', async () => {
     jest.useFakeTimers();
     const onPress = jest.fn();
-    await render(<TaskCard task={task} onPress={onPress} actions={actions} />);
+    const onToggleSelect = jest.fn();
+    await render(<TaskCard task={task} onPress={onPress} actions={actions} onToggleSelect={onToggleSelect} />);
 
     await fireEvent.press(screen.getByTestId('task-card-t1'));
     expect(onPress).not.toHaveBeenCalled();
     jest.advanceTimersByTime(300);
 
     expect(onPress).toHaveBeenCalledWith(task);
-    expect(actions.complete).not.toHaveBeenCalled();
+    expect(onToggleSelect).not.toHaveBeenCalled();
     jest.useRealTimers();
   });
 
-  it('reopens a finished task on double tap, without opening it', async () => {
+  it('an event is ticked by a double tap and opened by a single tap the same way a task is', async () => {
     jest.useFakeTimers();
     const onPress = jest.fn();
-    const done = { ...task, status: TaskStatus.Completed };
-    await render(<TaskCard task={done} onPress={onPress} actions={actions} />);
+    const onToggleSelect = jest.fn();
+    const event = { ...task, taskType: TaskType.Event, status: TaskStatus.Confirmed };
+    await render(<TaskCard task={event} onPress={onPress} actions={actions} onToggleSelect={onToggleSelect} />);
 
     await fireEvent.press(screen.getByTestId('task-card-t1'));
     await fireEvent.press(screen.getByTestId('task-card-t1'));
     jest.advanceTimersByTime(500);
+    expect(onToggleSelect).toHaveBeenCalledWith(event);
 
-    expect(actions.reopen).toHaveBeenCalledWith(done);
-    expect(actions.complete).not.toHaveBeenCalled();
-    expect(onPress).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByTestId('task-card-t1'));
+    jest.advanceTimersByTime(500);
+    expect(onPress).toHaveBeenCalledWith(event);
     jest.useRealTimers();
+  });
+
+  it('while selecting, a tap ticks or unticks the card (it does not open) and a long press ticks too, with no menu', async () => {
+    const onPress = jest.fn();
+    const onToggleSelect = jest.fn();
+    await render(<TaskCard task={task} onPress={onPress} actions={actions} onToggleSelect={onToggleSelect} selectionMode selected />);
+
+    expect(screen.getByTestId('task-ticked-t1')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('task-card-t1'));
+    await fireEvent(screen.getByTestId('task-card-t1'), 'longPress');
+
+    expect(onToggleSelect).toHaveBeenCalledTimes(2);
+    expect(onPress).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('task-menu-delete')).toBeNull();
+  });
+
+  it('shows an empty box on a card that is not ticked while the mode is on, and no box otherwise', async () => {
+    await render(<TaskCard task={task} onToggleSelect={jest.fn()} selectionMode />);
+    expect(screen.getByTestId('task-unticked-t1')).toBeTruthy();
+
+    await render(<TaskCard task={{ ...task, id: 't2' }} onToggleSelect={jest.fn()} />);
+    expect(screen.queryByTestId('task-unticked-t2')).toBeNull();
+    expect(screen.queryByTestId('task-ticked-t2')).toBeNull();
+  });
+
+  it('offers "Select" in the long-press menu, which ticks the card', async () => {
+    const onToggleSelect = jest.fn();
+    await render(<TaskCard task={task} actions={actions} onToggleSelect={onToggleSelect} />);
+
+    await fireEvent(screen.getByTestId('task-card-t1'), 'longPress');
+    await fireEvent.press(screen.getByTestId('task-menu-select'));
+
+    expect(onToggleSelect).toHaveBeenCalledWith(task);
+  });
+
+  it('keeps done / not done in the long-press menu, where the double tap used to be', async () => {
+    await render(<TaskCard task={task} actions={actions} onToggleSelect={jest.fn()} />);
+
+    await fireEvent(screen.getByTestId('task-card-t1'), 'longPress');
+    await fireEvent.press(screen.getByTestId('task-menu-complete'));
+
+    expect(actions.complete).toHaveBeenCalledWith(task);
+  });
+
+  it('a series entry says how many other occurrences it stands for', async () => {
+    await render(<TaskCard task={{ ...task, seriesMore: 12 }} />);
+
+    expect(screen.getByText('🔁 +12 more')).toBeTruthy();
   });
 
   it('offers "Mark as not done" instead of "Mark as done" for a finished task', async () => {
@@ -145,7 +201,7 @@ describe('TaskCard long-press menu', () => {
     expect(screen.getByTestId('task-menu-delete')).toBeTruthy();
   });
 
-  it('opens an event at once on a single tap - there is no double-tap action to wait for', async () => {
+  it('opens a card at once on a single tap when its list has no selection - there is no double tap to wait for', async () => {
     const onPress = jest.fn();
     const event = { ...task, taskType: TaskType.Event, status: TaskStatus.Confirmed };
     await render(<TaskCard task={event} onPress={onPress} actions={actions} />);

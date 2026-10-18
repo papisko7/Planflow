@@ -294,6 +294,7 @@ export function toUpdateRequest(task: TaskDto, overrides: Partial<UpdateTaskRequ
     manualUrgencyOverride: task.manualUrgencyOverride,
     manualUrgencyOverrideExpiresAtUtc: task.manualUrgencyOverrideExpiresAtUtc,
     useAiEnhancement: task.useAiEnhancement, // not editable in the app yet, but the backend resets it when omitted
+    itemListId: task.itemListId ?? null, // the whole value: leaving it out would take the item out of its list
     ...scheduleFromTask(task),
     ...overrides,
   };

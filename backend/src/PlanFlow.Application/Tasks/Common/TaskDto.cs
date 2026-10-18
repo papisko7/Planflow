@@ -10,6 +10,7 @@ namespace PlanFlow.Application.Tasks.Common;
 /// <see cref="GoogleTaskListId"/> / <see cref="GoogleTaskListTitle"/> name the Google Tasks list an imported task belongs to (the title is filled by the queries that load it).
 /// <see cref="ReasonText"/> is the latest urgency explanation; only the list query fills it (null elsewhere).
 /// <see cref="ParticipantUserIds"/> are the guests of an event / co-contractors of a task (not the assignee); empty when the entity was loaded without them.
+/// <see cref="SeriesId"/> groups the occurrences of one repeating event (null = not part of a series); <see cref="ItemListId"/> is the team's own list the item sits in (null = none).
 /// </summary>
 public record TaskDto(
     Guid Id,
@@ -48,7 +49,9 @@ public record TaskDto(
     Guid? GoogleTaskListId = null,
     string? GoogleTaskListTitle = null,
     string? ReasonText = null,
-    IReadOnlyList<Guid>? ParticipantUserIds = null)
+    IReadOnlyList<Guid>? ParticipantUserIds = null,
+    string? SeriesId = null,
+    Guid? ItemListId = null)
 {
     public static TaskDto FromEntity(CalendarItem task) => new(
         task.Id,
@@ -86,5 +89,7 @@ public record TaskDto(
         task.IsDeadlineDefaulted,
         task.ExternalTaskListId,
         task.ExternalTaskList?.Title,
-        ParticipantUserIds: task.Participants.OrderBy(p => p.CreatedAtUtc).Select(p => p.UserId).ToList());
+        ParticipantUserIds: task.Participants.OrderBy(p => p.CreatedAtUtc).Select(p => p.UserId).ToList(),
+        SeriesId: task.SeriesId,
+        ItemListId: task.ItemListId);
 }

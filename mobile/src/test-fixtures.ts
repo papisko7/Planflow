@@ -24,4 +24,6 @@ export const PLAIN_TASK_FIELDS = {
   googleTaskListId: null,
   googleTaskListTitle: null,
   participantUserIds: [] as string[],
+  seriesId: null,
+  itemListId: null,
 } satisfies Partial<TaskDto>;

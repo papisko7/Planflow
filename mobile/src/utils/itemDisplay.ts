@@ -3,7 +3,8 @@ import { formatDuration, INTERVAL_UNITS } from './duration';
 import { allDayDays, utcDay } from './schedule';
 
 const pad = (n: number) => String(n).padStart(2, '0');
-const shortDate = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+// The year is always shown: the same event comes back every week or year, and without it the copies cannot be told apart.
+const shortDate = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 const clock = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 

@@ -16,8 +16,10 @@ import { CreateTaskModal } from '../components/CreateTaskModal';
 import { Fab } from '../components/Fab';
 import { GoogleCalendarBanner } from '../components/GoogleCalendarBanner';
 import { MonthGrid } from '../components/MonthGrid';
+import { SelectionBar } from '../components/SelectionBar';
 import { TaskCard } from '../components/TaskCard';
 import { useAllTasks } from '../hooks/useAllTasks';
+import { useSelectionSet } from '../hooks/useSelectionSet';
 import { useTaskActions } from '../hooks/useTaskActions';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { groupTasksByDueDate } from '../utils/calendarGrouping';
@@ -25,8 +27,11 @@ import { dayKey, pinchDirection } from '../utils/dateUtils';
 import { isInformational } from '../utils/templateRules';
 import { getUrgencyTier } from '../utils/urgencyGrouping';
 import type { RootStackParamList } from '../navigation/types';
+import type { ItemListDto } from '../types/itemList';
 import { type TaskDto, type TaskWithTeam } from '../types/task';
 import { isFinishedStatus } from '../utils/taskStatus';
+
+const NO_LISTS: ItemListDto[] = [];
 
 type ViewMode = 'agenda' | 'month';
 
@@ -45,7 +50,7 @@ function fingerDistance(e: GestureResponderEvent): number {
 
 export default function CalendarScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { state, tasks, teams, errorMessage, refreshing, refresh, reload } = useAllTasks();
+  const { state, tasks, teams, lists = NO_LISTS, errorMessage, refreshing, refresh, reload } = useAllTasks();
   const [creatingTask, setCreatingTask] = useState(false);
   const [mode, setMode] = useState<ViewMode>('agenda');
   const [month, setMonth] = useState(new Date());
@@ -81,6 +86,14 @@ export default function CalendarScreen() {
     () => sections.find((s) => s.dateKey === selectedKey)?.data ?? [],
     [sections, selectedKey],
   );
+
+  // Selection mode. The Agenda keeps every occurrence of a repeating event on its own day, so a ticked card is exactly that one occurrence;
+  // "Select all" ticks what the open view lists (all items in the Agenda, the chosen day in Month).
+  const listedIds = useMemo(() => (mode === 'agenda' ? tasks : selectedTasks).map((t) => t.id), [mode, tasks, selectedTasks]);
+  const selection = useSelectionSet(listedIds);
+  const selectedEntries = useMemo(() => tasks.filter((t) => selection.selected.has(t.id)), [tasks, selection.selected]);
+  const { toggle } = selection;
+  const onToggleSelect = useCallback((task: TaskDto) => toggle(task.id), [toggle]);
 
   // Pinch to zoom: fingers together = zoom out to the month, fingers apart = zoom into the day list.
   // Plain touch events are used (they never steal the touch from the list), and the gesture is judged
@@ -163,7 +176,17 @@ export default function CalendarScreen() {
           style={styles.list}
           sections={listSections}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <TaskCard task={item} onPress={onTaskPress} actions={taskActions} />}
+          extraData={selection.selected}
+          renderItem={({ item }) => (
+            <TaskCard
+              task={item}
+              onPress={onTaskPress}
+              actions={taskActions}
+              onToggleSelect={onToggleSelect}
+              selectionMode={selection.selecting}
+              selected={selection.selected.has(item.id)}
+            />
+          )}
           renderSectionHeader={({ section }) => (
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionHeaderText}>{section.title}</Text>
@@ -193,7 +216,17 @@ export default function CalendarScreen() {
           style={styles.list}
           data={selectedTasks}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <TaskCard task={item} onPress={onTaskPress} actions={taskActions} />}
+          extraData={selection.selected}
+          renderItem={({ item }) => (
+            <TaskCard
+              task={item}
+              onPress={onTaskPress}
+              actions={taskActions}
+              onToggleSelect={onToggleSelect}
+              selectionMode={selection.selecting}
+              selected={selection.selected.has(item.id)}
+            />
+          )}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
           ListHeaderComponent={
             <>
@@ -210,7 +243,7 @@ export default function CalendarScreen() {
               </View>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionHeaderText}>
-                  {selectedDay.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
+                  {selectedDay.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                 </Text>
               </View>
             </>
@@ -219,7 +252,19 @@ export default function CalendarScreen() {
           contentContainerStyle={styles.listContent}
         />
       )}
-      <Fab onPress={() => setCreatingTask(true)} />
+      {selection.selecting ? (
+        <SelectionBar
+          selected={selectedEntries}
+          allItems={tasks}
+          lists={lists}
+          teams={teams}
+          onSelectAll={selection.selectAll}
+          onCancel={selection.clear}
+          reload={reload}
+        />
+      ) : (
+        <Fab onPress={() => setCreatingTask(true)} />
+      )}
       <CreateTaskModal
         visible={creatingTask}
         teams={teams}

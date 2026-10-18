@@ -1,10 +1,13 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { getCurrentUserId } from '../services/authService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { formatDuration } from '../utils/duration';
+import { DOUBLE_TAP_MS } from '../utils/gestures';
 import { formatRecurrence, formatWhen, splitReason, TEMPLATE_LABEL } from '../utils/itemDisplay';
 import { colorHex } from '../utils/palette';
+import { formatSeriesMore } from '../utils/seriesGrouping';
 import { isInformational } from '../utils/templateRules';
 import { getUrgencyTier, URGENCY_TIER_META } from '../utils/urgencyGrouping';
 import { TaskStatus, TaskType, type TaskDto } from '../types/task';
@@ -35,12 +38,14 @@ export interface TaskCardProps {
   task: TaskDto & { teamName?: string };
   onPress?: (task: TaskDto & { teamName?: string }) => void;
   actions?: TaskCardActions;
+  // Selection mode (step 7.5.11). Given, a double tap ticks the card (that starts the mode). While `selectionMode` is on, a tap ticks or
+  // unticks, a long press does too, and the swipes are off. Cards of a list without it open instantly, with no double-tap wait.
+  onToggleSelect?: (task: TaskDto & { teamName?: string }) => void;
+  selectionMode?: boolean;
+  selected?: boolean;
 }
 
-// Two taps within this window count as a double tap.
-const DOUBLE_TAP_MS = 250;
-
-function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
+function TaskCardComponent({ task, onPress, actions, onToggleSelect, selectionMode = false, selected = false }: TaskCardProps) {
   const [menuVisible, setMenuVisible] = useState(false);
   const tier = getUrgencyTier(task.currentUrgencyScore);
   // A day off, a focus block, a working place or a birthday is not ranked: no score pill, no urgency colour, no "why".
@@ -50,11 +55,12 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
   const recurrence = formatRecurrence(task);
   const templateLabel = TEMPLATE_LABEL[task.eventTemplate];
   const reason = splitReason(task.reasonText);
+  // A list that shows one entry for a whole repeating series says how many other occurrences it stands for.
+  const seriesMore = formatSeriesMore(task.seriesMore);
 
-  // Double tap toggles done: an open task becomes done, a done task is reopened. To tell it apart from a
-  // single tap, the single tap (open details) waits DOUBLE_TAP_MS for a possible second tap; cards
-  // without actions open instantly because they have no double-tap action. Events cannot be "done",
-  // so they never have the double-tap action either.
+  // Double tap ticks the card and starts the selection mode (done / not done moved to the long-press menu and the selection bar). To tell
+  // it apart from a single tap, the single tap (open details) waits DOUBLE_TAP_MS for a possible second tap; cards of a list
+  // without selection open instantly.
   const isDone = task.status === TaskStatus.Completed;
   const isUnassigned = !task.assignedUserId;
   // Only the current assignee can abandon a task (the API enforces the same).
@@ -72,15 +78,18 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
   );
 
   const handlePress = () => {
-    if (!actions || isEvent) {
+    if (selectionMode) {
+      onToggleSelect?.(task);
+      return;
+    }
+    if (!onToggleSelect) {
       onPress?.(task);
       return;
     }
     if (pendingTap.current) {
       clearTimeout(pendingTap.current);
       pendingTap.current = null;
-      if (isDone) actions.reopen(task);
-      else actions.complete(task);
+      onToggleSelect(task);
       return;
     }
     pendingTap.current = setTimeout(() => {
@@ -89,14 +98,28 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
     }, DOUBLE_TAP_MS);
   };
 
+  const handleLongPress = () => {
+    if (selectionMode) onToggleSelect?.(task);
+    else setMenuVisible(true);
+  };
+
   const card = (
     <Pressable
       testID={`task-card-${task.id}`}
-      onPress={onPress || actions ? handlePress : undefined}
-      onLongPress={actions ? () => setMenuVisible(true) : undefined}
-      style={({ pressed }) => [styles.card, { borderLeftColor: ranked ? TIER_COLOR[tier] : colors.border, opacity: pressed ? 0.7 : 1 }]}
+      onPress={onPress || actions || onToggleSelect ? handlePress : undefined}
+      onLongPress={actions || (selectionMode && onToggleSelect) ? handleLongPress : undefined}
+      style={({ pressed }) => [
+        styles.card,
+        { borderLeftColor: ranked ? TIER_COLOR[tier] : colors.border, opacity: pressed ? 0.7 : 1 },
+        selected ? styles.cardSelected : null,
+      ]}
     >
       <View style={styles.headerRow}>
+        {selectionMode ? (
+          <View testID={selected ? `task-ticked-${task.id}` : `task-unticked-${task.id}`}>
+            <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={22} color={selected ? colors.primary : colors.textMuted} />
+          </View>
+        ) : null}
         {colorHex(task.colorKey) ? (
           <View testID={`item-color-${task.id}`} style={[styles.colorDot, { backgroundColor: colorHex(task.colorKey)! }]} />
         ) : null}
@@ -132,6 +155,7 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
           <Text style={styles.metaText}>⏱ {formatDuration(task.estimatedEffortHours)}</Text>
         ) : null}
         {recurrence ? <Text style={styles.metaText}>🔁 {recurrence}</Text> : null}
+        {seriesMore ? <Text testID={`series-more-${task.id}`} style={styles.metaText}>🔁 {seriesMore}</Text> : null}
         {task.isDataIncomplete ? <Text testID={`needs-details-${task.id}`} style={[styles.metaText, styles.blockedText]}>⚠ Needs details</Text> : null}
         {task.blockedByTaskId ? <Text style={[styles.metaText, styles.blockedText]}>⛔ Blocked</Text> : null}
         {task.manualUrgencyOverride !== null ? <Text style={styles.metaText}>✋ Manual override</Text> : null}
@@ -160,8 +184,8 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
       {/* Swipe right = delete. Swipe left follows the task: nobody owns it yet -> "Take over",
           otherwise "Edit". Editing an unassigned task is still one tap away in the long-press menu. */}
       <SwipeableRow
-        onSwipeRight={() => actions.remove(task)}
-        onSwipeLeft={() => (isUnassigned ? actions.claim(task) : actions.edit(task))}
+        onSwipeRight={selectionMode ? undefined : () => actions.remove(task)}
+        onSwipeLeft={selectionMode ? undefined : () => (isUnassigned ? actions.claim(task) : actions.edit(task))}
         leftLabel={isUnassigned ? 'Take over' : 'Edit'}
       >
         {card}
@@ -171,6 +195,7 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
         title={task.title}
         onClose={() => setMenuVisible(false)}
         onOpen={() => onPress?.(task)}
+        onSelect={onToggleSelect ? () => onToggleSelect(task) : undefined}
         onClaim={isUnassigned ? () => actions.claim(task) : undefined}
         onAbandon={isMine ? () => actions.abandon(task) : undefined}
         onEdit={() => actions.edit(task)}
@@ -196,6 +221,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.xs,
   },
+  cardSelected: { backgroundColor: colors.primaryMuted },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm },
   title: { ...typography.subtitle, color: colors.text, flex: 1 },
   colorDot: { width: 10, height: 10, borderRadius: 5, marginTop: 6 },

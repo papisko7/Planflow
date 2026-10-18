@@ -17,6 +17,7 @@ public interface IApplicationDbContext
     DbSet<CalendarItem> CalendarItems { get; }
     DbSet<ItemReminder> ItemReminders { get; }
     DbSet<ItemParticipant> ItemParticipants { get; }
+    DbSet<ItemList> ItemLists { get; }
     DbSet<TaskHistory> TaskHistories { get; }
     DbSet<UrgencyScoreLog> UrgencyScoreLogs { get; }
     DbSet<Alert> Alerts { get; }

@@ -35,6 +35,14 @@ const LOGIN_OPTIONS: { value: LoginNotificationMode; label: string }[] = [
   { value: LoginNotificationMode.Off, label: 'Off' },
 ];
 
+// What a collapsed team block says: which of its two switches are on.
+function teamMuteSummary(team: TeamDto): string {
+  if (team.muteNotifications && team.muteChat) return 'Items and chat muted';
+  if (team.muteNotifications) return 'Items muted';
+  if (team.muteChat) return 'Chat muted';
+  return 'Nothing muted';
+}
+
 export function NotificationSettingsCard() {
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
   const [teams, setTeams] = useState<TeamDto[]>([]);
@@ -162,9 +170,15 @@ export function NotificationSettingsCard() {
               title="Teams"
               summary={mutedTeams === 0 ? 'None muted' : `${mutedTeams} muted`}
             >
+              {/* One accordion per team, like Notifications and Teams themselves; collapsed it says what is muted. */}
               {teams.map((team) => (
-                <View key={team.id} style={styles.teamBlock}>
-                  <Text style={styles.rowLabel}>{team.name}</Text>
+                <AccordionSection
+                  key={team.id}
+                  nested
+                  testID={`notif-team-${team.id}`}
+                  title={team.name}
+                  summary={teamMuteSummary(team)}
+                >
                   <View style={styles.row}>
                     <Text style={[styles.hint, styles.rowText]}>Mute item notifications</Text>
                     <Switch
@@ -181,7 +195,7 @@ export function NotificationSettingsCard() {
                       onValueChange={(value) => saveTeamMute(team, { muteChat: value })}
                     />
                   </View>
-                </View>
+                </AccordionSection>
               ))}
             </AccordionSection>
           ) : null}
@@ -199,7 +213,6 @@ const styles = StyleSheet.create({
   rowText: { flex: 1 },
   rowLabel: { ...typography.body, color: colors.text, fontWeight: '600' },
   hint: { ...typography.body, fontSize: 12, color: colors.textMuted },
-  teamBlock: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: spacing.xs },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   chip: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
   chipActive: { backgroundColor: colors.primaryMuted, borderColor: colors.primary },

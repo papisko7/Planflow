@@ -121,6 +121,10 @@ public class CalendarItem : BaseEntity
     /// <summary>Google Tasks id this item was imported from (a Task, never an Event); null for everything else. With <see cref="SourceCalendarIntegrationId"/> it is the idempotency key SyncTasksJob upserts on.</summary>
     public string? ExternalTaskId { get; set; }
 
+    /// <summary>The team's own list the item sits in (a task list for a task, a meeting list for an event); null = in none. Independent of the read-only Google Tasks list below.</summary>
+    public Guid? ItemListId { get; set; }
+    public ItemList? ItemList { get; set; }
+
     /// <summary>The Google Tasks list the item belongs to; the app shows imported tasks grouped by it.</summary>
     public Guid? ExternalTaskListId { get; set; }
     public ExternalTaskList? ExternalTaskList { get; set; }

@@ -16,9 +16,10 @@ export function dateKey(iso: string): string {
 
 function sectionTitle(key: string): string {
   const today = dateKey(new Date().toISOString());
-  if (key === today) return 'Today';
   const [y, m, d] = key.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  // The year is always there, so the same weekly or yearly event under different headings can be told apart.
+  const date = new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  return key === today ? `Today · ${date}` : date;
 }
 
 // Buckets items with a due moment (a Task's deadline, an Event's start) into date-keyed sections sorted chronologically; tasks with no

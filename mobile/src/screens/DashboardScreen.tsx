@@ -8,8 +8,11 @@ import { CalendarStatusChip } from '../components/CalendarStatusChip';
 import { CreateTaskModal } from '../components/CreateTaskModal';
 import { CreateTeamModal } from '../components/CreateTeamModal';
 import { Fab } from '../components/Fab';
+import { ListFormModal } from '../components/ListFormModal';
+import { SelectionBar } from '../components/SelectionBar';
 import { TaskCard } from '../components/TaskCard';
 import { useAllTasks } from '../hooks/useAllTasks';
+import { useSelectionSet } from '../hooks/useSelectionSet';
 import { useTaskActions } from '../hooks/useTaskActions';
 import { useUnreadCount } from '../hooks/useUnreadCount';
 import { getProfile } from '../services/userService';
@@ -17,22 +20,27 @@ import { isPastEvent } from '../utils/schedule';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { computeDashboardStats } from '../utils/dashboardStats';
 import { selectOneNextAction } from '../utils/oneNextAction';
+import { collapseSeries } from '../utils/seriesGrouping';
 import { groupTasksByUrgency } from '../utils/urgencyGrouping';
 import type { RootStackParamList, RootTabParamList } from '../navigation/types';
+import type { ItemListDto } from '../types/itemList';
 import type { TaskDto, TaskWithTeam } from '../types/task';
 import { isFinishedStatus } from '../utils/taskStatus';
+
+const NO_LISTS: ItemListDto[] = [];
 
 type Shortcut = { testID: string; label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void };
 
 export default function DashboardScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { state, tasks, teams, errorMessage, refreshing, lastUpdated, refresh, reload } = useAllTasks();
+  const { state, tasks, teams, lists = NO_LISTS, errorMessage, refreshing, lastUpdated, refresh, reload } = useAllTasks();
   const taskActions = useTaskActions(reload);
   const listRef = useRef<SectionList<TaskWithTeam>>(null);
   useScrollToTop(listRef); // tapping the active tab jumps back to the top
   const [addMenuVisible, setAddMenuVisible] = useState(false);
   const [creatingTask, setCreatingTask] = useState(false);
   const [creatingTeam, setCreatingTeam] = useState(false);
+  const [creatingList, setCreatingList] = useState(false);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [emailUnconfirmed, setEmailUnconfirmed] = useState(false);
   const { count: unreadCount } = useUnreadCount();
@@ -50,14 +58,32 @@ export default function DashboardScreen() {
   );
 
   // Finished / cancelled tasks and events that already took place are history, not "what needs attention" — they stay visible on the Items tab.
+  // A repeating event is one entry (its next occurrence, "+N more") instead of a dozen copies.
   const openTasks = useMemo(
-    () => tasks.filter((t) => !isFinishedStatus(t.status) && !isPastEvent(t)),
+    () => collapseSeries(tasks.filter((t) => !isFinishedStatus(t.status) && !isPastEvent(t))),
     [tasks],
   );
   const stats = useMemo(() => computeDashboardStats(tasks), [tasks]);
   // "Do now": the single most urgent actionable task is promoted above the list and left out of it.
   const nextTask = useMemo(() => selectOneNextAction(openTasks), [openTasks]);
   const sections = useMemo(() => groupTasksByUrgency(openTasks.filter((t) => t.id !== nextTask?.id)), [openTasks, nextTask]);
+
+  // Selection mode: a double tap ticks a card; the bar at the bottom then acts on the ticked ones.
+  const openIds = useMemo(() => openTasks.map((t) => t.id), [openTasks]);
+  const selection = useSelectionSet(openIds);
+  const selectedEntries = useMemo(() => openTasks.filter((t) => selection.selected.has(t.id)), [openTasks, selection.selected]);
+  const { toggle } = selection;
+  const onToggleSelect = useCallback((task: TaskDto) => toggle(task.id), [toggle]);
+  const card = (task: TaskWithTeam) => (
+    <TaskCard
+      task={task}
+      onPress={onTaskPress}
+      actions={taskActions}
+      onToggleSelect={onToggleSelect}
+      selectionMode={selection.selecting}
+      selected={selection.selected.has(task.id)}
+    />
+  );
 
   const onTaskPress = useCallback(
     (task: TaskDto) => navigation.navigate('TaskDetail', { taskId: task.id, teamId: task.teamId }),
@@ -170,7 +196,8 @@ export default function DashboardScreen() {
         style={styles.list}
         sections={sections}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <TaskCard task={item} onPress={onTaskPress} actions={taskActions} />}
+        extraData={selection.selected}
+        renderItem={({ item }) => card(item)}
         renderSectionHeader={({ section }) => (
           <View testID={`dashboard-section-${section.tier}`} style={styles.sectionHeader}>
             <Text style={styles.sectionHeaderText}>{section.title}</Text>
@@ -179,7 +206,7 @@ export default function DashboardScreen() {
         ListHeaderComponent={
           <>
             {header}
-            {nextTask ? <TaskCard task={nextTask} onPress={onTaskPress} actions={taskActions} /> : null}
+            {nextTask ? card(nextTask) : null}
           </>
         }
         stickySectionHeadersEnabled
@@ -197,12 +224,25 @@ export default function DashboardScreen() {
         }
         contentContainerStyle={styles.listContent}
       />
-      <Fab onPress={() => setAddMenuVisible(true)} accessibilityLabel="Add item or team" />
+      {selection.selecting ? (
+        <SelectionBar
+          selected={selectedEntries}
+          allItems={tasks}
+          lists={lists}
+          teams={teams}
+          onSelectAll={selection.selectAll}
+          onCancel={selection.clear}
+          reload={reload}
+        />
+      ) : (
+        <Fab onPress={() => setAddMenuVisible(true)} accessibilityLabel="Add item, list or team" />
+      )}
       <AddMenu
         visible={addMenuVisible}
         onClose={() => setAddMenuVisible(false)}
         onNewTask={() => setCreatingTask(true)}
         onNewTeam={() => setCreatingTeam(true)}
+        onNewList={() => setCreatingList(true)}
       />
       <CreateTaskModal
         visible={creatingTask}
@@ -211,6 +251,7 @@ export default function DashboardScreen() {
         onClose={() => setCreatingTask(false)}
         onCreated={reload}
       />
+      <ListFormModal visible={creatingList} teams={teams} onClose={() => setCreatingList(false)} onSaved={() => void reload()} />
       <CreateTeamModal visible={creatingTeam} onClose={() => setCreatingTeam(false)} onCreated={reload} />
     </View>
   );

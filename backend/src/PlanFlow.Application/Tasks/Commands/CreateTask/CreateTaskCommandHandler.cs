@@ -39,6 +39,7 @@ public class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, TaskD
         };
         TaskScheduleMapper.Apply(task, request);
         task.Status = TaskStatusRules.DefaultFor(task.TaskType); // a Task starts in Backlog, an Event is Confirmed
+        task.ItemListId = await TaskItemLists.ResolveAsync(_context, request.TeamId, task.TaskType, request.ItemListId, cancellationToken);
 
         _context.CalendarItems.Add(task);
 

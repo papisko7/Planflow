@@ -10,6 +10,8 @@ type Props = {
   // `nested` is a section inside another one: no card background of its own, only a divider above it.
   nested?: boolean;
   defaultExpanded?: boolean;
+  // Long-pressing the header (e.g. the rename / delete menu of a list); a plain tap still opens and closes the section.
+  onHeaderLongPress?: () => void;
   // Header gets `${testID}-header`, the content `${testID}-body`.
   testID: string;
   children: ReactNode;
@@ -17,7 +19,7 @@ type Props = {
 
 // An accordion (collapsible section): a tappable header that shows or hides its content. Collapsed by default.
 // The content stays mounted while collapsed (only hidden), so a half-typed form or a loading request is not lost.
-export function AccordionSection({ title, summary, nested = false, defaultExpanded = false, testID, children }: Props) {
+export function AccordionSection({ title, summary, nested = false, defaultExpanded = false, onHeaderLongPress, testID, children }: Props) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   const toggle = () => {
@@ -30,6 +32,7 @@ export function AccordionSection({ title, summary, nested = false, defaultExpand
       <Pressable
         testID={`${testID}-header`}
         onPress={toggle}
+        onLongPress={onHeaderLongPress}
         accessibilityRole="button"
         accessibilityLabel={title}
         accessibilityState={{ expanded }}

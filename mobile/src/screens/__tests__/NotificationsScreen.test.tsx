@@ -104,9 +104,42 @@ describe('NotificationsScreen', () => {
 
     await fireEvent.press(screen.getByTestId('notification-n1'));
 
+    // A single tap waits a moment in case a second one follows (that would tick the entry instead).
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('TaskDetail', { taskId: 'task-1', teamId: 'team-1' }));
     expect(mockedRead).toHaveBeenCalledWith('n1');
-    expect(mockNavigate).toHaveBeenCalledWith('TaskDetail', { taskId: 'task-1', teamId: 'team-1' });
     expect(screen.queryByTestId('notification-unread-n1')).toBeNull();
+  });
+
+  it('a quick double tap ticks the entry and starts the selection mode instead of opening it', async () => {
+    mockedInbox.mockResolvedValue([entry(), entry({ id: 'n2' })]);
+    await render(<NotificationsScreen />);
+    await waitFor(() => screen.getByTestId('notification-n1'));
+
+    await fireEvent.press(screen.getByTestId('notification-n1'));
+    await fireEvent.press(screen.getByTestId('notification-n1'));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 400)); // longer than the double-tap window
+    });
+
+    expect(screen.getByTestId('selection-bar')).toBeTruthy();
+    expect(screen.getByTestId('notification-ticked-n1')).toBeTruthy();
+    expect(screen.queryByTestId('notification-ticked-n2')).toBeNull();
+    expect(lastOptions().title).toBe('1 selected');
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(mockedRead).not.toHaveBeenCalled();
+  });
+
+  it('two taps on different entries open the first one and do not tick anything', async () => {
+    mockedInbox.mockResolvedValue([entry(), entry({ id: 'n2', taskId: 'task-2' })]);
+    await render(<NotificationsScreen />);
+    await waitFor(() => screen.getByTestId('notification-n1'));
+
+    await fireEvent.press(screen.getByTestId('notification-n1'));
+    await fireEvent.press(screen.getByTestId('notification-n2'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('TaskDetail', { taskId: 'task-1', teamId: 'team-1' });
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('TaskDetail', { taskId: 'task-2', teamId: 'team-1' }));
+    expect(screen.queryByTestId('selection-bar')).toBeNull();
   });
 
   it('an entry without a task is marked read but goes nowhere', async () => {
@@ -116,7 +149,7 @@ describe('NotificationsScreen', () => {
 
     await fireEvent.press(screen.getByTestId('notification-n1'));
 
-    expect(mockedRead).toHaveBeenCalledWith('n1');
+    await waitFor(() => expect(mockedRead).toHaveBeenCalledWith('n1'));
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 

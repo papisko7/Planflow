@@ -59,6 +59,7 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
         // A Task is Backlog/InProgress/Completed/Cancelled, an Event Confirmed/Tentative/Cancelled. When the type changed (or an
         // older app sent the other type's status) the status falls back to the new type's default instead of failing the save.
         task.Status = TaskStatusRules.Normalize(task.TaskType, request.Status);
+        task.ItemListId = await TaskItemLists.ResolveAsync(_context, task.TeamId, task.TaskType, request.ItemListId, cancellationToken);
         task.UseAiEnhancement = request.UseAiEnhancement;
         task.ImpactScore = request.ImpactScore;
         task.BlockedByTaskId = request.BlockedByTaskId;

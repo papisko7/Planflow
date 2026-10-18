@@ -3,6 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { restoreSession } from '../services/authService';
 import { getAllTasks } from '../services/taskService';
 import type { ApiError } from '../types/api';
+import type { ItemListDto } from '../types/itemList';
 import type { TeamDto } from '../types/team';
 import type { TaskWithTeam } from '../types/task';
 
@@ -15,6 +16,7 @@ export function useAllTasks() {
   const [state, setState] = useState<LoadState>('loading');
   const [tasks, setTasks] = useState<TaskWithTeam[]>([]);
   const [teams, setTeams] = useState<TeamDto[]>([]);
+  const [lists, setLists] = useState<ItemListDto[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   // When the data on screen was last fetched from the server (shown as "Updated 12:30" on the dashboard).
@@ -29,6 +31,7 @@ export function useAllTasks() {
       const result = await getAllTasks(force);
       setTeams(result.teams);
       setTasks(result.tasks);
+      setLists(result.lists);
       setErrorMessage(null);
       setLastUpdated(new Date());
       setState('ready');
@@ -56,5 +59,5 @@ export function useAllTasks() {
   // Stable identity: it is passed down to memoized task cards.
   const reload = useCallback(() => fetchAll(true), [fetchAll]);
 
-  return { state, tasks, teams, errorMessage, refreshing, lastUpdated, refresh, reload };
+  return { state, tasks, teams, lists, errorMessage, refreshing, lastUpdated, refresh, reload };
 }

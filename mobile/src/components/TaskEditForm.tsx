@@ -5,11 +5,13 @@ import { colors, radius, spacing, typography } from '../theme/theme';
 import { AssigneePicker } from './AssigneePicker';
 import { DeadlinePicker } from './DeadlinePicker';
 import { DurationInput } from './DurationInput';
+import { ListPicker } from './ListPicker';
 import { ParticipantPicker } from './ParticipantPicker';
 import { RemindersEditor } from './RemindersEditor';
 import { ScheduleForm } from './ScheduleForm';
 import type { ApiError } from '../types/api';
 import type { TeamMemberDto } from '../types/team';
+import { ItemListKind } from '../types/itemList';
 import { TaskType, type ReminderDto, type ReminderInput, type ScheduleFields, type TaskDto } from '../types/task';
 import { formatWhen } from '../utils/itemDisplay';
 import {
@@ -45,6 +47,7 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
   // A Task and an Event have different statuses; switching the type in the form swaps the list and resets an illegal pick.
   const status = normalizeStatus(schedule.taskType, pickedStatus);
   const [assignedUserId, setAssignedUserId] = useState(task.assignedUserId);
+  const [itemListId, setItemListId] = useState<string | null>(task.itemListId ?? null);
   const [saving, setSaving] = useState(false);
   const rules = rulesFor(schedule.taskType, schedule.eventTemplate);
   // An item imported from Google: Google owns its title, time, place, description and colour (the next sync would overwrite
@@ -116,6 +119,7 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
             ? {
                 status,
                 assignedUserId,
+                itemListId,
                 impactScore: rules.informational ? null : impactNumber,
                 estimatedEffortHours: rules.informational ? task.estimatedEffortHours : effort,
                 ...(googleTask ? { startUtc: startDay, deadlineUtc: deadlineDay } : {}),
@@ -127,6 +131,7 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
                 description: rules.allowsDescription ? description.trim() || null : null,
                 status,
                 assignedUserId,
+                itemListId,
                 impactScore: rules.informational ? null : impactNumber,
                 ...scheduleForRequest(schedule),
                 ...(ownAlerts ? { reminders: shownAlerts } : {}),
@@ -245,6 +250,13 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
           ))}
         </View>
       </View>
+
+      <ListPicker
+        teamId={task.teamId}
+        kind={schedule.taskType === TaskType.Event ? ItemListKind.MeetingList : ItemListKind.TaskList}
+        value={itemListId}
+        onChange={setItemListId}
+      />
 
       {canAssign && members.length > 1 ? (
         <AssigneePicker members={members} value={assignedUserId} onChange={setAssignedUserId} />

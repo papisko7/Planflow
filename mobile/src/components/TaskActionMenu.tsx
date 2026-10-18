@@ -6,6 +6,8 @@ type Props = {
   title: string;
   onClose: () => void;
   onOpen: () => void;
+  // Starts the selection mode with this item ticked (the same as a double tap).
+  onSelect?: () => void;
   onClaim?: () => void;
   onAbandon?: () => void;
   onEdit?: () => void;
@@ -15,7 +17,7 @@ type Props = {
 };
 
 // Bottom sheet shown on long-press of a task: every quick action in one place, no extra screen.
-export function TaskActionMenu({ visible, title, onClose, onOpen, onClaim, onAbandon, onEdit, onComplete, onReopen, onDelete }: Props) {
+export function TaskActionMenu({ visible, title, onClose, onOpen, onSelect, onClaim, onAbandon, onEdit, onComplete, onReopen, onDelete }: Props) {
   // Close first, then run the action, so an Alert/navigation never opens underneath the sheet.
   const run = (action?: () => void) => () => {
     onClose();
@@ -30,6 +32,7 @@ export function TaskActionMenu({ visible, title, onClose, onOpen, onClaim, onAba
             {title}
           </Text>
           <MenuItem testID="task-menu-open" label="Open details" onPress={run(onOpen)} />
+          {onSelect ? <MenuItem testID="task-menu-select" label="Select" onPress={run(onSelect)} /> : null}
           {onClaim ? <MenuItem testID="task-menu-claim" label="Take over" onPress={run(onClaim)} /> : null}
           {onAbandon ? <MenuItem testID="task-menu-abandon" label="Abandon (give back to the team)" onPress={run(onAbandon)} /> : null}
           {onEdit ? <MenuItem testID="task-menu-edit" label="Edit" onPress={run(onEdit)} /> : null}

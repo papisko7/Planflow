@@ -19,7 +19,7 @@ const googleTask = (day: string, over: Partial<TaskDto> = {}) =>
 
 describe('a whole-day task from Google Tasks', () => {
   it('shows its due day as the date it stores, not as the clock time of midnight UTC', () => {
-    const expected = new Date(2030, 9, 20).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const expected = new Date(2030, 9, 20).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
     expect(formatWhen(googleTask('2030-10-20'))).toBe(expected);
   });
@@ -27,7 +27,7 @@ describe('a whole-day task from Google Tasks', () => {
   it('a timed task still shows the local day of its deadline', () => {
     const local = new Date(2030, 9, 20, 18, 30);
 
-    expect(formatWhen(item({ deadlineUtc: local.toISOString() }))).toBe(local.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+    expect(formatWhen(item({ deadlineUtc: local.toISOString() }))).toBe(local.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }));
   });
 
   it('runs out at the END of its day (a task due today is not late yet), a whole-day event at the START of its first day', () => {

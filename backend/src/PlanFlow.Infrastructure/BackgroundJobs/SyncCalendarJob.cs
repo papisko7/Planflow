@@ -328,6 +328,11 @@ public class SyncCalendarJob : IJob
             affectedTeamIds.Add(task.TeamId);
         }
 
+        if (fullPass)
+        {
+            await RemoveItemsBeyondWindowAsync(integration, syncStartedAtUtc, affectedTeamIds, cancellationToken);
+        }
+
         if (incompleteItems.Count > 0)
         {
             // One message per run listing every newly imported event that needs details (inbox + push + e-mail by preference),
@@ -360,6 +365,37 @@ public class SyncCalendarJob : IJob
         }
 
         return (created, updated);
+    }
+
+    /// <summary>
+    /// Clean-up of the daily full pass: an imported item that starts after the far end of the import window is deleted. Before the window
+    /// existed (step 7.5.2) Google expanded a yearly event (a birthday) up to 2099 and every copy was stored; they would otherwise clutter
+    /// every list for good. Google stays the source of truth: an item returns on its own when its day comes into the window.
+    /// </summary>
+    private async Task RemoveItemsBeyondWindowAsync(
+        CalendarIntegration integration, DateTime syncStartedAtUtc, HashSet<Guid> affectedTeamIds, CancellationToken cancellationToken)
+    {
+        var windowEndUtc = syncStartedAtUtc.AddDays(IGoogleCalendarClient.WindowDays);
+        // An older row can still be a Task with a deadline instead of an Event with a start (see the conversion above).
+        var candidates = await _context.CalendarItems
+            .Where(t => t.SourceCalendarIntegrationId == integration.Id && t.ExternalCalendarEventId != null && (t.StartUtc ?? t.DeadlineUtc) > windowEndUtc)
+            .ToListAsync(cancellationToken);
+        // The query sees the stored dates; an item this very pass moved into the window (Google changed its date) is tracked with the new
+        // one and must stay, so the check is repeated on the values as they are now.
+        var beyondWindow = candidates.Where(t => (t.StartUtc ?? t.DeadlineUtc) > windowEndUtc).ToList();
+        if (beyondWindow.Count == 0)
+        {
+            return;
+        }
+
+        _context.CalendarItems.RemoveRange(beyondWindow);
+        foreach (var teamId in beyondWindow.Select(t => t.TeamId))
+        {
+            affectedTeamIds.Add(teamId);
+        }
+
+        _logger.LogInformation("Removed {Count} imported items of integration {IntegrationId} that start beyond the {Days}-day window.",
+            beyondWindow.Count, integration.Id, IGoogleCalendarClient.WindowDays);
     }
 
     /// <summary>

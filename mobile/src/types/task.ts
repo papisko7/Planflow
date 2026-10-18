@@ -99,8 +99,14 @@ export interface TaskDto {
   googleTaskListTitle: string | null;
   // The guests of an event / co-contractors of a task (not the assignee), as user ids. Empty for older servers' rows.
   participantUserIds: string[];
+  // The occurrences of one repeating event share a series id (Google's recurringEventId); null = not part of a series.
+  seriesId: string | null;
+  // The team's own list the item sits in (a task list for a task, a meeting list for an event); null = in none.
+  itemListId: string | null;
   // Latest "[Priority] why" sentence; only the team list endpoint fills it.
   reasonText?: string | null;
+  // Client side only, set by utils/seriesGrouping when a list shows one entry for a whole series: how many other occurrences it hides.
+  seriesMore?: number;
 }
 
 // Mirrors PlanFlow.Application.Tasks.Common.UrgencyScoreBreakdownDto
@@ -152,6 +158,7 @@ export interface CreateTaskRequest extends ScheduleFields {
   blockedByTaskId: string | null;
   reminders?: ReminderInput[];
   participantUserIds?: string[];
+  itemListId?: string | null;
 }
 
 // Mirrors PlanFlow.Api.Contracts.UpdateTaskRequest
@@ -168,6 +175,8 @@ export interface UpdateTaskRequest extends ScheduleFields {
   // Both lists: left out = the server keeps what it has (quick actions send neither); a list - even an empty one - replaces it.
   reminders?: ReminderInput[];
   participantUserIds?: string[];
+  // The whole value, not "left out = unchanged": null takes the item out of its list, so every update resends the stored one.
+  itemListId?: string | null;
 }
 
 // A task plus the name of its team (resolved client-side from the teams list) for display.

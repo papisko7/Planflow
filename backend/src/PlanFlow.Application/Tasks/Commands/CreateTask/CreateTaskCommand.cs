@@ -27,4 +27,5 @@ public record CreateTaskCommand(
     string? ColorKey = null,
     bool IsBusy = true,
     IReadOnlyList<ReminderInput>? Reminders = null,
-    IReadOnlyList<Guid>? ParticipantUserIds = null) : IRequest<TaskDto>, ITaskScheduleFields;
+    IReadOnlyList<Guid>? ParticipantUserIds = null,
+    Guid? ItemListId = null) : IRequest<TaskDto>, ITaskScheduleFields;
