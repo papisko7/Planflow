@@ -40,7 +40,10 @@ public class GetTasksByTeamQueryHandler : IRequestHandler<GetTasksByTeamQuery, I
             })
             .ToListAsync(cancellationToken);
 
-        var result = rows.Select(r => TaskDto.FromEntity(r.Item) with { ReasonText = r.Reason }).ToList();
+        // An informational item (Out of office, ...) has no score and so no "why"; an old log from before it was one must not show.
+        var result = rows
+            .Select(r => TaskDto.FromEntity(r.Item) with { ReasonText = CalendarItemUrgencyScoreFactory.IsRanked(r.Item) ? r.Reason : null })
+            .ToList();
         await _cache.SetAsync(cacheKey, result, CacheKeys.TeamTasksTtl, cancellationToken);
         return result;
     }

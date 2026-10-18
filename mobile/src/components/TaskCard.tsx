@@ -5,6 +5,7 @@ import { colors, radius, spacing, typography } from '../theme/theme';
 import { formatDuration } from '../utils/duration';
 import { formatRecurrence, formatWhen, splitReason, TEMPLATE_LABEL } from '../utils/itemDisplay';
 import { colorHex } from '../utils/palette';
+import { isInformational } from '../utils/templateRules';
 import { getUrgencyTier, URGENCY_TIER_META } from '../utils/urgencyGrouping';
 import { TaskStatus, TaskType, type TaskDto } from '../types/task';
 import { ItemTypeBadge } from './ItemTypeBadge';
@@ -42,6 +43,8 @@ const DOUBLE_TAP_MS = 250;
 function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
   const [menuVisible, setMenuVisible] = useState(false);
   const tier = getUrgencyTier(task.currentUrgencyScore);
+  // A day off, a focus block, a working place or a birthday is not ranked: no score pill, no urgency colour, no "why".
+  const ranked = !isInformational(task);
   const isEvent = task.taskType === TaskType.Event;
   const when = formatWhen(task);
   const recurrence = formatRecurrence(task);
@@ -87,7 +90,7 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
       testID={`task-card-${task.id}`}
       onPress={onPress || actions ? handlePress : undefined}
       onLongPress={actions ? () => setMenuVisible(true) : undefined}
-      style={({ pressed }) => [styles.card, { borderLeftColor: TIER_COLOR[tier], opacity: pressed ? 0.7 : 1 }]}
+      style={({ pressed }) => [styles.card, { borderLeftColor: ranked ? TIER_COLOR[tier] : colors.border, opacity: pressed ? 0.7 : 1 }]}
     >
       <View style={styles.headerRow}>
         {colorHex(task.colorKey) ? (
@@ -96,9 +99,11 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
         <Text style={styles.title} numberOfLines={2}>
           {task.title}
         </Text>
-        <View style={[styles.scorePill, { backgroundColor: TIER_COLOR[tier] }]}>
-          <Text style={styles.scoreText}>{task.currentUrgencyScore.toFixed(2)}</Text>
-        </View>
+        {ranked ? (
+          <View testID={`score-pill-${task.id}`} style={[styles.scorePill, { backgroundColor: TIER_COLOR[tier] }]}>
+            <Text style={styles.scoreText}>{task.currentUrgencyScore.toFixed(2)}</Text>
+          </View>
+        ) : null}
       </View>
 
       {task.description ? (
@@ -124,7 +129,7 @@ function TaskCardComponent({ task, onPress, actions }: TaskCardProps) {
       </View>
 
       {/* The backend's one-line explanation ("[High] due in 2d, impact 8/10"); older rows without one fall back to the tier. */}
-      {reason ? (
+      {!ranked ? null : reason ? (
         <Text style={styles.reasonText} numberOfLines={3}>
           {reason.label ? <Text style={[styles.reasonLabel, { color: TIER_COLOR[tier] }]}>{reason.label} </Text> : null}
           {reason.rest}

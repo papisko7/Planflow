@@ -133,3 +133,20 @@ describe('scheduleForEditing with all-day and templates', () => {
     expect([form.eventTemplate, form.location, form.colorKey]).toEqual([EventTemplate.FocusTime, 'Library', 'sage']);
   });
 });
+
+describe('switchKind - a task\'s planned start', () => {
+  it('Event -> Task starts the dates from scratch: the meeting times are not a planned start', () => {
+    const meeting = event({ startUtc: inHours(5), endUtc: inHours(6) });
+    const asTask = switchKind(meeting, kind('task'));
+
+    expect([asTask.taskType, asTask.startUtc, asTask.endUtc]).toEqual([TaskType.Task, null, null]);
+  });
+
+  it('Task -> Event keeps a planned start as the event start, and the request carries the start of a Task', () => {
+    const planned = task({ startUtc: inHours(5), deadlineUtc: inHours(9) });
+
+    expect(switchKind(planned, kind('event')).startUtc).toBe(planned.startUtc);
+    expect(scheduleForRequest(planned).startUtc).toBe(planned.startUtc);
+    expect(scheduleForRequest(planned).endUtc).toBeNull();
+  });
+});

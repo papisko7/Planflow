@@ -74,6 +74,11 @@ export function switchKind(s: ScheduleFields, kind: ItemKind): ScheduleFields {
   next.isBusy = resolveBusy(kind.taskType, kind.template, s.isBusy);
 
   next.isAllDay = resolveAllDay(kind.taskType, kind.template, wasAllDay);
+  // An event's times are not a task's planned start: turning an Event into a Task starts the task's dates from scratch.
+  if (kind.taskType === TaskType.Task && s.taskType === TaskType.Event) {
+    next.startUtc = null;
+    next.endUtc = null;
+  }
   if (kind.taskType === TaskType.Event) {
     if (next.isAllDay && !wasAllDay) Object.assign(next, pairAllDayDates(s.startUtc, s.endUtc, s.startUtc ? 'start' : 'end'));
     if (!next.isAllDay && wasAllDay) Object.assign(next, allDayToTimed(s.startUtc));
@@ -196,7 +201,8 @@ export function normalizeSchedule(s: ScheduleFields): ScheduleFields {
     colorKey: rules.allowsColor ? s.colorKey : null,
     isBusy: resolveBusy(s.taskType, eventTemplate, s.isBusy),
     deadlineUtc: isEvent ? null : s.deadlineUtc,
-    startUtc: isEvent ? s.startUtc : null,
+    // An Event's start is when it begins; a Task's is its optional planned start (it feeds the "Scheduled" part of the score).
+    startUtc: s.startUtc,
     endUtc: isEvent ? s.endUtc : null,
     recurrenceIntervalHours: s.isRecurring ? s.recurrenceIntervalHours : null,
     recurrenceEndsAtUtc: s.isRecurring ? s.recurrenceEndsAtUtc : null,
@@ -234,8 +240,11 @@ export function validateSchedule(raw: ScheduleFields, isNew: boolean): string | 
     if (s.endUtc && new Date(s.endUtc).getTime() < start) return 'The end must not be earlier than the start.';
     const end = s.endUtc ? new Date(s.endUtc).getTime() : start + DEFAULT_EVENT_HOURS * 3_600_000;
     if (isNew && end <= now) return 'The event must not be already over.';
-  } else if (isNew && s.deadlineUtc && new Date(s.deadlineUtc).getTime() <= now) {
-    return 'Deadline must be in the future.';
+  } else {
+    if (isNew && s.deadlineUtc && new Date(s.deadlineUtc).getTime() <= now) return 'Deadline must be in the future.';
+    if (s.startUtc && s.deadlineUtc && new Date(s.startUtc).getTime() > new Date(s.deadlineUtc).getTime()) {
+      return 'The start must not be after the deadline.';
+    }
   }
 
   if (s.isRecurring) {

@@ -192,3 +192,29 @@ describe('TaskCard long-press menu', () => {
     expect(screen.queryByTestId('item-color-c2')).toBeNull();
   });
 });
+
+// Step 7.5.4: an informational item (Out of office, ...) is shown in the calendar but is not ranked.
+describe('TaskCard - informational items', () => {
+  const leave: TaskDto = {
+    ...task, id: 'leave', title: 'Holiday', taskType: TaskType.Event, eventTemplate: EventTemplate.OutOfOffice, status: TaskStatus.Confirmed,
+    currentUrgencyScore: 0, startUtc: '2030-10-20T00:00:00Z', endUtc: '2030-10-22T00:00:00Z', isAllDay: true,
+    reasonText: '[Critical] a stale reason from the old algorithm',
+  };
+
+  it('shows no score pill and no urgency explanation, but still the template and the title', async () => {
+    await render(<TaskCard task={leave} />);
+
+    expect(screen.getByText('Holiday')).toBeTruthy();
+    expect(screen.getByTestId('item-template-leave')).toBeTruthy();
+    expect(screen.queryByTestId('score-pill-leave')).toBeNull();
+    expect(screen.queryByText(/stale reason/)).toBeNull();
+    expect(screen.queryByText(/Low|Critical/)).toBeNull();
+  });
+
+  it('a task still shows its score pill', async () => {
+    await render(<TaskCard task={task} />);
+
+    expect(screen.getByTestId('score-pill-t1')).toBeTruthy();
+    expect(screen.getByText('0.50')).toBeTruthy();
+  });
+});

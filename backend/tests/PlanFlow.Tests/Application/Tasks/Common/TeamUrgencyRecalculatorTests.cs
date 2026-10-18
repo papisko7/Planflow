@@ -1,6 +1,7 @@
 using PlanFlow.Application.Tasks.Common;
 using PlanFlow.Domain.Entities;
 using PlanFlow.Domain.Enums;
+using PlanFlow.Domain.Services;
 using PlanFlow.Infrastructure.Persistence;
 using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 
@@ -140,6 +141,66 @@ public class TeamUrgencyRecalculatorTests
 
         Assert.DoesNotContain(done.Id, changed);
         Assert.Equal(0.0, done.CurrentUrgencyScore);
+    }
+
+    // ---- Step 7.5.4 ----
+
+    [Fact]
+    public async Task RecalculateTeam_InformationalItem_KeepsAZeroScoreAndGetsNoAuditRow()
+    {
+        var (db, teamId) = await CreateTeamAsync();
+        var leave = new CalendarItem
+        {
+            TeamId = teamId, Title = "Holiday", TaskType = TaskType.Event, EventTemplate = EventTemplate.OutOfOffice,
+            StartUtc = Now.AddHours(1), EndUtc = Now.AddDays(3), ImpactScore = 10, Status = TaskStatus.Confirmed
+        };
+        db.CalendarItems.Add(leave);
+        await db.SaveChangesAsync();
+
+        await TeamUrgencyRecalculator.RecalculateTeamAsync(db, teamId, Now, ScoreTriggerSource.ManualCreate, leave, CancellationToken.None);
+        await db.SaveChangesAsync();
+
+        Assert.Equal(0.0, leave.CurrentUrgencyScore);
+        Assert.Empty(db.UrgencyScoreLogs.Where(l => l.CalendarItemId == leave.Id));
+    }
+
+    [Fact]
+    public async Task RecalculateTeam_InformationalItemScoredByTheOldAlgorithm_IsResetToZeroOnce()
+    {
+        var (db, teamId) = await CreateTeamAsync();
+        var focus = new CalendarItem
+        {
+            TeamId = teamId, Title = "Deep work", TaskType = TaskType.Event, EventTemplate = EventTemplate.FocusTime,
+            StartUtc = Now.AddHours(1), EndUtc = Now.AddHours(3), Status = TaskStatus.Confirmed, CurrentUrgencyScore = 0.91 // v1 scored it
+        };
+        db.CalendarItems.Add(focus);
+        await db.SaveChangesAsync();
+
+        var first = await TeamUrgencyRecalculator.RecalculateTeamAsync(db, teamId, Now, ScoreTriggerSource.ScheduledRecalculation, null, CancellationToken.None);
+        var second = await TeamUrgencyRecalculator.RecalculateTeamAsync(db, teamId, Now, ScoreTriggerSource.ScheduledRecalculation, null, CancellationToken.None);
+
+        Assert.Equal(0.0, focus.CurrentUrgencyScore);
+        Assert.Contains(focus.Id, first);
+        Assert.Empty(second);
+    }
+
+    [Fact]
+    public async Task RecalculateTeam_ReadsAnAllDayItemInTheAssigneesTimeZone()
+    {
+        var (db, teamId) = await CreateTeamAsync();
+        var user = await TestDb.AddUserAsync(db, "Ann");
+        user.TimeZoneId = "Europe/Warsaw";
+        // Due on 5 Oct (the literal day): in Warsaw that day ends 5 Oct 22:00 UTC, so at 12:00 UTC there are 10 hours left, not 12.
+        var task = AddTask(db, teamId, deadline: new DateTime(2026, 10, 5, 0, 0, 0, DateTimeKind.Utc), impact: 5);
+        task.IsAllDay = true;
+        task.AssignedUserId = user.Id;
+        await db.SaveChangesAsync();
+
+        await TeamUrgencyRecalculator.RecalculateTeamAsync(db, teamId, Now, ScoreTriggerSource.ScheduledRecalculation, task, CancellationToken.None);
+
+        var log = db.UrgencyScoreLogs.Local.Single(l => l.CalendarItemId == task.Id);
+        Assert.Contains("due in 10h", log.ReasonText);
+        Assert.Equal(UrgencyScoreCalculator.AlgorithmVersion, log.AlgorithmVersion);
     }
 
     [Fact]

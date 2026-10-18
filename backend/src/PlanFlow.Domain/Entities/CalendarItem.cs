@@ -65,7 +65,7 @@ public class CalendarItem : BaseEntity
     /// <summary>True when an Owner/Admin assigned the item: the assignee cannot give it back. Decided by the role at assignment time.</summary>
     public bool IsAssignmentLocked { get; set; }
 
-    /// <summary>Event only: when it begins. Always null for a Task.</summary>
+    /// <summary>An Event: when it begins. A Task: its optional planned start (feeds the "Scheduled" part of the score; never later than the deadline).</summary>
     public DateTime? StartUtc { get; set; }
 
     /// <summary>Event only: when it ends. Null = unknown, the algorithm assumes a default duration. Always null for a Task.</summary>

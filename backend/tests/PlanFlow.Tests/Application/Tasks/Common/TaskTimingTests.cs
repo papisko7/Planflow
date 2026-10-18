@@ -306,8 +306,16 @@ public class TaskScheduleFieldsTests
         Assert.False(IsValid(Create(TaskType.Event, start: Future, recurring: true, interval: 168, recurrenceEnds: Future.AddDays(-1))));
 
     [Fact]
-    public void Validator_TaskIgnoresStart_SoALateStartDoesNotBlockIt() =>
-        Assert.True(IsValid(Create(TaskType.Task, start: Future.AddDays(1), deadline: Future)));
+    public void Validator_TaskStartAfterItsDeadline_IsRejected() =>
+        Assert.False(IsValid(Create(TaskType.Task, start: Future.AddDays(1), deadline: Future)));
+
+    [Fact]
+    public void Validator_TaskStartBeforeOrAtItsDeadline_IsAccepted()
+    {
+        Assert.True(IsValid(Create(TaskType.Task, start: Future.AddDays(-1), deadline: Future)));
+        Assert.True(IsValid(Create(TaskType.Task, start: Future, deadline: Future)));
+        Assert.True(IsValid(Create(TaskType.Task, start: null, deadline: Future)));
+    }
 
     [Fact]
     public async Task ChangingAnEventToATask_DropsItsStartAndEnd()

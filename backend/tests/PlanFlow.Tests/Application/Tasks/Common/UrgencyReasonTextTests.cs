@@ -170,9 +170,9 @@ public class UrgencyReasonTextTests
     {
         var unrated = Score(Item(deadline: Now.AddDays(5), impact: null));
 
-        // Deadline 0.45 * e^(-5/7), re-normalized because the impact weight (0.25) is shared out: / 0.75.
+        // Deadline 0.40 * e^(-5/7), re-normalized because the impact (0.25) and Scheduled (0.05) weights are shared out: / 0.70.
         Assert.Null(unrated.ImpactComponent);
-        Assert.Equal(0.45 * Math.Exp(-5.0 / 7.0) / 0.75, unrated.FinalScore, precision: 9);
+        Assert.Equal(0.40 * Math.Exp(-5.0 / 7.0) / 0.70, unrated.FinalScore, precision: 9);
         Assert.Contains("impact not rated", unrated.ReasonText);
     }
 
@@ -241,8 +241,10 @@ public class UrgencyReasonTextTests
 
         Assert.Equal(0.0, evt.DeadlineComponent);
         Assert.Equal("[Low] no start time, impact 0/10", evt.ReasonText);
+        // A task's start never stands in for its deadline: it only feeds the Scheduled part (24h away: e^(-1/7)).
         Assert.Equal(0.0, task.DeadlineComponent);
-        Assert.Equal("[Low] no deadline, impact 0/10", task.ReasonText);
+        Assert.Equal(Math.Exp(-1.0 / 7.0), task.ScheduledComponent!.Value, precision: 9);
+        Assert.Equal("[Low] no deadline, planned start in 24h, impact 0/10", task.ReasonText);
     }
 
     [Fact]

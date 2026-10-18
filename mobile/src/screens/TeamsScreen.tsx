@@ -12,6 +12,7 @@ import { useTaskActions } from '../hooks/useTaskActions';
 import { createTeam, getMyTeams, getTeamMembers } from '../services/teamService';
 import { getTeamTasks } from '../services/taskService';
 import { colors, radius, spacing, typography } from '../theme/theme';
+import { isInformational } from '../utils/templateRules';
 import { getUrgencyTier, URGENCY_TIER_META } from '../utils/urgencyGrouping';
 import type { RootStackParamList } from '../navigation/types';
 import type { ApiError } from '../types/api';
@@ -31,6 +32,7 @@ interface WorkloadRow {
 function buildWorkload(tasks: TaskDto[], names: Map<string, string>): WorkloadRow[] {
   const buckets = new Map<string, TaskDto[]>();
   for (const task of tasks) {
+    if (isInformational(task)) continue; // a day off or a birthday is not workload
     const key = task.assignedUserId ?? 'unassigned';
     if (!buckets.has(key)) buckets.set(key, []);
     buckets.get(key)!.push(task);

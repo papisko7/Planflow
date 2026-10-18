@@ -12,6 +12,7 @@ import { colorHex, colorLabel } from '../utils/palette';
 import { formatColorKey, formatRecurrence, formatReminder, TEMPLATE_LABEL } from '../utils/itemDisplay';
 import { formatDay } from '../utils/dateUtils';
 import { allDayDays, toUpdateRequest } from '../utils/schedule';
+import { isInformational } from '../utils/templateRules';
 import type { RootStackParamList } from '../navigation/types';
 import type { ApiError } from '../types/api';
 import { TeamRole, type TeamMemberDto } from '../types/team';
@@ -97,6 +98,8 @@ export default function TaskDetailScreen() {
   const reminders = detail.reminders ?? [];
   const isEvent = task.taskType === TaskType.Event;
   const dueDate = formatDateTime(task.deadlineUtc);
+  const plannedStart = isEvent ? null : formatDateTime(task.startUtc);
+  const ranked = !isInformational(task);
   // An all-day event reads "Oct 19, 2026 · all day" instead of 12:00 AM - 11:59 PM.
   // (For an imported all-day event the end shown is its LAST day, not the midnight after it that is stored.)
   const days = allDayDays(task);
@@ -209,6 +212,7 @@ export default function TaskDetailScreen() {
             </>
           ) : (
             <>
+              {plannedStart ? <MetaItem label="Planned start" value={plannedStart} /> : null}
               {dueDate ? <MetaItem label="Due" value={dueDate} /> : null}
               {task.estimatedEffortHours !== null ? (
                 <MetaItem label="Estimated effort" value={formatDuration(task.estimatedEffortHours)} />
@@ -225,7 +229,7 @@ export default function TaskDetailScreen() {
           {recurrence ? (
             <MetaItem label="Repeats" value={recurrenceEnd ? `${recurrence}, until ${recurrenceEnd}` : recurrence} />
           ) : null}
-          <MetaItem label="Impact score" value={task.impactScore === null ? "Not rated" : String(task.impactScore)} />
+          {ranked ? <MetaItem label="Impact score" value={task.impactScore === null ? "Not rated" : String(task.impactScore)} /> : null}
           <MetaItem label="Assigned to" value={assigneeName} />
         </View>
 
@@ -258,6 +262,8 @@ export default function TaskDetailScreen() {
         {actionError ? <Text style={styles.deleteText}>{actionError}</Text> : null}
       </View>
 
+      {/* A day off, a focus block, a working place or a birthday is not ranked: no blocking chain and no score to explain. */}
+      {ranked ? (
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Blocking Relationships</Text>
         {blockingTask ? (
@@ -278,7 +284,9 @@ export default function TaskDetailScreen() {
           </View>
         ) : null}
       </View>
+      ) : null}
 
+      {ranked ? (
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Urgency Score Breakdown</Text>
         {latestScoreBreakdown ? (
@@ -287,6 +295,7 @@ export default function TaskDetailScreen() {
           <Text style={styles.relationTextMuted}>No score has been computed for this task yet.</Text>
         )}
       </View>
+      ) : null}
     </ScrollView>
   );
 }

@@ -96,6 +96,12 @@ export function rulesFor(type: TaskType, template: EventTemplate): TemplateRules
   return type === TaskType.Task ? TASK : EVENT_RULES[template];
 }
 
+// Informational items (Out of office, Focus time, Working location, Birthday) are outside the ranking: the backend gives them no
+// score, so the app shows no score for them and leaves them out of the "Do now" card, the urgency groups and the statistics.
+export function isInformational(item: { taskType: TaskType; eventTemplate: EventTemplate }): boolean {
+  return rulesFor(item.taskType, item.eventTemplate).informational;
+}
+
 // All-day once the template has had its say: Birthday always, Focus time never, a Task is never flagged (its all-day
 // deadline is a different convention), the rest follow the switch.
 export function resolveAllDay(type: TaskType, template: EventTemplate, requested: boolean): boolean {

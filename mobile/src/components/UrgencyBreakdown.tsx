@@ -4,14 +4,16 @@ import type { UrgencyScoreBreakdownDto } from '../types/task';
 import { splitReason } from '../utils/itemDisplay';
 
 // Mirrors the weights hard-coded server-side (see UrgencyScoreCalculator.cs):
-// weighted sum 0.45*Deadline + 0.20*Blocking + 0.25*Impact + 0.10*UserOverride, then two floors
-// (due within 24h -> at least 0.85; a blocker is never below what it blocks) and, for a blocked task, x0.5.
+// weighted sum 0.40*Deadline + 0.20*Blocking + 0.25*Impact + 0.10*UserOverride + 0.05*Scheduled (algorithm v2), then two floors
+// (due within 24h -> at least 0.85, except for an unverified item; a blocker is never below what it blocks) and, for a blocked task, x0.5.
+// A factor that does not apply (unrated impact, no planned start) hands its weight to the others.
 // Shown next to each bar so the breakdown UI doubles as documentation of the formula for the thesis.
 const COMPONENTS: Array<{ key: keyof UrgencyScoreBreakdownDto; label: string; weight: number; color: string }> = [
-  { key: 'deadlineComponent', label: 'Deadline', weight: 0.45, color: colors.urgencyCritical },
+  { key: 'deadlineComponent', label: 'Deadline', weight: 0.4, color: colors.urgencyCritical },
   { key: 'impactComponent', label: 'Impact', weight: 0.25, color: colors.primary },
   { key: 'blockingComponent', label: 'Blocks urgent work', weight: 0.2, color: colors.urgencyMedium },
   { key: 'userOverrideComponent', label: 'Manual Override', weight: 0.1, color: colors.textMuted },
+  { key: 'scheduledComponent', label: 'Planned start', weight: 0.05, color: colors.primary },
 ];
 
 function formatComputedAt(createdAtUtc: string): string {
@@ -44,7 +46,9 @@ export function UrgencyBreakdown({ breakdown }: UrgencyBreakdownProps) {
       </View>
 
       {COMPONENTS.map(({ key, label, weight, color }) => {
-        const value = breakdown[key] as number | null;
+        const value = (breakdown[key] ?? null) as number | null;
+        // No planned start (or one that did not count) is simply not part of this score - no row at all.
+        if (key === 'scheduledComponent' && value === null) return null;
         // An unrated impact is not a zero: its weight is shared by the other factors, so show that instead of a bar.
         if (value === null) {
           return (

@@ -37,12 +37,16 @@ public static class TaskScheduleMapper
         var rules = EventTemplateRules.For(fields.TaskType, fields.EventTemplate);
         var allDay = EventTemplateRules.ResolveAllDay(fields.TaskType, fields.EventTemplate, fields.IsAllDay);
 
+        // An event turned into a task: its unchanged start is when the meeting began, not when work should begin, so it is not carried over.
+        var staleEventStart = !isEvent && task.TaskType == Domain.Enums.TaskType.Event && fields.StartUtc == task.StartUtc;
+
         task.TaskType = fields.TaskType;
         task.EventTemplate = isEvent ? fields.EventTemplate : Domain.Enums.EventTemplate.Default;
         // A Task is due at a deadline; an Event occupies a time range. The fields of the other type are dropped,
         // so switching Event <-> Task never leaves stale dates behind.
         task.DeadlineUtc = isEvent ? null : fields.DeadlineUtc;
-        task.StartUtc = isEvent ? fields.StartUtc : null;
+        // A Task may also carry a planned start (optional); it feeds the "Scheduled" part of its score.
+        task.StartUtc = staleEventStart ? null : fields.StartUtc;
         // An all-day event without an end lasts that one day (end = the midnight after it, the exclusive end Google uses too).
         task.EndUtc = !isEvent ? null : allDay && fields.EndUtc is null && fields.StartUtc is { } start ? start.AddDays(1) : fields.EndUtc;
         task.IsAllDay = allDay;
@@ -111,6 +115,13 @@ public abstract class TaskScheduleValidator<T> : AbstractValidator<T> where T : 
             .When(x => x.TaskType == Domain.Enums.TaskType.Event && x.StartUtc.HasValue && x.EndUtc.HasValue)
             .OverridePropertyName("EndUtc")
             .WithMessage("End must not be earlier than the start.");
+
+        // A task cannot be planned to start after it is due.
+        RuleFor(x => x)
+            .Must(x => x.StartUtc!.Value <= x.DeadlineUtc!.Value)
+            .When(x => x.TaskType == Domain.Enums.TaskType.Task && x.StartUtc.HasValue && x.DeadlineUtc.HasValue)
+            .OverridePropertyName("StartUtc")
+            .WithMessage("A task cannot start after its deadline.");
 
         When(x => x.IsRecurring, () =>
         {

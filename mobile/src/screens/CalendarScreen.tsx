@@ -22,6 +22,7 @@ import { useTaskActions } from '../hooks/useTaskActions';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { groupTasksByDueDate } from '../utils/calendarGrouping';
 import { dayKey, pinchDirection } from '../utils/dateUtils';
+import { isInformational } from '../utils/templateRules';
 import { getUrgencyTier } from '../utils/urgencyGrouping';
 import type { RootStackParamList } from '../navigation/types';
 import { type TaskDto, type TaskWithTeam } from '../types/task';
@@ -68,7 +69,9 @@ export default function CalendarScreen() {
         map.set(section.dateKey, colors.border);
         continue;
       }
-      const top = Math.max(...open.map((t) => t.currentUrgencyScore));
+      // Informational items (a day off, a birthday) have no score, so only ranked ones colour the dot by urgency.
+      const ranked = open.filter((t) => !isInformational(t));
+      const top = ranked.length > 0 ? Math.max(...ranked.map((t) => t.currentUrgencyScore)) : 0;
       map.set(section.dateKey, TIER_COLOR[getUrgencyTier(top)]);
     }
     return map;

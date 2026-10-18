@@ -23,9 +23,9 @@ const event = (over: Partial<ScheduleFields> = {}): ScheduleFields => ({ ...empt
 const task = (over: Partial<ScheduleFields> = {}): ScheduleFields => ({ ...emptySchedule(TaskType.Task), ...over });
 
 describe('normalizeSchedule', () => {
-  it('drops event dates from a Task and the deadline from an Event', () => {
+  it('drops the end from a Task (it keeps its planned start) and the deadline from an Event', () => {
     const asTask = normalizeSchedule(task({ deadlineUtc: inHours(5), startUtc: inHours(1), endUtc: inHours(2) }));
-    expect(asTask.startUtc).toBeNull();
+    expect(asTask.startUtc).not.toBeNull(); // a Task's optional planned start (step 7.5.4)
     expect(asTask.endUtc).toBeNull();
     expect(asTask.deadlineUtc).not.toBeNull();
 
@@ -234,5 +234,22 @@ describe('imported all-day events (dates stored as midnight UTC)', () => {
     expect(isPastEvent(item, new Date(2026, 9, 21, 23, 0))).toBe(false); // evening of the last day
     expect(isPastEvent(item, new Date(2026, 9, 22, 0, 30))).toBe(true); // just after local midnight
     expect(isPastEvent(item, new Date(2026, 9, 20, 12, 0))).toBe(false);
+  });
+});
+
+// Step 7.5.4: a Task may carry a planned start, which can not be later than its deadline.
+describe('validateSchedule - a task\'s planned start', () => {
+  it('accepts a start before the deadline, and a task without a start', () => {
+    expect(validateSchedule(task({ startUtc: inHours(2), deadlineUtc: inHours(10) }), true)).toBeNull();
+    expect(validateSchedule(task({ deadlineUtc: inHours(10) }), true)).toBeNull();
+  });
+
+  it('rejects a start after the deadline, also when editing', () => {
+    expect(validateSchedule(task({ startUtc: inHours(20), deadlineUtc: inHours(10) }), true)).toMatch(/start must not be after the deadline/i);
+    expect(validateSchedule(task({ startUtc: inHours(-1), deadlineUtc: inHours(-5) }), false)).toMatch(/start must not be after the deadline/i);
+  });
+
+  it('a start in the past is fine (the work may already be planned to be under way)', () => {
+    expect(validateSchedule(task({ startUtc: inHours(-3), deadlineUtc: inHours(10) }), true)).toBeNull();
   });
 });

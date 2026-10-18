@@ -16,7 +16,9 @@ public record UrgencyScoreBreakdownDto(
     ScoreTriggerSource TriggerSource,
     DateTime CreatedAtUtc,
     bool IsBlocked,
-    string? ReasonText = null)
+    string? ReasonText = null,
+    double? ScheduledComponent = null,
+    int AlgorithmVersion = 1)
 {
     public static UrgencyScoreBreakdownDto FromEntity(UrgencyScoreLog log) => new(
         log.DeadlineComponent,
@@ -27,7 +29,9 @@ public record UrgencyScoreBreakdownDto(
         log.TriggerSource,
         log.CreatedAtUtc,
         log.IsBlocked,
-        log.ReasonText);
+        log.ReasonText,
+        log.ScheduledComponent,
+        log.AlgorithmVersion);
 }
 
 /// <summary>

@@ -50,8 +50,8 @@ public static class RecurrenceScheduler
             Description = finished.Description,
             Status = TaskStatusRules.DefaultFor(finished.TaskType),
             TaskType = finished.TaskType,
-            // An event keeps its length: start and end move together.
-            StartUtc = isEvent ? finished.StartUtc + shift : null,
+            // An event keeps its length: start and end move together. A task's planned start moves with its deadline (null stays null).
+            StartUtc = finished.StartUtc + shift,
             EndUtc = isEvent ? finished.EndUtc + shift : null,
             DeadlineUtc = isEvent ? null : finished.DeadlineUtc + shift,
             EstimatedEffortHours = finished.EstimatedEffortHours,

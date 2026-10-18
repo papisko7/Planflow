@@ -106,3 +106,45 @@ describe('TaskDetailScreen - imported Google event', () => {
     expect(screen.queryByText('Reminders')).toBeNull();
   });
 });
+
+// Step 7.5.4: informational items have no score; a task shows its planned start and the Scheduled row of the breakdown.
+describe('TaskDetailScreen - scoring', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const breakdown = (over: Record<string, unknown> = {}) => ({
+    deadlineComponent: 0.5, blockingComponent: 0, impactComponent: 0.5, userOverrideComponent: 0, finalScore: 0.42,
+    triggerSource: 0, createdAtUtc: '2026-10-18T10:00:00Z', isBlocked: false, reasonText: '[Medium] due in 2d, impact 5/10', ...over,
+  });
+
+  it('an Out of office has neither an impact score nor a blocking or score section', async () => {
+    await showDetail({ task: importedEvent({ eventTemplate: EventTemplate.OutOfOffice }), latestScoreBreakdown: null });
+
+    expect(screen.queryByText('Impact score')).toBeNull();
+    expect(screen.queryByText('Urgency Score Breakdown')).toBeNull();
+    expect(screen.queryByText('Blocking Relationships')).toBeNull();
+  });
+
+  it('a plain event keeps them', async () => {
+    await showDetail({ task: importedEvent(), latestScoreBreakdown: null });
+
+    expect(screen.getByText('Impact score')).toBeTruthy();
+    expect(screen.getByText('Urgency Score Breakdown')).toBeTruthy();
+  });
+
+  it('a task with a planned start shows it, and the breakdown has the Planned start row', async () => {
+    await showDetail({
+      task: importedEvent({ taskType: TaskType.Task, eventTemplate: EventTemplate.Default, isAllDay: false, startUtc: '2030-10-20T09:00:00Z', endUtc: null, deadlineUtc: '2030-10-25T09:00:00Z', status: TaskStatus.Backlog }),
+      latestScoreBreakdown: breakdown({ scheduledComponent: 0.87, algorithmVersion: 2 }),
+    });
+
+    expect(screen.getByText('Planned start')).toBeTruthy();
+    expect(screen.getByText('0.87')).toBeTruthy();
+  });
+
+  it('the breakdown has no Planned start row when it did not count (and none on a score from the older algorithm)', async () => {
+    await showDetail({ task: importedEvent({ taskType: TaskType.Task, eventTemplate: EventTemplate.Default, isAllDay: false, startUtc: null, endUtc: null, deadlineUtc: '2030-10-25T09:00:00Z', status: TaskStatus.Backlog }), latestScoreBreakdown: breakdown({ scheduledComponent: null }) });
+
+    expect(screen.getByText(/Deadline/)).toBeTruthy(); // the other rows are there
+    expect(screen.queryByText('Planned start')).toBeNull();
+  });
+});

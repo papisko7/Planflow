@@ -1,6 +1,7 @@
 import { TaskStatus, type TaskDto } from '../types/task';
 import { dueUtc, isPastEvent } from './schedule';
 import { isFinishedStatus } from './taskStatus';
+import { isInformational } from './templateRules';
 
 export interface DashboardStats {
   open: number;
@@ -19,7 +20,7 @@ function sameLocalDay(a: Date, b: Date): boolean {
 
 // The four headline numbers on the dashboard. "Overdue" = open and past its due moment (a Task's deadline,
 // an Event's start); "due today" = open and due later today (so the two never overlap). Finished events are
-// history, not open work, so they are skipped.
+// history, not open work, so they are skipped - and so are informational items (a day off, a birthday), which are not work.
 export function computeDashboardStats(tasks: TaskDto[], now: Date = new Date()): DashboardStats {
   let open = 0;
   let overdue = 0;
@@ -27,6 +28,7 @@ export function computeDashboardStats(tasks: TaskDto[], now: Date = new Date()):
   let done = 0;
 
   for (const task of tasks) {
+    if (isInformational(task)) continue;
     if (task.status === TaskStatus.Completed) {
       done++;
       continue;

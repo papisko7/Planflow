@@ -269,6 +269,70 @@ public class TaskSchedulingApiTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task InformationalItem_HasNoScoreAndNoReason_AndTurningATaskIntoOneResetsIt()
+    {
+        var (client, teamId) = await OwnerWithTeamAsync();
+
+        // A task due very soon is critical...
+        var created = await client.PostAsJsonAsync($"api/teams/{teamId}/tasks",
+            new { title = "Leave soon", impactScore = 9, deadlineUtc = Iso(TimeSpan.FromHours(3)) });
+        var dto = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var id = dto.GetProperty("id").GetGuid();
+        Assert.True(dto.GetProperty("currentUrgencyScore").GetDouble() >= 0.85);
+
+        // ...but the same item turned into an Out of office is not a decision: no score, no reason, no breakdown.
+        var start = DateTime.UtcNow.Date.AddDays(1);
+        var edited = await client.PutAsJsonAsync($"api/tasks/{id}", new
+        {
+            title = "Leave soon", status = 5, taskType = 1, eventTemplate = (int)EventTemplate.OutOfOffice,
+            startUtc = start, endUtc = start.AddDays(1), isAllDay = true
+        });
+        Assert.Equal(HttpStatusCode.OK, edited.StatusCode);
+        Assert.Equal(0.0, (await edited.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("currentUrgencyScore").GetDouble());
+
+        var list = await client.GetFromJsonAsync<JsonElement>($"api/teams/{teamId}/tasks");
+        var listed = list.EnumerateArray().Single(t => t.GetProperty("id").GetGuid() == id);
+        Assert.Equal(JsonValueKind.Null, listed.GetProperty("reasonText").ValueKind);
+
+        var detail = await client.GetFromJsonAsync<JsonElement>($"api/tasks/{id}");
+        Assert.Equal(JsonValueKind.Null, detail.GetProperty("latestScoreBreakdown").ValueKind);
+    }
+
+    [Fact]
+    public async Task ATasksPlannedStart_RoundTrips_FeedsTheBreakdown_AndMustNotBeAfterTheDeadline()
+    {
+        var (client, teamId) = await OwnerWithTeamAsync();
+
+        var created = await client.PostAsJsonAsync($"api/teams/{teamId}/tasks", new
+        {
+            title = "Plan the thesis", impactScore = 6, deadlineUtc = Iso(TimeSpan.FromDays(10)), startUtc = Iso(TimeSpan.FromDays(2))
+        });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var dto = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var id = dto.GetProperty("id").GetGuid();
+        Assert.NotEqual(JsonValueKind.Null, dto.GetProperty("startUtc").ValueKind);
+
+        var detail = await client.GetFromJsonAsync<JsonElement>($"api/tasks/{id}");
+        var breakdown = detail.GetProperty("latestScoreBreakdown");
+        Assert.True(breakdown.GetProperty("scheduledComponent").GetDouble() > 0.0);
+        Assert.Equal(2, breakdown.GetProperty("algorithmVersion").GetInt32());
+        Assert.Contains("planned start in", breakdown.GetProperty("reasonText").GetString());
+
+        // An old client (no startUtc in the body, no taskType) must not wipe the planned start.
+        var oldEdit = await client.PutAsJsonAsync($"api/tasks/{id}", new
+        {
+            title = "Plan the thesis v2", status = 0, deadlineUtc = Iso(TimeSpan.FromDays(10)), impactScore = 6
+        });
+        Assert.Equal(HttpStatusCode.OK, oldEdit.StatusCode);
+
+        var late = await client.PostAsJsonAsync($"api/teams/{teamId}/tasks", new
+        {
+            title = "Backwards", impactScore = 5, deadlineUtc = Iso(TimeSpan.FromDays(2)), startUtc = Iso(TimeSpan.FromDays(5))
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, late.StatusCode);
+    }
+
+    [Fact]
     public async Task EditingAnImportedEvent_ChangesOnlyPlanflowFields()
     {
         var (client, teamId) = await OwnerWithTeamAsync();

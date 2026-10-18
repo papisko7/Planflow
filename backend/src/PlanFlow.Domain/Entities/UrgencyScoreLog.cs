@@ -6,8 +6,9 @@ namespace PlanFlow.Domain.Entities;
 /// <summary>
 /// Snapshot of one Urgency Score computation for a <see cref="CalendarItem"/>, capturing every
 /// weighted component so the result is explainable and reproducible for the thesis evaluation:
-/// weighted sum 0.45*Deadline + 0.20*Blocking + 0.25*Impact + 0.10*UserOverride, then the deadline and
-/// inheritance floors and, for blocked tasks, the blocked penalty (see UrgencyScoreCalculator).
+/// weighted sum 0.40*Deadline + 0.20*Blocking + 0.25*Impact + 0.10*UserOverride + 0.05*Scheduled (version 2; version 1 had
+/// 0.45 / 0.20 / 0.25 / 0.10 and no Scheduled), then the deadline and inheritance floors and, for blocked tasks, the blocked
+/// penalty (see UrgencyScoreCalculator).
 /// </summary>
 public class UrgencyScoreLog : BaseEntity
 {
@@ -21,7 +22,7 @@ public class UrgencyScoreLog : BaseEntity
     public double? ImpactComponent { get; set; }
     public double UserOverrideComponent { get; set; }
 
-    /// <summary>The "time to the task's Start" component (algorithm v2); null on rows written by v1, which had no such component.</summary>
+    /// <summary>The "time to the task's planned start" component (algorithm v2); null on rows written by v1 and for an item with no counted start.</summary>
     public double? ScheduledComponent { get; set; }
 
     /// <summary>Which version of the weights/rules produced this row, so history before and after a weight change is never compared blindly. 1 = original weights.</summary>

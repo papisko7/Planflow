@@ -211,3 +211,53 @@ describe('CreateTaskModal - templates', () => {
     expect(screen.getByText('PlanFlow')).toBeTruthy();
   });
 });
+
+// Step 7.5.4: the optional planned start of a Task.
+describe('CreateTaskModal - a task\'s planned start', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedGetTeamMembers.mockResolvedValue([]);
+    mockedCreateTask.mockResolvedValue({} as never);
+  });
+
+  it('a Task offers an optional Start, an Event does not', async () => {
+    await open();
+    expect(screen.getByText('Start (optional)')).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('schedule-type-event'));
+    expect(screen.queryByTestId('task-start-picker-button')).toBeNull();
+  });
+
+  it('sends the planned start together with the deadline, and nothing when it is left empty', async () => {
+    await open();
+    await fireEvent.changeText(screen.getByTestId('create-task-title-input'), 'Write chapter 3');
+    await fireEvent.press(screen.getByTestId('create-task-submit-button'));
+    await waitFor(() => expect(mockedCreateTask).toHaveBeenCalledTimes(1));
+    expect(mockedCreateTask.mock.calls[0][1].startUtc).toBeNull();
+
+    await fireEvent.press(screen.getByTestId('task-start-picker-button'));
+    await fireEvent.press(screen.getByTestId('task-start-picker-quick-tomorrow'));
+    await fireEvent.press(screen.getByTestId('task-start-picker-set'));
+    await fireEvent.press(screen.getByTestId('create-task-submit-button'));
+    await waitFor(() => expect(mockedCreateTask).toHaveBeenCalledTimes(2));
+    const request = mockedCreateTask.mock.calls[1][1];
+    expect(request.taskType).toBe(TaskType.Task);
+    expect(request.startUtc).not.toBeNull();
+    expect(new Date(request.startUtc!).getHours()).toBe(9); // a new start defaults to 09:00
+  });
+
+  it('refuses a start that is after the deadline', async () => {
+    await open();
+    await fireEvent.changeText(screen.getByTestId('create-task-title-input'), 'Backwards');
+    await fireEvent.press(screen.getByTestId('task-start-picker-button'));
+    await fireEvent.press(screen.getByTestId('task-start-picker-quick-week'));
+    await fireEvent.press(screen.getByTestId('task-start-picker-set'));
+    await fireEvent.press(screen.getByTestId('deadline-picker-button'));
+    await fireEvent.press(screen.getByTestId('deadline-picker-quick-tomorrow'));
+    await fireEvent.press(screen.getByTestId('deadline-picker-set'));
+    await fireEvent.press(screen.getByTestId('create-task-submit-button'));
+
+    expect(await screen.findByText('The start must not be after the deadline.')).toBeTruthy();
+    expect(mockedCreateTask).not.toHaveBeenCalled();
+  });
+});

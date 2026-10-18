@@ -1,6 +1,7 @@
 import { type TaskDto } from '../types/task';
 import { dueUtc, isPastEvent } from './schedule';
 import { isFinishedStatus } from './taskStatus';
+import { isInformational } from './templateRules';
 
 // Deterministic local ranking for the dashboard "Do now" card — no LLM/API call, so it works
 // offline and returns instantly. Tie-break order: urgency score -> earliest deadline (tasks with
@@ -8,7 +9,10 @@ import { isFinishedStatus } from './taskStatus';
 export function selectOneNextAction<T extends TaskDto>(tasks: T[]): T | null {
   // Open work = not finished and not an event that already took place. A task is "blocked" while the task it waits
   // on is still open work (blocked is derived, there is no longer a Blocked status), and a blocked task is not actionable yet.
-  const openIds = new Set(tasks.filter((task) => !isFinishedStatus(task.status) && !isPastEvent(task)).map((task) => task.id));
+  // A day off or a birthday (informational) is never "the next action".
+  const openIds = new Set(
+    tasks.filter((task) => !isFinishedStatus(task.status) && !isPastEvent(task) && !isInformational(task)).map((task) => task.id),
+  );
   const candidates = tasks.filter(
     (task) => openIds.has(task.id) && !(task.blockedByTaskId && openIds.has(task.blockedByTaskId)),
   );

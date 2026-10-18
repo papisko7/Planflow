@@ -31,7 +31,12 @@ public class GetTaskDetailQueryHandler : IRequestHandler<GetTaskDetailQuery, Tas
         var urgencyCacheKey = CacheKeys.TaskUrgency(request.TaskId);
         var breakdown = await _cache.GetAsync<UrgencyScoreBreakdownDto>(urgencyCacheKey, cancellationToken);
 
-        if (breakdown is null)
+        // An informational item has no score, so there is no breakdown to show (an old one from before it became one is not shown).
+        if (!CalendarItemUrgencyScoreFactory.IsRanked(task))
+        {
+            breakdown = null;
+        }
+        else if (breakdown is null)
         {
             var latestLog = await _context.UrgencyScoreLogs
                 .AsNoTracking()

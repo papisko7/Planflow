@@ -12,6 +12,7 @@ namespace PlanFlow.Application.Tasks.Common;
 /// (a blocker inherits urgency, a blocked task is lowered), so whenever a task is created, edited,
 /// finished, deleted or synced, the whole team is rescored in one pass instead of just that task.
 /// The hourly job calls the same code, so time passing (deadlines approaching) is covered too.
+/// Informational items (Out of office, Focus time, ...) are not ranked: they keep a score of 0 and get no audit rows.
 /// </summary>
 public static class TeamUrgencyRecalculator
 {
@@ -34,22 +35,35 @@ public static class TeamUrgencyRecalculator
             teamTasks.Add(subject); // newly created, not yet in the database
         }
 
-        return Apply(context, teamTasks, nowUtc, triggerSource, subject);
+        var zones = await UserTimeZones.LoadAsync(context, teamTasks, cancellationToken);
+        return Apply(context, teamTasks, nowUtc, triggerSource, subject, zones);
     }
 
-    /// <summary>Same as <see cref="RecalculateTeamAsync"/> for tasks the caller has already loaded (any teams).</summary>
+    /// <summary>
+    /// Same as <see cref="RecalculateTeamAsync"/> for tasks the caller has already loaded (any teams).
+    /// <paramref name="zones"/> are the time zones of the assignees (see <see cref="UserTimeZones"/>); without them all-day items are read in UTC.
+    /// </summary>
     public static IReadOnlyCollection<Guid> Apply(
         IApplicationDbContext context, IEnumerable<CalendarItem> tasks, DateTime nowUtc, ScoreTriggerSource triggerSource,
-        CalendarItem? subject = null)
+        CalendarItem? subject = null, IReadOnlyDictionary<Guid, TimeZoneInfo>? zones = null)
     {
         var changed = new List<Guid>();
+        var zoneOf = UserTimeZones.ResolverFor(zones);
 
         foreach (var teamTasks in tasks.GroupBy(t => t.TeamId))
         {
-            var active = teamTasks.Where(IsActive).ToList();
-            var logs = CalendarItemUrgencyScoreFactory.BuildTeamScoreLogs(active, nowUtc, triggerSource);
+            // Informational items have no score. One that was scored before the algorithm learnt this (version 1) is reset once.
+            foreach (var informational in teamTasks.Where(t => !CalendarItemUrgencyScoreFactory.IsRanked(t) && t.CurrentUrgencyScore != 0.0))
+            {
+                informational.CurrentUrgencyScore = 0.0;
+                informational.UpdatedAtUtc = nowUtc;
+                changed.Add(informational.Id);
+            }
 
-            foreach (var task in active)
+            var active = teamTasks.Where(IsActive).ToList();
+            var logs = CalendarItemUrgencyScoreFactory.BuildTeamScoreLogs(active, nowUtc, triggerSource, zoneOf);
+
+            foreach (var task in active.Where(CalendarItemUrgencyScoreFactory.IsRanked))
             {
                 var log = logs[task.Id];
                 var scoreChanged = Math.Abs(log.FinalScore - task.CurrentUrgencyScore) > LogChangeThreshold;
@@ -60,9 +74,9 @@ public static class TeamUrgencyRecalculator
             }
 
             // A finished subject isn't part of the active graph (it blocks nobody), but an edit still records its score.
-            if (subject is not null && subject.TeamId == teamTasks.Key && !IsActive(subject))
+            if (subject is not null && subject.TeamId == teamTasks.Key && !IsActive(subject) && CalendarItemUrgencyScoreFactory.IsRanked(subject))
             {
-                var log = CalendarItemUrgencyScoreFactory.BuildScoreLog(subject, 0.0, false, nowUtc, triggerSource);
+                var log = CalendarItemUrgencyScoreFactory.BuildScoreLog(subject, 0.0, false, nowUtc, triggerSource, zoneOf(subject));
                 Stage(context, subject, log, nowUtc, changed);
             }
         }

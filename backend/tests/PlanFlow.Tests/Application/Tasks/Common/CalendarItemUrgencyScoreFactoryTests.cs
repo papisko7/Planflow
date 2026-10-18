@@ -204,7 +204,8 @@ public class CalendarItemUrgencyScoreFactoryTests
 
         var log = Build(task, blocking: 0.4);
 
-        var expected = 0.45 * Math.Exp(-1) + 0.20 * 0.4 + 0.25 * 0.6 + 0.10 * 0.5;
+        // No planned start, so the 0.05 Scheduled weight is shared out: / 0.95.
+        var expected = (0.40 * Math.Exp(-1) + 0.20 * 0.4 + 0.25 * 0.6 + 0.10 * 0.5) / 0.95;
         Assert.Equal(expected, log.FinalScore, precision: 5);
     }
 

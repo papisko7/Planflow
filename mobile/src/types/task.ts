@@ -86,6 +86,9 @@ export interface UrgencyScoreBreakdownDto {
   blockingComponent: number;
   impactComponent: number | null; // null = task not rated, its weight is shared by the other factors
   userOverrideComponent: number;
+  // Algorithm v2: closeness of a task's planned start; null when it did not count, absent on rows written by v1.
+  scheduledComponent?: number | null;
+  algorithmVersion?: number;
   finalScore: number;
   isBlocked: boolean; // true = waiting on an unfinished blocker, score is halved
   createdAtUtc: string;

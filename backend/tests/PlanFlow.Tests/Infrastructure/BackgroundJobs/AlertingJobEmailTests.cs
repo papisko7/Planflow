@@ -51,6 +51,20 @@ public class AlertingJobEmailTests
     }
 
     [Fact]
+    public async Task Execute_UnverifiedTask_NeverRaisesAnAlertOrMail()
+    {
+        // An imported item whose impact / effort are still placeholders: its score is a guess, so it must stay silent.
+        var (db, _) = await UrgentTaskAsync();
+        db.CalendarItems.Single().IsDataIncomplete = true;
+        await db.SaveChangesAsync();
+
+        await Job(db).Execute(JobContext().Object);
+
+        Assert.Empty(db.Alerts);
+        Assert.Empty(db.EmailOutbox);
+    }
+
+    [Fact]
     public async Task Execute_RunAgain_DoesNotMailAgain()
     {
         var (db, _) = await UrgentTaskAsync();

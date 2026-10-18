@@ -98,6 +98,14 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
         </>
       ) : (
         <>
+          {/* The planned start is optional: the closer it gets, the more the score nudges you to begin (never later than the deadline). */}
+          <DeadlinePicker
+            testIDPrefix="task-start-picker"
+            label="Start"
+            allowAllDay={false}
+            value={value.startUtc}
+            onChange={(startUtc) => patch({ startUtc })}
+          />
           <DeadlinePicker futureOnly={isNew} value={value.deadlineUtc} onChange={(deadlineUtc) => patch({ deadlineUtc })} />
           <DurationInput
             testID="effort"

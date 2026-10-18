@@ -12,6 +12,7 @@ namespace PlanFlow.Infrastructure.BackgroundJobs;
 /// <summary>
 /// Raises an <see cref="AlertType.UrgencySpike"/> alert for every assigned task whose
 /// urgency score (kept fresh by <see cref="PrioritizationJob"/>) crosses <see cref="UrgencyThreshold"/>.
+/// Informational items have no score and unverified ones are skipped, so neither raises an alert.
 /// Runs every minute so alerts fire close to the moment a deadline pushes a task over the line.
 /// </summary>
 public class AlertingJob : IJob
@@ -45,6 +46,9 @@ public class AlertingJob : IJob
         var candidateTasks = await _context.CalendarItems
             .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Cancelled)
             .Where(t => t.AssignedUserId != null)
+            // An unverified item (imported, impact / effort still placeholders) never raises an alert: its score is a guess,
+            // and a first import of old Google tasks would otherwise mail the user about every one of them.
+            .Where(t => !t.IsDataIncomplete)
             .Where(t => t.CurrentUrgencyScore >= UrgencyThreshold)
             .Select(t => new { t.Id, t.TeamId, t.AssignedUserId, t.Title, t.TaskType, DeadlineUtc =t.DeadlineUtc ?? t.StartUtc, t.CurrentUrgencyScore })
             .ToListAsync(cancellationToken);
