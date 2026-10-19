@@ -17,10 +17,8 @@ internal static class BenchmarkHost
         Console.WriteLine("PlanFlow Phase 5.2 Benchmarks");
         Console.WriteLine($"Results folder: {resultsDir}");
         Console.WriteLine();
-        Console.WriteLine("Scenario C (SignalR real-time hub overhead) is skipped: no SignalR hub exists in this");
-        Console.WriteLine("codebase yet (Chat is an [EXT]/optional feature per CLAUDE.md scope governance, not part");
-        Console.WriteLine("of the mandatory ZAKRES PRACY scope) - there is nothing to benchmark. Documented as N/A");
-        Console.WriteLine("rather than building a throwaway hub solely to produce a benchmark number.");
+        Console.WriteLine("Scenario C (SignalR chat hub delivery overhead) is not measured: the chat is an optional");
+        Console.WriteLine("feature outside the mandatory thesis scope.");
 
         // Both hosts are started up front and stopped only after both scenarios finish - see
         // BenchmarkWebApplicationFactory's remarks on why a dispose-then-start-a-new-host sequence
@@ -76,9 +74,8 @@ internal static class BenchmarkHost
         sb.AppendLine();
         sb.AppendLine("## Scenario C — SignalR Real-Time Hub Overhead");
         sb.AppendLine();
-        sb.AppendLine("**N/A.** No SignalR hub is implemented in this codebase (Chat/real-time delivery is an [EXT],");
-        sb.AppendLine("optional feature per Use_Case_Diagram.md, not part of the mandatory ZAKRES PRACY scope governed");
-        sb.AppendLine("by CLAUDE.md). Skipped rather than building a throwaway hub solely to produce a benchmark number.");
+        sb.AppendLine("**Not measured.** The SignalR chat hub exists, but chat is an optional feature outside the mandatory");
+        sb.AppendLine("thesis scope, so its delivery overhead has no benchmark.");
 
         File.WriteAllText(summaryPath, sb.ToString());
         Console.WriteLine();
