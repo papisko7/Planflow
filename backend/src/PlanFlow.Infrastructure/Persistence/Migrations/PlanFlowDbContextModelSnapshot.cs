@@ -219,7 +219,7 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Property<bool?>("IsPrivate")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("IsRecurring")
+                    b.Property<bool>("IsSeriesException")
                         .HasColumnType("boolean");
 
                     b.Property<Guid?>("ItemListId")
@@ -235,11 +235,8 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("ManualUrgencyOverrideExpiresAtUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime?>("RecurrenceEndsAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("RecurrenceIntervalHours")
-                        .HasColumnType("integer");
+                    b.Property<Guid?>("RecurrenceSeriesId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("SeriesId")
                         .HasMaxLength(512)
@@ -285,6 +282,8 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.HasIndex("ExternalTaskListId");
 
                     b.HasIndex("ItemListId");
+
+                    b.HasIndex("RecurrenceSeriesId");
 
                     b.HasIndex("TeamId");
 
@@ -725,6 +724,55 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.ToTable("push_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("PlanFlow.Domain.Entities.RecurrenceSeries", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AnchorUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("EndsAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Frequency")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("GeneratedThroughUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Interval")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TaskType")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TimeZoneId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Weekdays")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GeneratedThroughUtc");
+
+                    b.HasIndex("TeamId");
+
+                    b.ToTable("recurrence_series", (string)null);
+                });
+
             modelBuilder.Entity("PlanFlow.Domain.Entities.RefreshSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1060,6 +1108,11 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ItemListId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("PlanFlow.Domain.Entities.RecurrenceSeries", "RecurrenceSeries")
+                        .WithMany()
+                        .HasForeignKey("RecurrenceSeriesId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("PlanFlow.Domain.Entities.CalendarIntegration", "SourceCalendarIntegration")
                         .WithMany()
                         .HasForeignKey("SourceCalendarIntegrationId")
@@ -1080,6 +1133,8 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("ExternalTaskList");
 
                     b.Navigation("ItemList");
+
+                    b.Navigation("RecurrenceSeries");
 
                     b.Navigation("SourceCalendarIntegration");
 
@@ -1206,6 +1261,17 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PlanFlow.Domain.Entities.RecurrenceSeries", b =>
+                {
+                    b.HasOne("PlanFlow.Domain.Entities.Team", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Team");
                 });
 
             modelBuilder.Entity("PlanFlow.Domain.Entities.RefreshSession", b =>

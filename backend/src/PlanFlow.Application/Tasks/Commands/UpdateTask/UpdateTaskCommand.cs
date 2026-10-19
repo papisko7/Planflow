@@ -3,7 +3,10 @@ using PlanFlow.Application.Tasks.Common;
 
 namespace PlanFlow.Application.Tasks.Commands.UpdateTask;
 
-/// <summary>Overwrites a task's mutable fields and recalculates its Urgency Score.</summary>
+/// <summary>
+/// Overwrites a task's mutable fields and recalculates its Urgency Score. For an item that repeats, <c>Scope</c> says which occurrences
+/// the change applies to (this one, this and the following ones, or all of them); an item that does not repeat ignores it.
+/// </summary>
 public record UpdateTaskCommand(
     Guid TaskId,
     string Title,
@@ -20,7 +23,9 @@ public record UpdateTaskCommand(
     DateTime? StartUtc = null,
     double? EstimatedEffortHours = null,
     bool IsRecurring = false,
-    int? RecurrenceIntervalHours = null,
+    Domain.Enums.RecurrenceFrequency? RecurrenceFrequency = null,
+    int? RecurrenceInterval = null,
+    int? RecurrenceWeekdays = null,
     DateTime? RecurrenceEndsAtUtc = null,
     bool UseAiEnhancement = false,
     DateTime? EndUtc = null,
@@ -32,4 +37,5 @@ public record UpdateTaskCommand(
     IReadOnlyList<ReminderInput>? Reminders = null,
     IReadOnlyList<Guid>? ParticipantUserIds = null,
     Guid? ItemListId = null,
-    bool CallerIsManager = true) : IRequest<TaskDto>, ITaskScheduleFields;
+    bool CallerIsManager = true,
+    Domain.Enums.SeriesScope Scope = Domain.Enums.SeriesScope.This) : IRequest<TaskDto>, ITaskScheduleFields;

@@ -25,6 +25,7 @@ public class GetTaskDetailQueryHandler : IRequestHandler<GetTaskDetailQuery, Tas
             .AsNoTracking()
             .Include(t => t.ExternalTaskList)
             .Include(t => t.Participants)
+            .Include(t => t.RecurrenceSeries)
             .FirstOrDefaultAsync(t => t.Id == request.TaskId, cancellationToken)
             ?? throw new NotFoundException(nameof(CalendarItem), request.TaskId);
 

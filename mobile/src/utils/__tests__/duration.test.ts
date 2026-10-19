@@ -1,4 +1,4 @@
-import { formatDuration, fromHours, INTERVAL_UNITS, toHours } from '../duration';
+import { formatDuration, fromHours, toHours } from '../duration';
 
 describe('toHours', () => {
   it('converts every unit to hours', () => {
@@ -39,6 +39,5 @@ describe('formatDuration', () => {
   it('formats compactly', () => {
     expect(formatDuration(48)).toBe('2 d');
     expect(formatDuration(1.5)).toBe('90 min');
-    expect(formatDuration(24, INTERVAL_UNITS)).toBe('1 d');
   });
 });

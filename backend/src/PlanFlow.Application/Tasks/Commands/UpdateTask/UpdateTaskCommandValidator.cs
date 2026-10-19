@@ -16,5 +16,6 @@ public class UpdateTaskCommandValidator : TaskScheduleValidator<UpdateTaskComman
         RuleFor(x => x.ManualUrgencyOverride)
             .InclusiveBetween(0.0, 1.0)
             .When(x => x.ManualUrgencyOverride.HasValue);
+        RuleFor(x => x.Scope).IsInEnum();
     }
 }

@@ -37,6 +37,7 @@ public class GetTasksByTeamQueryHandler : IRequestHandler<GetTasksByTeamQuery, I
             {
                 Item = t,
                 ListTitle = t.ExternalTaskList == null ? null : t.ExternalTaskList.Title,
+                Series = t.RecurrenceSeries,
                 ParticipantIds = t.Participants.OrderBy(p => p.CreatedAtUtc).Select(p => p.UserId),
                 Reason = t.UrgencyScoreLogs.OrderByDescending(l => l.CreatedAtUtc).Select(l => l.ReasonText).FirstOrDefault()
             })
@@ -44,7 +45,7 @@ public class GetTasksByTeamQueryHandler : IRequestHandler<GetTasksByTeamQuery, I
 
         // An informational item (Out of office, ...) has no score and so no "why"; an old log from before it was one must not show.
         var result = rows
-            .Select(r => TaskDto.FromEntity(r.Item) with
+            .Select(r => TaskDto.FromEntity(r.Item, r.Series) with
             {
                 GoogleTaskListTitle = r.ListTitle,
                 ParticipantUserIds = r.ParticipantIds.ToList(),

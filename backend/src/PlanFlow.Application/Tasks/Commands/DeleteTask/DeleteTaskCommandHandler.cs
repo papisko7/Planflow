@@ -26,6 +26,8 @@ public class DeleteTaskCommandHandler : IRequestHandler<DeleteTaskCommand>
     public async Task Handle(DeleteTaskCommand request, CancellationToken cancellationToken)
     {
         var task = await _context.CalendarItems
+            .Include(t => t.Reminders)
+            .Include(t => t.Participants)
             .FirstOrDefaultAsync(t => t.Id == request.TaskId, cancellationToken)
             ?? throw new NotFoundException(nameof(CalendarItem), request.TaskId);
 
@@ -37,7 +39,10 @@ public class DeleteTaskCommandHandler : IRequestHandler<DeleteTaskCommand>
 
         // TaskHistory/UrgencyScoreLog rows cascade-delete with the task (see TaskHistoryConfiguration),
         // so no separate "Deleted" audit entry is written here — it would be removed in the same transaction.
-        _context.CalendarItems.Remove(task);
+        // An item that repeats may take other occurrences with it (the pop-up's choice); a Member only deletes the ones assigned to them.
+        var nowUtc = DateTime.UtcNow;
+        await SeriesEditing.DeleteAsync(
+            _context, task, request.Scope, row => request.CanDeleteAny || row.AssignedUserId == request.DeletedByUserId, nowUtc, cancellationToken);
 
         await TaskNotifications.OnDeletedAsync(_context, _notifications, task, request.DeletedByUserId, participantIds, cancellationToken);
 

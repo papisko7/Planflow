@@ -30,6 +30,22 @@ export enum EventTemplate {
   Birthday = 4,
 }
 
+// Mirrors backend PlanFlow.Domain.Enums.RecurrenceFrequency (plain int on the wire): the unit of "repeat every N ...".
+export enum RecurrenceFrequency {
+  Daily = 0,
+  Weekly = 1,
+  Monthly = 2,
+  Yearly = 3,
+}
+
+// Mirrors backend PlanFlow.Domain.Enums.SeriesScope (plain int on the wire): which occurrences of a repeating item an edit or a
+// delete reaches. The "This / This and following / All" pop-up (utils/seriesScope.ts) asks for it.
+export enum SeriesScope {
+  This = 0,
+  ThisAndFollowing = 1,
+  All = 2,
+}
+
 // Mirrors backend PlanFlow.Domain.Enums.ReminderAnchor (plain int on the wire): what a reminder counts back from.
 // An event's reminders always count from its start; a task may use its planned start or its deadline.
 export enum ReminderAnchor {
@@ -74,8 +90,12 @@ export interface TaskDto {
   startUtc: string | null; // Event only
   endUtc: string | null; // Event only
   estimatedEffortHours: number | null;
+  // The app's own repeat rule: every `recurrenceInterval` days / weeks / months / years; for weekly `recurrenceWeekdays` is a bit mask
+  // (Mon = 1 ... Sun = 64, see utils/recurrence.ts). All null for an item that does not repeat or whose series is Google's.
   isRecurring: boolean;
-  recurrenceIntervalHours: number | null;
+  recurrenceFrequency: RecurrenceFrequency | null;
+  recurrenceInterval: number | null;
+  recurrenceWeekdays: number | null;
   recurrenceEndsAtUtc: string | null;
   useAiEnhancement: boolean;
   aiImpactScore: number | null;
@@ -99,7 +119,7 @@ export interface TaskDto {
   googleTaskListTitle: string | null;
   // The guests of an event / co-contractors of a task (not the assignee), as user ids. Empty for older servers' rows.
   participantUserIds: string[];
-  // The occurrences of one repeating event share a series id (Google's recurringEventId); null = not part of a series.
+  // The occurrences of one repeating item share a series id (an own series' id, or Google's recurringEventId); null = not part of a series.
   seriesId: string | null;
   // The team's own list the item sits in (a task list for a task, a meeting list for an event); null = in none.
   itemListId: string | null;
@@ -148,7 +168,9 @@ export interface ScheduleFields {
   endUtc: string | null; // Event only
   estimatedEffortHours: number | null;
   isRecurring: boolean;
-  recurrenceIntervalHours: number | null;
+  recurrenceFrequency: RecurrenceFrequency | null;
+  recurrenceInterval: number | null;
+  recurrenceWeekdays: number | null;
   recurrenceEndsAtUtc: string | null;
 }
 
@@ -180,6 +202,8 @@ export interface UpdateTaskRequest extends ScheduleFields {
   participantUserIds?: string[];
   // The whole value, not "left out = unchanged": null takes the item out of its list, so every update resends the stored one.
   itemListId?: string | null;
+  // Which occurrences a change of a repeating item reaches; left out = only this one. The repeat rule fields count only for the other two.
+  scope?: SeriesScope;
 }
 
 // A task plus the name of its team (resolved client-side from the teams list) for display.

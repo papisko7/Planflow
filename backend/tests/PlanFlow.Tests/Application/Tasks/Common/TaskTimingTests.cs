@@ -206,8 +206,9 @@ public class TaskScheduleFieldsTests
 
     private static CreateTaskCommand Create(
         TaskType type = TaskType.Task, DateTime? start = null, DateTime? deadline = null, double? effort = null,
-        bool recurring = false, int? interval = null, DateTime? recurrenceEnds = null, DateTime? end = null) =>
-        new(Guid.NewGuid(), "T", null, null, deadline, 5, null, null, type, start, effort, recurring, interval, recurrenceEnds, EndUtc: end);
+        bool recurring = false, RecurrenceFrequency? frequency = null, int? interval = null, DateTime? recurrenceEnds = null,
+        DateTime? end = null, int? weekdays = null) =>
+        new(Guid.NewGuid(), "T", null, null, deadline, 5, null, null, type, start, effort, recurring, frequency, interval, weekdays, recurrenceEnds, EndUtc: end);
 
     private static bool IsValid(CreateTaskCommand command) => new CreateTaskCommandValidator().Validate(command).IsValid;
 
@@ -233,20 +234,34 @@ public class TaskScheduleFieldsTests
         Assert.False(IsValid(Create(deadline: Future, effort: effort)));
 
     [Fact]
-    public void Validator_RecurringWithoutInterval_IsRejected() =>
+    public void Validator_RecurringWithoutFrequencyOrInterval_IsRejected() =>
         Assert.False(IsValid(Create(deadline: Future, recurring: true)));
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(100)]
+    public void Validator_RecurringIntervalOutOfRange_IsRejected(int interval) =>
+        Assert.False(IsValid(Create(deadline: Future, recurring: true, frequency: RecurrenceFrequency.Daily, interval: interval)));
+
+    [Fact]
+    public void Validator_WeeklyWithAnUnknownDay_IsRejected() =>
+        Assert.False(IsValid(Create(deadline: Future, recurring: true, frequency: RecurrenceFrequency.Weekly, interval: 1, weekdays: 128)));
+
+    [Fact]
+    public void Validator_WeeklyOnMondayAndFriday_IsValid() =>
+        Assert.True(IsValid(Create(deadline: Future, recurring: true, frequency: RecurrenceFrequency.Weekly, interval: 1, weekdays: 1 | 16)));
 
     [Fact]
     public void Validator_RecurringWithoutAnyDate_IsRejected() =>
-        Assert.False(IsValid(Create(recurring: true, interval: 24)));
+        Assert.False(IsValid(Create(recurring: true, frequency: RecurrenceFrequency.Daily, interval: 1)));
 
     [Fact]
     public void Validator_RecurringEndingBeforeFirstOccurrence_IsRejected() =>
-        Assert.False(IsValid(Create(deadline: Future, recurring: true, interval: 24, recurrenceEnds: Future.AddDays(-1))));
+        Assert.False(IsValid(Create(deadline: Future, recurring: true, frequency: RecurrenceFrequency.Daily, interval: 1, recurrenceEnds: Future.AddDays(-1))));
 
     [Fact]
     public void Validator_RecurringWithIntervalAndEnd_IsValid() =>
-        Assert.True(IsValid(Create(deadline: Future, recurring: true, interval: 168, recurrenceEnds: Future.AddDays(60))));
+        Assert.True(IsValid(Create(deadline: Future, recurring: true, frequency: RecurrenceFrequency.Weekly, interval: 1, recurrenceEnds: Future.AddDays(60))));
 
     [Fact]
     public async Task CreateThenUpdate_PersistsAndReturnsTheNewFields()
@@ -259,7 +274,7 @@ public class TaskScheduleFieldsTests
 
         var created = await new CreateTaskCommandHandler(db, cache, notifications).Handle(
             new CreateTaskCommand(team.Id, "Standup", null, null, null, 5, null, owner.Id,
-                TaskType.Event, Future, 0.5, true, 24, Future.AddDays(30), UseAiEnhancement: true, EndUtc: Future.AddHours(1)),
+                TaskType.Event, Future, 0.5, true, RecurrenceFrequency.Daily, 1, null, Future.AddDays(30), UseAiEnhancement: true, EndUtc: Future.AddHours(1)),
             CancellationToken.None);
 
         Assert.Equal(TaskType.Event, created.TaskType);
@@ -268,19 +283,21 @@ public class TaskScheduleFieldsTests
         Assert.Null(created.DeadlineUtc);
         Assert.Equal(0.5, created.EstimatedEffortHours);
         Assert.True(created.IsRecurring);
-        Assert.Equal(24, created.RecurrenceIntervalHours);
+        Assert.Equal(RecurrenceFrequency.Daily, created.RecurrenceFrequency);
+        Assert.Equal(1, created.RecurrenceInterval);
         Assert.True(created.UseAiEnhancement);
 
-        // Switching recurrence off clears the interval/end so stale values never linger.
+        // Switching recurrence off for the whole series clears the rule so stale values never linger.
         var updated = await new UpdateTaskCommandHandler(db, cache, notifications).Handle(
             new UpdateTaskCommand(created.Id, "Standup", null, TaskStatus.Backlog, null, Future.AddHours(1), 5, null, null, null, owner.Id,
-                TaskType.Task, null, 2.0, false, 24, Future.AddDays(30)),
+                TaskType.Task, null, 2.0, false, RecurrenceFrequency.Daily, 1, null, Future.AddDays(30), Scope: SeriesScope.All),
             CancellationToken.None);
 
         Assert.Equal(TaskType.Task, updated.TaskType);
         Assert.Equal(2.0, updated.EstimatedEffortHours);
         Assert.False(updated.IsRecurring);
-        Assert.Null(updated.RecurrenceIntervalHours);
+        Assert.Null(updated.RecurrenceFrequency);
+        Assert.Null(updated.RecurrenceInterval);
         Assert.Null(updated.RecurrenceEndsAtUtc);
         Assert.False(updated.UseAiEnhancement);
     }
@@ -299,11 +316,11 @@ public class TaskScheduleFieldsTests
 
     [Fact]
     public void Validator_RecurringEvent_RepeatsFromItsStart() =>
-        Assert.True(IsValid(Create(TaskType.Event, start: Future, recurring: true, interval: 168)));
+        Assert.True(IsValid(Create(TaskType.Event, start: Future, recurring: true, frequency: RecurrenceFrequency.Weekly, interval: 1)));
 
     [Fact]
     public void Validator_RecurringEventEndingBeforeItsStart_IsRejected() =>
-        Assert.False(IsValid(Create(TaskType.Event, start: Future, recurring: true, interval: 168, recurrenceEnds: Future.AddDays(-1))));
+        Assert.False(IsValid(Create(TaskType.Event, start: Future, recurring: true, frequency: RecurrenceFrequency.Weekly, interval: 1, recurrenceEnds: Future.AddDays(-1))));
 
     [Fact]
     public void Validator_TaskStartAfterItsDeadline_IsRejected() =>

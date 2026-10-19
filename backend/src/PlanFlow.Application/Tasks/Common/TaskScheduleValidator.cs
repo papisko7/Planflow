@@ -15,7 +15,11 @@ public interface ITaskScheduleFields
     DateTime? DeadlineUtc { get; }
     double? EstimatedEffortHours { get; }
     bool IsRecurring { get; }
-    int? RecurrenceIntervalHours { get; }
+
+    /// <summary>The repeat rule: "every <see cref="RecurrenceInterval"/> days / weeks / months / years", on <see cref="RecurrenceWeekdays"/> for weekly, until <see cref="RecurrenceEndsAtUtc"/>.</summary>
+    Domain.Enums.RecurrenceFrequency? RecurrenceFrequency { get; }
+    int? RecurrenceInterval { get; }
+    int? RecurrenceWeekdays { get; }
     DateTime? RecurrenceEndsAtUtc { get; }
     string? Description { get; }
     string? Location { get; }
@@ -35,8 +39,8 @@ public static class TaskScheduleMapper
 
     /// <summary>
     /// Copies the scheduling and template fields onto the entity. What the type or template does not use is dropped, so stale values
-    /// never linger: recurrence of a non-recurring item, the dates of the other type, and the place / colour / description of a
-    /// template that has no such field (the form hides them, the server makes sure).
+    /// never linger: the dates of the other type, and the place / colour / description of a template that has no such field (the form
+    /// hides them, the server makes sure). The repeat rule is not copied here: it belongs to the series, which TaskSeries creates and edits.
     /// </summary>
     public static void Apply(Domain.Entities.CalendarItem task, ITaskScheduleFields fields)
     {
@@ -58,9 +62,6 @@ public static class TaskScheduleMapper
         task.EndUtc = !isEvent ? null : allDay && fields.EndUtc is null && fields.StartUtc is { } start ? start.AddDays(1) : fields.EndUtc;
         task.IsAllDay = allDay;
         task.EstimatedEffortHours = fields.EstimatedEffortHours;
-        task.IsRecurring = fields.IsRecurring;
-        task.RecurrenceIntervalHours = fields.IsRecurring ? fields.RecurrenceIntervalHours : null;
-        task.RecurrenceEndsAtUtc = fields.IsRecurring ? fields.RecurrenceEndsAtUtc : null;
 
         task.Description = rules.AllowsDescription && !string.IsNullOrWhiteSpace(fields.Description) ? fields.Description : null;
         task.Location = rules.Location == LocationMode.None || string.IsNullOrWhiteSpace(fields.Location) ? null : fields.Location.Trim();
@@ -73,7 +74,7 @@ public static class TaskScheduleMapper
 /// <summary>Rules for type, dates, effort and recurrence that must hold for every task regardless of who creates or edits it.</summary>
 public abstract class TaskScheduleValidator<T> : AbstractValidator<T> where T : ITaskScheduleFields
 {
-    /// <summary>Upper bound for one effort estimate / recurrence interval: one year in hours.</summary>
+    /// <summary>Upper bound for one effort estimate: one year in hours.</summary>
     private const int MaxHours = 366 * 24;
 
     protected TaskScheduleValidator()
@@ -146,9 +147,16 @@ public abstract class TaskScheduleValidator<T> : AbstractValidator<T> where T : 
 
         When(x => x.IsRecurring, () =>
         {
-            RuleFor(x => x.RecurrenceIntervalHours)
-                .NotNull().WithMessage("A recurring item needs an interval.")
-                .InclusiveBetween(1, MaxHours).WithMessage($"Interval must be between 1 and {MaxHours} hours.");
+            RuleFor(x => x.RecurrenceFrequency)
+                .NotNull().WithMessage("A repeating item needs a frequency (daily, weekly, monthly or yearly).")
+                .IsInEnum().WithMessage("Unknown repeat frequency.");
+            RuleFor(x => x.RecurrenceInterval)
+                .NotNull().WithMessage("A repeating item needs an interval.")
+                .InclusiveBetween(1, RecurrenceRules.MaxInterval).WithMessage($"Repeat every 1 to {RecurrenceRules.MaxInterval}.");
+            RuleFor(x => x.RecurrenceWeekdays)
+                .Must(mask => RecurrenceRules.IsValidWeekdayMask(mask!.Value))
+                .When(x => x.RecurrenceWeekdays.HasValue)
+                .WithMessage("Unknown days of the week.");
 
             RuleFor(x => x)
                 .Must(x => RecurrenceAnchor(x).HasValue)

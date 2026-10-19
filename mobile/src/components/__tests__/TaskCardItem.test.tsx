@@ -49,11 +49,11 @@ describe('TaskCard - CalendarItem fields', () => {
     expect(screen.getByText(/14:00-15:30/)).toBeTruthy();
     await unmount();
 
-    await render(<TaskCard task={{ ...base, estimatedEffortHours: 48, isRecurring: true, recurrenceIntervalHours: 168 }} />);
+    await render(<TaskCard task={{ ...base, estimatedEffortHours: 48, isRecurring: true, recurrenceFrequency: 1, recurrenceInterval: 2, recurrenceWeekdays: 1 | 4 }} />);
     expect(screen.getByText('☑ Task')).toBeTruthy(); // every item carries its type, not just events
     expect(screen.queryByText('🗓 Event')).toBeNull();
     expect(screen.getByText(/2 d/)).toBeTruthy();
-    expect(screen.getByText(/every 1 wk/)).toBeTruthy();
+    expect(screen.getByText(/every 2 weeks on Mon, Wed/)).toBeTruthy();
   });
 });
 

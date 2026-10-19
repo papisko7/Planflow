@@ -15,7 +15,9 @@ public record CreateTaskRequest(
     DateTime? StartUtc = null,
     double? EstimatedEffortHours = null,
     bool IsRecurring = false,
-    int? RecurrenceIntervalHours = null,
+    Domain.Enums.RecurrenceFrequency? RecurrenceFrequency = null,
+    int? RecurrenceInterval = null,
+    int? RecurrenceWeekdays = null,
     DateTime? RecurrenceEndsAtUtc = null,
     bool UseAiEnhancement = false,
     DateTime? EndUtc = null,
@@ -34,7 +36,9 @@ public record CreateTaskRequest(
 // when it is null the stored values are kept. Reminders and ParticipantUserIds work the same way (step 7.5.6): null keeps what is
 // stored (quick actions such as "done" send neither), a list - even an empty one - replaces it. ItemListId (step 7.5.11) is the
 // whole value: null takes the item out of its list, so the app resends the stored one with every update (a client that predates the
-// scheduling block, TaskType null, keeps the stored list).
+// scheduling block, TaskType null, keeps the stored list). Scope (step 7.5.7) matters only for an item that repeats: which occurrences the
+// edit applies to (0 this one, 1 this and the following, 2 all); the repeat rule fields are used only by the two last, because the rule
+// belongs to the series.
 public record UpdateTaskRequest(
     string Title,
     string? Description,
@@ -49,7 +53,9 @@ public record UpdateTaskRequest(
     DateTime? StartUtc = null,
     double? EstimatedEffortHours = null,
     bool IsRecurring = false,
-    int? RecurrenceIntervalHours = null,
+    Domain.Enums.RecurrenceFrequency? RecurrenceFrequency = null,
+    int? RecurrenceInterval = null,
+    int? RecurrenceWeekdays = null,
     DateTime? RecurrenceEndsAtUtc = null,
     bool UseAiEnhancement = false,
     DateTime? EndUtc = null,
@@ -60,7 +66,8 @@ public record UpdateTaskRequest(
     bool IsBusy = true,
     IReadOnlyList<ReminderInput>? Reminders = null,
     IReadOnlyList<Guid>? ParticipantUserIds = null,
-    Guid? ItemListId = null);
+    Guid? ItemListId = null,
+    Domain.Enums.SeriesScope Scope = Domain.Enums.SeriesScope.This);
 
 // Bulk actions (step 7.5.11): selection mode and "Clear". The ids belong to the team in the URL; the reply says what was left alone.
 public record BulkTasksRequest(IReadOnlyList<Guid> TaskIds);

@@ -12,6 +12,7 @@ using PlanFlow.Application.Tasks.Queries.GetTaskDetail;
 using PlanFlow.Application.Tasks.Queries.GetTaskScoreHistory;
 using PlanFlow.Application.Tasks.Queries.GetTasksByTeam;
 using PlanFlow.Domain.Authorization;
+using PlanFlow.Domain.Enums;
 
 namespace PlanFlow.Api.Controllers;
 
@@ -70,7 +71,9 @@ public class TasksController : ControllerBase
                 request.StartUtc,
                 request.EstimatedEffortHours,
                 request.IsRecurring,
-                request.RecurrenceIntervalHours,
+                request.RecurrenceFrequency,
+                request.RecurrenceInterval,
+                request.RecurrenceWeekdays,
                 request.RecurrenceEndsAtUtc,
                 request.UseAiEnhancement,
                 request.EndUtc,
@@ -205,7 +208,9 @@ public class TasksController : ControllerBase
                 keepStored ? stored.StartUtc : request.StartUtc,
                 keepStored ? stored.EstimatedEffortHours : request.EstimatedEffortHours,
                 keepStored ? stored.IsRecurring : request.IsRecurring,
-                keepStored ? stored.RecurrenceIntervalHours : request.RecurrenceIntervalHours,
+                keepStored ? stored.RecurrenceFrequency : request.RecurrenceFrequency,
+                keepStored ? stored.RecurrenceInterval : request.RecurrenceInterval,
+                keepStored ? stored.RecurrenceWeekdays : request.RecurrenceWeekdays,
                 keepStored ? stored.RecurrenceEndsAtUtc : request.RecurrenceEndsAtUtc,
                 keepStored ? stored.UseAiEnhancement : request.UseAiEnhancement,
                 keepStored ? stored.EndUtc : request.EndUtc,
@@ -217,7 +222,8 @@ public class TasksController : ControllerBase
                 request.Reminders,
                 request.ParticipantUserIds,
                 keepStored ? stored.ItemListId : request.ItemListId,
-                User.HasPermission(Permission.EditAnyTask)),
+                User.HasPermission(Permission.EditAnyTask),
+                request.Scope),
             cancellationToken);
 
         return Ok(task);
@@ -242,7 +248,7 @@ public class TasksController : ControllerBase
 
     [HttpDelete("api/tasks/{taskId:guid}")]
     [Authorize(Policy = nameof(Permission.DeleteOwnTask))]
-    public async Task<IActionResult> DeleteTask(Guid taskId, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeleteTask(Guid taskId, [FromQuery] SeriesScope scope, CancellationToken cancellationToken)
     {
         var existing = await _sender.Send(new GetTaskDetailQuery(taskId), cancellationToken);
 
@@ -257,7 +263,7 @@ public class TasksController : ControllerBase
             return Forbid();
         }
 
-        await _sender.Send(new DeleteTaskCommand(taskId, User.GetUserId()), cancellationToken);
+        await _sender.Send(new DeleteTaskCommand(taskId, User.GetUserId(), scope, User.HasPermission(Permission.DeleteTask)), cancellationToken);
         return NoContent();
     }
 }

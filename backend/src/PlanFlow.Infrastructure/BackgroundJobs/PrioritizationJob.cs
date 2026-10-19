@@ -34,8 +34,13 @@ public class PrioritizationJob : IJob
         var cancellationToken = context.CancellationToken;
         var nowUtc = DateTime.UtcNow;
 
+        // An occurrence of a repeating event that is still far away (they are created 90 days ahead) is left alone: its score hardly moves,
+        // and rescoring up to 90 copies of every daily meeting each hour would only fill the score history. It is scored when created and
+        // again once it comes inside the window.
+        var scoringHorizon = nowUtc + TaskSeries.ScoringWindow;
         var activeTasks = await _context.CalendarItems
             .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Cancelled)
+            .Where(t => t.RecurrenceSeriesId == null || t.TaskType != TaskType.Event || t.StartUtc <= scoringHorizon)
             .ToListAsync(cancellationToken);
 
         if (activeTasks.Count == 0)

@@ -1,5 +1,6 @@
 import { addDays, composeDeadline, startOfDay } from './dateUtils';
-import { EventTemplate, TaskType, type ScheduleFields, type TaskDto, type UpdateTaskRequest } from '../types/task';
+import { EventTemplate, RecurrenceFrequency, TaskType, type ScheduleFields, type TaskDto, type UpdateTaskRequest } from '../types/task';
+import { validateRecurrence } from './recurrence';
 import { resolveAllDay, resolveBusy, rulesFor, WORKING_LOCATION_PRESETS, type ItemKind } from './templateRules';
 
 // Same bound as the backend's TaskScheduleValidator: one year in hours.
@@ -21,7 +22,9 @@ export function emptySchedule(taskType: TaskType = TaskType.Task, eventTemplate:
     endUtc: null,
     estimatedEffortHours: null,
     isRecurring: false,
-    recurrenceIntervalHours: null,
+    recurrenceFrequency: null,
+    recurrenceInterval: null,
+    recurrenceWeekdays: null,
     recurrenceEndsAtUtc: null,
   };
 }
@@ -41,7 +44,9 @@ export function scheduleFromTask(task: TaskDto): ScheduleFields {
     endUtc: task.endUtc,
     estimatedEffortHours: task.estimatedEffortHours,
     isRecurring: task.isRecurring,
-    recurrenceIntervalHours: task.recurrenceIntervalHours,
+    recurrenceFrequency: task.recurrenceFrequency,
+    recurrenceInterval: task.recurrenceInterval,
+    recurrenceWeekdays: task.recurrenceWeekdays,
     recurrenceEndsAtUtc: task.recurrenceEndsAtUtc,
   };
 }
@@ -217,7 +222,9 @@ export function normalizeSchedule(s: ScheduleFields): ScheduleFields {
     // An Event's start is when it begins; a Task's is its optional planned start (it feeds the "Scheduled" part of the score).
     startUtc: s.startUtc,
     endUtc: isEvent ? s.endUtc : null,
-    recurrenceIntervalHours: s.isRecurring ? s.recurrenceIntervalHours : null,
+    recurrenceFrequency: s.isRecurring ? s.recurrenceFrequency : null,
+    recurrenceInterval: s.isRecurring ? s.recurrenceInterval : null,
+    recurrenceWeekdays: s.isRecurring && s.recurrenceFrequency === RecurrenceFrequency.Weekly ? s.recurrenceWeekdays : null,
     recurrenceEndsAtUtc: s.isRecurring ? s.recurrenceEndsAtUtc : null,
   };
 }
@@ -269,9 +276,8 @@ export function validateSchedule(raw: ScheduleFields, isNew: boolean): string | 
   }
 
   if (s.isRecurring) {
-    if (s.recurrenceIntervalHours === null || s.recurrenceIntervalHours < 1 || s.recurrenceIntervalHours > MAX_HOURS) {
-      return 'Set how often it repeats (at least 1 hour, at most one year).';
-    }
+    const ruleError = validateRecurrence(s);
+    if (ruleError) return ruleError;
     const anchor = dueUtc(s);
     if (!anchor) return isEvent ? 'A repeating event needs a start.' : 'A repeating task needs a deadline to repeat from.';
     if (s.recurrenceEndsAtUtc && new Date(s.recurrenceEndsAtUtc).getTime() <= new Date(anchor).getTime()) {

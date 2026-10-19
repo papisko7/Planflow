@@ -46,7 +46,7 @@ public class CalendarItem : BaseEntity
     /// <summary>True when the deadline was filled in with "tomorrow" because the source (e.g. a Google task) had none.</summary>
     public bool IsDeadlineDefaulted { get; set; }
 
-    /// <summary>Groups the occurrences of one repeating series (an imported event's recurringEventId, or an own series id).</summary>
+    /// <summary>Groups the occurrences of a series imported from Google (its recurringEventId). Items created in the app are grouped by <see cref="RecurrenceSeriesId"/>; <see cref="SeriesKey"/> is whichever applies.</summary>
     public string? SeriesId { get; set; }
 
     /// <summary>Last status seen in the external system; a sync changes our status only when this value changed, so the app's own edits are not undone.</summary>
@@ -86,12 +86,15 @@ public class CalendarItem : BaseEntity
     /// <summary>Estimated working time in hours (the UI converts minutes/days/weeks/months). Null = unknown, the algorithm falls back to a per-type default.</summary>
     public double? EstimatedEffortHours { get; set; }
 
-    /// <summary>Recurring item: a new instance is created every <see cref="RecurrenceIntervalHours"/> (scheduled by the recurring job).</summary>
-    public bool IsRecurring { get; set; }
-    public int? RecurrenceIntervalHours { get; set; }
+    /// <summary>The repeat rule this item is an occurrence of (an item created in the app); null = does not repeat. Items imported from Google use <see cref="SeriesId"/> instead.</summary>
+    public Guid? RecurrenceSeriesId { get; set; }
+    public RecurrenceSeries? RecurrenceSeries { get; set; }
 
-    /// <summary>Optional end of the recurrence; no new instance is created after this moment.</summary>
-    public DateTime? RecurrenceEndsAtUtc { get; set; }
+    /// <summary>True when this occurrence was changed on its own ("This" in the series pop-up): new occurrences do not copy their values from it.</summary>
+    public bool IsSeriesException { get; set; }
+
+    /// <summary>True for an occurrence of a repeating item created in the app. Derived, not stored.</summary>
+    public bool IsRecurring => RecurrenceSeriesId is not null;
 
     /// <summary>Opt-in per task: allow the Gemini layer to suggest an impact for it. Off by default; the core algorithm never depends on it.</summary>
     public bool UseAiEnhancement { get; set; }
@@ -144,6 +147,9 @@ public class CalendarItem : BaseEntity
 
     /// <summary>True for a task imported from Google Tasks. Its planned start belongs to PlanFlow (Google Tasks has no such field).</summary>
     public bool IsGoogleTask => ExternalTaskId is not null;
+
+    /// <summary>What ties the occurrences of one series together, whichever source it has; null = the item is not part of a series.</summary>
+    public string? SeriesKey => RecurrenceSeriesId?.ToString() ?? SeriesId;
 
     public ICollection<CalendarItem> BlockedTasks { get; set; } = new List<CalendarItem>();
     public ICollection<TaskHistory> History { get; set; } = new List<TaskHistory>();

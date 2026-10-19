@@ -1,4 +1,4 @@
-// The backend stores every duration (effort, recurrence interval) as plain hours; the UI lets the user
+// The backend stores a duration (the effort) as plain hours; the UI lets the user
 // think in whatever unit is natural ("2 days", "90 minutes"). These helpers convert both ways.
 export type DurationUnit = 'minute' | 'hour' | 'day' | 'week' | 'month';
 
@@ -19,9 +19,8 @@ export const DURATION_UNIT_LABEL: Record<DurationUnit, { short: string; long: st
   month: { short: 'mo', long: 'Months' },
 };
 
-// Effort can be tiny (minutes) or huge (months); a recurrence interval is never shorter than an hour.
+// Effort can be tiny (minutes) or huge (months).
 export const EFFORT_UNITS: DurationUnit[] = ['minute', 'hour', 'day', 'week', 'month'];
-export const INTERVAL_UNITS: DurationUnit[] = ['hour', 'day', 'week', 'month'];
 
 export function toHours(value: number, unit: DurationUnit): number {
   return value * HOURS_PER_UNIT[unit];

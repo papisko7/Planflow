@@ -1,5 +1,4 @@
 import { EventTemplate, ReminderAnchor, TaskType, type ReminderDto, type TaskDto } from '../types/task';
-import { formatDuration, INTERVAL_UNITS } from './duration';
 import { allDayDays, utcDay } from './schedule';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -69,12 +68,6 @@ export function formatReminder(reminder: ReminderDto, type: TaskType = TaskType.
   const time = `${String(Math.floor(minuteOfDay / 60)).padStart(2, '0')}:${String(minuteOfDay % 60).padStart(2, '0')}`;
   const day = days === 0 ? (suffix ? `On the ${fromDeadline ? 'deadline' : 'start'} day` : 'On the day') : `${plural(days, 'day')} before${suffix}`;
   return `${day} at ${time}`;
-}
-
-// "every 2 d" / null when the item does not repeat.
-export function formatRecurrence(item: Pick<TaskDto, 'isRecurring' | 'recurrenceIntervalHours'>): string | null {
-  if (!item.isRecurring || item.recurrenceIntervalHours === null) return null;
-  return `every ${formatDuration(item.recurrenceIntervalHours, INTERVAL_UNITS)}`;
 }
 
 // The backend writes "[High] due in 2d, impact 8/10" - the bracketed priority first, the explanation after it.

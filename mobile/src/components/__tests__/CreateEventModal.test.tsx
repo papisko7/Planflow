@@ -134,8 +134,8 @@ describe('CreateTaskModal - Task vs Event', () => {
     await fireEvent.press(screen.getByTestId('event-start-picker-set'));
 
     await fireEvent(screen.getByTestId('schedule-recurring-switch'), 'valueChange', true);
-    await fireEvent.changeText(screen.getByTestId('recurrence-interval-input'), '1');
-    await fireEvent.press(screen.getByTestId('recurrence-interval-unit-week'));
+    await fireEvent.press(screen.getByTestId('recurrence-frequency-1')); // weekly
+    await fireEvent.changeText(screen.getByTestId('recurrence-interval-input'), '2');
     await fireEvent.press(screen.getByTestId('create-task-submit-button'));
 
     await waitFor(() => expect(mockedCreateTask).toHaveBeenCalled());
@@ -144,6 +144,8 @@ describe('CreateTaskModal - Task vs Event', () => {
     expect(request.deadlineUtc).toBeNull();
     expect(request.startUtc).not.toBeNull();
     expect(request.isRecurring).toBe(true);
-    expect(request.recurrenceIntervalHours).toBe(168);
+    expect(request.recurrenceFrequency).toBe(1);
+    expect(request.recurrenceInterval).toBe(2);
+    expect(request.recurrenceWeekdays).not.toBeNull(); // the weekday of the first occurrence is pre-selected
   });
 });

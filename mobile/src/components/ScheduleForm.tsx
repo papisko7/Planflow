@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme/theme';
-import { TaskType, type ScheduleFields } from '../types/task';
-import { INTERVAL_UNITS } from '../utils/duration';
+import { RecurrenceFrequency, TaskType, type ScheduleFields } from '../types/task';
 import { startOfDay } from '../utils/dateUtils';
+import { defaultRecurrence, FREQUENCY_LABEL, MAX_INTERVAL, WEEKDAYS, weekdayBit } from '../utils/recurrence';
 import { allDayToTimed, pairAllDayDates, pairEventTimes, switchKind } from '../utils/schedule';
 import { ITEM_KINDS, rulesFor, WORKING_LOCATION_PRESETS } from '../utils/templateRules';
 import { ColorPicker } from './ColorPicker';
@@ -27,6 +27,16 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
   const patch = (changes: Partial<ScheduleFields>) => onChange({ ...value, ...changes });
   const isActive = (kind: (typeof ITEM_KINDS)[number]) =>
     kind.taskType === value.taskType && (kind.taskType === TaskType.Task || kind.template === value.eventTemplate);
+
+  // Picking weekly starts the days at the weekday of the first occurrence, so the rule fits the date it was set up on.
+  const changeFrequency = (frequency: RecurrenceFrequency) => {
+    const anchor = isEvent ? value.startUtc : value.deadlineUtc;
+    patch({
+      recurrenceFrequency: frequency,
+      recurrenceWeekdays:
+        frequency === RecurrenceFrequency.Weekly ? (value.recurrenceWeekdays ?? (anchor ? weekdayBit(new Date(anchor)) : null)) : value.recurrenceWeekdays,
+    });
+  };
 
   const toggleAllDay = (next: boolean) =>
     patch({
@@ -158,20 +168,62 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
         <Switch
           testID="schedule-recurring-switch"
           value={value.isRecurring}
-          onValueChange={(isRecurring) => patch({ isRecurring })}
+          onValueChange={(isRecurring) => patch(isRecurring ? defaultRecurrence(isEvent ? value.startUtc : value.deadlineUtc) : { isRecurring })}
           trackColor={{ true: colors.primary }}
         />
       </View>
       {value.isRecurring ? (
         <>
-          <DurationInput
-            testID="recurrence-interval"
-            label="Repeat every"
-            hours={value.recurrenceIntervalHours}
-            units={INTERVAL_UNITS}
-            defaultUnit="day"
-            onChange={(recurrenceIntervalHours) => patch({ recurrenceIntervalHours })}
-          />
+          <View style={styles.chipRow}>
+            {Object.values(RecurrenceFrequency)
+              .filter((f): f is RecurrenceFrequency => typeof f === 'number')
+              .map((frequency) => (
+                <Pressable
+                  key={frequency}
+                  testID={`recurrence-frequency-${frequency}`}
+                  onPress={() => changeFrequency(frequency)}
+                  style={[styles.chip, value.recurrenceFrequency === frequency ? styles.chipActive : null]}
+                >
+                  <Text style={value.recurrenceFrequency === frequency ? styles.chipTextActive : styles.chipText}>
+                    {FREQUENCY_LABEL[frequency].chip}
+                  </Text>
+                </Pressable>
+              ))}
+          </View>
+          <View style={styles.intervalRow}>
+            <Text style={styles.label}>Every</Text>
+            <TextInput
+              testID="recurrence-interval-input"
+              style={[styles.input, styles.intervalInput]}
+              keyboardType="number-pad"
+              maxLength={2}
+              value={value.recurrenceInterval === null ? '' : String(value.recurrenceInterval)}
+              onChangeText={(text) => {
+                const parsed = Number.parseInt(text.replace(/D/g, ''), 10);
+                patch({ recurrenceInterval: Number.isNaN(parsed) ? null : Math.min(parsed, MAX_INTERVAL) });
+              }}
+            />
+            <Text style={styles.label}>
+              {value.recurrenceFrequency === null ? '' : `${FREQUENCY_LABEL[value.recurrenceFrequency].unit}${value.recurrenceInterval === 1 ? '' : 's'}`}
+            </Text>
+          </View>
+          {value.recurrenceFrequency === RecurrenceFrequency.Weekly ? (
+            <View style={styles.chipRow}>
+              {WEEKDAYS.map((day) => {
+                const on = ((value.recurrenceWeekdays ?? 0) & day.bit) !== 0;
+                return (
+                  <Pressable
+                    key={day.bit}
+                    testID={`recurrence-day-${day.short.toLowerCase()}`}
+                    onPress={() => patch({ recurrenceWeekdays: (value.recurrenceWeekdays ?? 0) ^ day.bit })}
+                    style={[styles.chip, on ? styles.chipActive : null]}
+                  >
+                    <Text style={on ? styles.chipTextActive : styles.chipText}>{day.short}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
           <DeadlinePicker
             testIDPrefix="recurrence-end-picker"
             label="Repeat until"
@@ -258,4 +310,6 @@ const styles = StyleSheet.create({
   chipTextActive: { ...typography.body, fontSize: 12, color: colors.primary, fontWeight: '700' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   switchLabel: { ...typography.body, color: colors.text },
+  intervalRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  intervalInput: { width: 64, textAlign: 'center', paddingVertical: spacing.xs },
 });

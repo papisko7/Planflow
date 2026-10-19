@@ -1,5 +1,5 @@
 import { PLAIN_TASK_FIELDS } from '../../test-fixtures';
-import { TaskStatus, TaskType, type ScheduleFields, type TaskDto } from '../../types/task';
+import { RecurrenceFrequency, TaskStatus, TaskType, type ScheduleFields, type TaskDto } from '../../types/task';
 import {
   allDayDays,
   allDayToTimed,
@@ -21,6 +21,7 @@ const inHours = (h: number) => new Date(Date.now() + h * HOUR).toISOString();
 
 const event = (over: Partial<ScheduleFields> = {}): ScheduleFields => ({ ...emptySchedule(TaskType.Event), ...over });
 const task = (over: Partial<ScheduleFields> = {}): ScheduleFields => ({ ...emptySchedule(TaskType.Task), ...over });
+const DAILY = { recurrenceFrequency: RecurrenceFrequency.Daily, recurrenceInterval: 1 };
 
 describe('normalizeSchedule', () => {
   it('drops the end from a Task (it keeps its planned start) and the deadline from an Event', () => {
@@ -35,8 +36,10 @@ describe('normalizeSchedule', () => {
   });
 
   it('drops recurrence settings when not recurring', () => {
-    const n = normalizeSchedule(task({ isRecurring: false, recurrenceIntervalHours: 24, recurrenceEndsAtUtc: inHours(100) }));
-    expect(n.recurrenceIntervalHours).toBeNull();
+    const n = normalizeSchedule(task({ isRecurring: false, recurrenceFrequency: RecurrenceFrequency.Daily, recurrenceInterval: 1, recurrenceWeekdays: 1, recurrenceEndsAtUtc: inHours(100) }));
+    expect(n.recurrenceFrequency).toBeNull();
+    expect(n.recurrenceInterval).toBeNull();
+    expect(n.recurrenceWeekdays).toBeNull();
     expect(n.recurrenceEndsAtUtc).toBeNull();
   });
 });
@@ -69,14 +72,22 @@ describe('validateSchedule', () => {
     expect(validateSchedule(task({ estimatedEffortHours: 0 }), true)).toMatch(/effort/i);
   });
 
-  it('needs an interval and a first occurrence for recurrence', () => {
-    expect(validateSchedule(task({ isRecurring: true, deadlineUtc: inHours(5) }), true)).toMatch(/repeats/i);
-    expect(validateSchedule(task({ isRecurring: true, recurrenceIntervalHours: 24 }), true)).toMatch(/deadline/i);
-    expect(validateSchedule(task({ isRecurring: true, recurrenceIntervalHours: 24, deadlineUtc: inHours(5) }), true)).toBeNull();
+  it('needs a frequency, an interval and a first occurrence for recurrence', () => {
+    expect(validateSchedule(task({ isRecurring: true, deadlineUtc: inHours(5) }), true)).toMatch(/how often/i);
+    expect(validateSchedule(task({ isRecurring: true, ...DAILY }), true)).toMatch(/deadline/i);
+    expect(validateSchedule(task({ isRecurring: true, ...DAILY, deadlineUtc: inHours(5) }), true)).toBeNull();
+  });
+
+  it('keeps the interval between 1 and 99 and a weekly rule on at least one day', () => {
+    const base = { isRecurring: true, deadlineUtc: inHours(5) };
+    expect(validateSchedule(task({ ...base, recurrenceFrequency: RecurrenceFrequency.Daily, recurrenceInterval: 0 }), true)).toMatch(/1 to 99/);
+    expect(validateSchedule(task({ ...base, recurrenceFrequency: RecurrenceFrequency.Daily, recurrenceInterval: 100 }), true)).toMatch(/1 to 99/);
+    expect(validateSchedule(task({ ...base, recurrenceFrequency: RecurrenceFrequency.Weekly, recurrenceInterval: 1 }), true)).toMatch(/day of the week/);
+    expect(validateSchedule(task({ ...base, recurrenceFrequency: RecurrenceFrequency.Weekly, recurrenceInterval: 1, recurrenceWeekdays: 5 }), true)).toBeNull();
   });
 
   it('rejects a recurrence ending before the first occurrence', () => {
-    const s = task({ isRecurring: true, recurrenceIntervalHours: 24, deadlineUtc: inHours(50), recurrenceEndsAtUtc: inHours(10) });
+    const s = task({ isRecurring: true, ...DAILY, deadlineUtc: inHours(50), recurrenceEndsAtUtc: inHours(10) });
     expect(validateSchedule(s, true)).toMatch(/end after/i);
   });
 });

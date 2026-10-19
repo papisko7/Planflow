@@ -13,7 +13,7 @@ import { ScheduleForm } from './ScheduleForm';
 import type { ApiError } from '../types/api';
 import type { TeamMemberDto } from '../types/team';
 import { ItemListKind } from '../types/itemList';
-import { TaskType, type ReminderDto, type ReminderInput, type ScheduleFields, type TaskDto } from '../types/task';
+import { TaskType, type ReminderDto, type ReminderInput, type ScheduleFields, type SeriesScope, type TaskDto } from '../types/task';
 import { formatWhen } from '../utils/itemDisplay';
 import {
   pickerToWireDay,
@@ -24,7 +24,9 @@ import {
   validateSchedule,
   wireDayToPicker,
 } from '../utils/schedule';
+import { recurrenceChanged } from '../utils/recurrence';
 import { fitReminders, toReminderInput, validateReminders, type ReminderContext } from '../utils/reminders';
+import { askSeriesScope } from '../utils/seriesScope';
 import { rulesFor } from '../utils/templateRules';
 import { normalizeStatus, STATUS_LABEL, statusesFor } from '../utils/taskStatus';
 
@@ -109,6 +111,21 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
       return;
     }
 
+    // An item that repeats: which occurrences does this change reach? (this / this and following / all)
+    let scope: SeriesScope | undefined;
+    if (task.seriesId) {
+      const ruleChanged = !imported && recurrenceChanged(task, schedule);
+      const choice = await askSeriesScope(
+        'Edit repeating item',
+        ruleChanged
+          ? 'You changed how it repeats. That applies to "This and following" or "All items", not to this item alone.'
+          : 'This item repeats. Which ones do you want to change?',
+      );
+      if (choice === null) return;
+      scope = choice;
+    }
+    const scopePart = scope === undefined ? {} : { scope };
+
     setSaving(true);
     setError(null);
     try {
@@ -127,6 +144,7 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
                 ...(googleTask ? { startUtc: startDay, deadlineUtc: deadlineDay } : {}),
                 ...(ownAlerts ? { reminders: shownAlerts } : {}),
                 ...(canInvite ? { participantUserIds: shownParticipants } : {}),
+                ...scopePart,
               }
             : {
                 title: trimmedTitle,
@@ -138,6 +156,7 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
                 ...scheduleForRequest(schedule),
                 ...(ownAlerts ? { reminders: shownAlerts } : {}),
                 ...(canInvite ? { participantUserIds: shownParticipants } : {}),
+                ...scopePart,
               },
         ),
       );

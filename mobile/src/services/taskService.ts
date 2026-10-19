@@ -3,7 +3,7 @@ import { runInTeamContext } from './authService';
 import { getMyTeams } from './teamService';
 import { getCachedAllTasks, invalidateAllTasksCache, setCachedAllTasks, type AllTasks } from './taskCache';
 import type { BulkResult, ItemListDto } from '../types/itemList';
-import type { CreateTaskRequest, TaskDetailDto, TaskDto, TaskStatus, TaskWithTeam, UpdateTaskRequest } from '../types/task';
+import type { CreateTaskRequest, SeriesScope, TaskDetailDto, TaskDto, TaskStatus, TaskWithTeam, UpdateTaskRequest } from '../types/task';
 
 export function getTeamTasks(teamId: string): Promise<TaskDto[]> {
   return runInTeamContext(teamId, async () => {
@@ -80,9 +80,10 @@ export function leaveTask(taskId: string, teamId: string): Promise<void> {
   });
 }
 
-export function deleteTask(taskId: string, teamId: string): Promise<void> {
+// `scope` matters for a repeating item only: which occurrences go (left out = just this one).
+export function deleteTask(taskId: string, teamId: string, scope?: SeriesScope): Promise<void> {
   return runInTeamContext(teamId, async () => {
-    await http.delete(`/api/tasks/${taskId}`);
+    await http.delete(`/api/tasks/${taskId}`, scope === undefined ? undefined : { params: { scope } });
     invalidateAllTasksCache();
   });
 }

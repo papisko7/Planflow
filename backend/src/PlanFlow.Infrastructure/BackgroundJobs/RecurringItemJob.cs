@@ -11,13 +11,16 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Infrastructure.BackgroundJobs;
 
 /// <summary>
-/// Renews recurring items. Every minute it looks for finished items (completed tasks, events that are over) that are still marked recurring, creates
-/// the next instance (see <see cref="RecurrenceScheduler"/>) and then clears the recurring flag on the finished one.
-/// That flag is the "already handled" marker: the new instance carries the recurrence on, so each cycle step has
-/// exactly one live link and a second run can never spawn a duplicate. When the cycle has ended (past
-/// RecurrenceEndsAtUtc) no instance is created and the flag is cleared, which closes the chain.
-/// New instance, flag change, history row and scores are saved in one SaveChanges call (one transaction).
+/// Keeps repeating items going (the rule and the series are described in <see cref="TaskSeries"/>). Every minute it:
+/// <list type="number">
+/// <item><b>tops up event series</b> that reach less than 80 days ahead, so every event has its occurrences created for the next 90 days;</item>
+/// <item><b>renews task series</b>: a completed task whose series has no later occurrence gets the next one (never an overdue copy);</item>
+/// <item>removes series that have no occurrences left.</item>
+/// </list>
+/// The series' cursor (<see cref="RecurrenceSeries.GeneratedThroughUtc"/>) is the "already handled" marker, so a second run never creates a duplicate
+/// and an occurrence the user deleted is not made again. New occurrences, cursor moves and scores are saved in one SaveChanges (one transaction).
 /// </summary>
+[DisallowConcurrentExecution]
 public class RecurringItemJob : IJob
 {
     private readonly IApplicationDbContext _context;
@@ -36,48 +39,24 @@ public class RecurringItemJob : IJob
         var cancellationToken = context.CancellationToken;
         var nowUtc = DateTime.UtcNow;
 
-        var recurring = await _context.CalendarItems
-            .Include(t => t.Reminders)
-            .Include(t => t.Participants)
-            .Where(t => t.IsRecurring && (t.Status == TaskStatus.Completed || (t.TaskType == TaskType.Event && t.Status != TaskStatus.Cancelled)))
-            .ToListAsync(cancellationToken);
+        var created = new List<CalendarItem>();
+        created.AddRange(await TopUpEventSeriesAsync(nowUtc, cancellationToken));
+        created.AddRange(await RenewTaskSeriesAsync(nowUtc, cancellationToken));
+        var removed = await RemoveEmptySeriesAsync(cancellationToken);
 
-        // A Task is finished when completed; an Event has no "completed" status, so it is finished once it is over.
-        var finished = recurring
-            .Where(t => t.Status == TaskStatus.Completed || CalendarItemUrgencyScoreFactory.IsPastEvent(t, nowUtc))
-            .ToList();
-
-        if (finished.Count == 0)
+        if (created.Count == 0 && removed == 0)
         {
             return;
         }
 
-        var created = new List<CalendarItem>();
-        foreach (var item in finished)
-        {
-            var next = RecurrenceScheduler.CreateNextInstance(item, nowUtc);
-            item.IsRecurring = false; // handled: the successor (if any) carries the recurrence on
-            item.UpdatedAtUtc = nowUtc;
-
-            if (next is null)
-            {
-                continue;
-            }
-
-            _context.CalendarItems.Add(next);
-            _context.TaskHistories.Add(new TaskHistory { CalendarItemId = next.Id, ChangeType = TaskChangeType.Created });
-            CarryOverAlertsAndPeople(item, next);
-            created.Add(next);
-        }
-
-        // Give the new instances a urgency score right away instead of waiting for the hourly job.
+        // Give the new occurrences an urgency score right away instead of waiting for the hourly job.
         var changedTaskIds = created.Count == 0
             ? []
             : TeamUrgencyRecalculator.Apply(_context, created, nowUtc, ScoreTriggerSource.ScheduledRecalculation);
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        foreach (var teamId in finished.Select(t => t.TeamId).Distinct())
+        foreach (var teamId in created.Select(t => t.TeamId).Distinct())
         {
             await _cache.RemoveAsync(CacheKeys.TeamTasks(teamId), cancellationToken);
         }
@@ -86,30 +65,72 @@ public class RecurringItemJob : IJob
             await _cache.RemoveAsync(CacheKeys.TaskUrgency(taskId), cancellationToken);
         }
 
-        _logger.LogInformation("RecurringItemJob created {Created} new instances and closed {Closed} cycles.",
-            created.Count, finished.Count - created.Count);
+        _logger.LogInformation("RecurringItemJob created {Created} occurrences and removed {Removed} empty series.", created.Count, removed);
     }
 
-    /// <summary>
-    /// The next occurrence is the same meeting / chore: it keeps the alerts (as fresh ones, not yet gone off) and the people taking part.
-    /// </summary>
-    private void CarryOverAlertsAndPeople(CalendarItem finished, CalendarItem next)
+    private async Task<List<CalendarItem>> TopUpEventSeriesAsync(DateTime nowUtc, CancellationToken cancellationToken)
     {
-        foreach (var reminder in finished.Reminders)
+        var refillBefore = nowUtc + TaskSeries.RefillBelow;
+        var due = await _context.RecurrenceSeries
+            .Where(s => s.TaskType == TaskType.Event && s.GeneratedThroughUtc < refillBefore
+                && (s.EndsAtUtc == null || s.GeneratedThroughUtc < s.EndsAtUtc))
+            .ToListAsync(cancellationToken);
+
+        var created = new List<CalendarItem>();
+        foreach (var series in due)
         {
-            _context.ItemReminders.Add(new ItemReminder
+            var template = await TaskSeries.LoadTemplateAsync(_context, series.Id, cancellationToken);
+            if (template is null)
             {
-                CalendarItemId = next.Id,
-                Anchor = reminder.Anchor,
-                OffsetMinutes = reminder.OffsetMinutes,
-                DaysBefore = reminder.DaysBefore,
-                TimeOfDayMinutes = reminder.TimeOfDayMinutes
-            });
+                continue; // nothing left to copy; RemoveEmptySeriesAsync deals with it
+            }
+
+            // An occurrence the user moved past the cursor may sit on a date the rule is about to produce: that date is already taken.
+            var taken = (await _context.CalendarItems
+                .Where(i => i.RecurrenceSeriesId == series.Id && i.StartUtc > series.GeneratedThroughUtc)
+                .Select(i => i.StartUtc!.Value)
+                .ToListAsync(cancellationToken)).ToHashSet();
+
+            created.AddRange(TaskSeries.CreateAhead(_context, series, template, AlertsAndPeople.Of(template), nowUtc, taken));
         }
 
-        foreach (var participant in finished.Participants)
+        return created;
+    }
+
+    private async Task<List<CalendarItem>> RenewTaskSeriesAsync(DateTime nowUtc, CancellationToken cancellationToken)
+    {
+        // A completed task is the end of its chain when the series has not moved past it (cursor <= its deadline) and has not ended.
+        var finished = await _context.CalendarItems
+            .Include(t => t.RecurrenceSeries)
+            .Where(t => t.TaskType == TaskType.Task && t.Status == TaskStatus.Completed && t.RecurrenceSeriesId != null
+                && t.RecurrenceSeries!.GeneratedThroughUtc <= t.DeadlineUtc
+                && (t.RecurrenceSeries.EndsAtUtc == null || t.RecurrenceSeries.GeneratedThroughUtc < t.RecurrenceSeries.EndsAtUtc))
+            .ToListAsync(cancellationToken);
+
+        var created = new List<CalendarItem>();
+        foreach (var item in finished.GroupBy(t => t.RecurrenceSeriesId))
         {
-            _context.ItemParticipants.Add(new ItemParticipant { CalendarItemId = next.Id, UserId = participant.UserId, Role = participant.Role });
+            var series = item.First().RecurrenceSeries!;
+            var latest = item.OrderByDescending(t => t.DeadlineUtc).First();
+            var template = await TaskSeries.LoadTemplateAsync(_context, series.Id, cancellationToken) ?? latest;
+
+            var next = TaskSeries.CreateNextTask(_context, series, template, AlertsAndPeople.Of(template), latest.DeadlineUtc!.Value, nowUtc);
+            if (next is not null)
+            {
+                created.Add(next);
+            }
         }
+
+        return created;
+    }
+
+    /// <summary>A series whose last occurrence was deleted has nothing to repeat from; its row goes too.</summary>
+    private async Task<int> RemoveEmptySeriesAsync(CancellationToken cancellationToken)
+    {
+        var empty = await _context.RecurrenceSeries
+            .Where(s => !_context.CalendarItems.Any(i => i.RecurrenceSeriesId == s.Id))
+            .ToListAsync(cancellationToken);
+        _context.RecurrenceSeries.RemoveRange(empty);
+        return empty.Count;
     }
 }

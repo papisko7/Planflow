@@ -30,6 +30,7 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
         var task = await _context.CalendarItems
             .Include(t => t.Reminders)
             .Include(t => t.Participants)
+            .Include(t => t.RecurrenceSeries)
             .FirstOrDefaultAsync(t => t.Id == request.TaskId, cancellationToken)
             ?? throw new NotFoundException(nameof(CalendarItem), request.TaskId);
 
@@ -45,6 +46,9 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
         var previousStatus = task.Status;
         var previousAssignedUserId = task.AssignedUserId;
         var before = TaskSnapshot.Of(task); // for the "your task was changed" e-mail
+        var seriesBefore = SeriesSnapshot.Of(task); // for the series pop-up: did this occurrence change on its own?
+        var originalDue = task.DueUtc;
+        var originalSeries = task.RecurrenceSeries;
 
         task.AssignedUserId = request.AssignedUserId;
         task.AssignedByUserId = outcome.AssignedByUserId;
@@ -77,9 +81,15 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
 
         // Alerts: an imported event's belong to Google (the next sync would overwrite ours), everything else to the person. A caller that
         // sends no list (a quick action such as "done", an older app) leaves them as they are.
+        IReadOnlyList<ReminderInput> alerts;
         if (request.Reminders is not null && !(task.IsExternal && !task.IsGoogleTask))
         {
-            TaskReminders.Replace(_context, task, TaskReminders.Resolve(request.Reminders, task));
+            alerts = TaskReminders.Resolve(request.Reminders, task);
+            TaskReminders.Replace(_context, task, alerts);
+        }
+        else
+        {
+            alerts = AlertsAndPeople.Of(task).Reminders;
         }
 
         // Guests / co-contractors: the same "no list = no change". The assignee is never also a participant, so handing the item to one of
@@ -91,6 +101,27 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
 
         var nowUtc = DateTime.UtcNow;
         task.UpdatedAtUtc = nowUtc;
+
+        // A repeating item: the pop-up's choice (this / this and following / all) decides what the other occurrences get from this edit.
+        var zoneId = !task.IsExternal && request.IsRecurring ? await TaskSeries.ZoneOfAsync(_context, request.UpdatedByUserId, cancellationToken) : null;
+        var edit = new SeriesEdit(
+            request, task, originalSeries, seriesBefore, originalDue, previousAssignedUserId != task.AssignedUserId, participantIds,
+            new AlertsAndPeople(alerts, participantIds), zoneId);
+        var seriesResult = new SeriesEditResult([], null);
+        if (task.IsExternal)
+        {
+            await SeriesEditing.ApplyImportedAsync(_context, edit, nowUtc, cancellationToken);
+        }
+        else
+        {
+            seriesResult = await SeriesEditing.ApplyAsync(_context, edit, nowUtc, cancellationToken);
+        }
+
+        // Occurrences may have been removed or created: save them first, so the rescoring below sees the team as it now is.
+        if (request.Scope != SeriesScope.This || seriesResult.Created.Count > 0)
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
 
         // Editing one task can change others (its blocker/blocked neighbours), so the whole team is rescored.
         var changedTaskIds = await TeamUrgencyRecalculator.RecalculateTeamAsync(
@@ -114,7 +145,7 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
 
         await TeamUrgencyRecalculator.InvalidateCachesAsync(_cache, task.TeamId, changedTaskIds.Append(task.Id), cancellationToken);
 
-        return TaskDto.FromEntity(task) with { ParticipantUserIds = participantIds };
+        return TaskDto.FromEntity(task, task.IsExternal ? null : seriesResult.Series) with { ParticipantUserIds = participantIds };
     }
 
     /// <summary>

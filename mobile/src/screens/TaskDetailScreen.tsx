@@ -10,7 +10,8 @@ import { getTeamMembers } from '../services/teamService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { formatDuration } from '../utils/duration';
 import { colorHex, colorLabel } from '../utils/palette';
-import { formatColorKey, formatRecurrence, formatReminder, TEMPLATE_LABEL } from '../utils/itemDisplay';
+import { formatColorKey, formatReminder, TEMPLATE_LABEL } from '../utils/itemDisplay';
+import { formatRecurrence } from '../utils/recurrence';
 import { formatDay } from '../utils/dateUtils';
 import { allDayDays, toUpdateRequest, utcDay } from '../utils/schedule';
 import { isInformational } from '../utils/templateRules';
@@ -18,7 +19,8 @@ import type { RootStackParamList } from '../navigation/types';
 import type { ApiError } from '../types/api';
 import { TeamRole, type TeamMemberDto } from '../types/team';
 import type { TaskDetailDto, TaskDto } from '../types/task';
-import { EventTemplate, TaskStatus, TaskType } from '../types/task';
+import { EventTemplate, TaskStatus, TaskType, type SeriesScope } from '../types/task';
+import { askSeriesScope } from '../utils/seriesScope';
 import { ItemTypeBadge } from '../components/ItemTypeBadge';
 import { STATUS_LABEL } from '../utils/taskStatus';
 
@@ -178,22 +180,26 @@ export default function TaskDetailScreen() {
     }
   };
 
-  const confirmDelete = () => {
+  const deleteNow = async (scope?: SeriesScope) => {
+    try {
+      await deleteTask(task.id, task.teamId, scope);
+      navigation.goBack();
+    } catch (err) {
+      const apiError = err as ApiError;
+      setActionError(apiError.status === 403 ? "You don't have permission to delete this task." : (apiError.message ?? 'Failed to delete.'));
+    }
+  };
+
+  const confirmDelete = async () => {
+    // An item that repeats asks which occurrences go (this / this and following / all) instead of the plain confirmation.
+    if (task.seriesId) {
+      const scope = await askSeriesScope(`Delete "${task.title}"`, 'This item repeats. Which ones do you want to delete?');
+      if (scope !== null) await deleteNow(scope);
+      return;
+    }
     Alert.alert(`Delete "${task.title}"?`, undefined, [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteTask(task.id, task.teamId);
-            navigation.goBack();
-          } catch (err) {
-            const apiError = err as ApiError;
-            setActionError(apiError.status === 403 ? "You don't have permission to delete this task." : (apiError.message ?? 'Failed to delete.'));
-          }
-        },
-      },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteNow() },
     ]);
   };
 

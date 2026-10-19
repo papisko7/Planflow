@@ -55,7 +55,7 @@ public class TaskSchedulingApiTests : IClassFixture<CustomWebApplicationFactory>
         {
             title = "Weekly sync", impactScore = 5, taskType = 1,
             startUtc = Iso(TimeSpan.FromHours(3)), endUtc = Iso(TimeSpan.FromHours(4)),
-            estimatedEffortHours = 1.0, isRecurring = true, recurrenceIntervalHours = 168
+            estimatedEffortHours = 1.0, isRecurring = true, recurrenceFrequency = 1, recurrenceInterval = 1
         });
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
@@ -74,7 +74,8 @@ public class TaskSchedulingApiTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(JsonValueKind.Null, body.GetProperty("deadlineUtc").ValueKind);
         Assert.Equal(1.0, body.GetProperty("estimatedEffortHours").GetDouble());
         Assert.True(body.GetProperty("isRecurring").GetBoolean());
-        Assert.Equal(168, body.GetProperty("recurrenceIntervalHours").GetInt32());
+        Assert.Equal(1, body.GetProperty("recurrenceFrequency").GetInt32());
+        Assert.Equal(1, body.GetProperty("recurrenceInterval").GetInt32());
     }
 
     [Fact]
@@ -368,6 +369,55 @@ public class TaskSchedulingApiTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(9, after.GetProperty("impactScore").GetInt32());
         Assert.Equal(2.0, after.GetProperty("estimatedEffortHours").GetDouble());
         Assert.Equal((int)TaskStatus.Tentative, after.GetProperty("status").GetInt32());
+    }
+
+    // Step 7.5.7 through the real pipeline: a repeating event gets its occurrences, "scope" travels as a number in the body and in the query.
+    [Fact]
+    public async Task RepeatingEvent_EditAndDeleteWithAScope_ReachTheRightOccurrences()
+    {
+        var (client, teamId) = await OwnerWithTeamAsync();
+        var start = DateTime.UtcNow.Date.AddDays(1).AddHours(9);
+        string At(DateTime d) => d.ToString("yyyy-MM-ddTHH:mm:ss'Z'");
+
+        var created = await client.PostAsJsonAsync($"api/teams/{teamId}/tasks", new
+        {
+            title = "Standup", impactScore = 5, taskType = 1, startUtc = At(start), endUtc = At(start.AddMinutes(30)),
+            isRecurring = true, recurrenceFrequency = 0, recurrenceInterval = 1
+        });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var first = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var id = first.GetProperty("id").GetGuid();
+        Assert.Equal(0, first.GetProperty("recurrenceFrequency").GetInt32());
+        var seriesId = first.GetProperty("seriesId").GetString();
+
+        async Task<List<JsonElement>> SeriesAsync() =>
+            (await client.GetFromJsonAsync<List<JsonElement>>($"api/teams/{teamId}/tasks"))!
+                .Where(t => t.GetProperty("seriesId").GetString() == seriesId).ToList();
+        Assert.InRange((await SeriesAsync()).Count, 88, 92);
+
+        var edit = await client.PutAsJsonAsync($"api/tasks/{id}", new
+        {
+            title = "Daily sync", status = 5, impactScore = 5, taskType = 1, startUtc = At(start), endUtc = At(start.AddMinutes(30)),
+            isRecurring = true, recurrenceFrequency = 0, recurrenceInterval = 1, scope = 2
+        });
+        Assert.Equal(HttpStatusCode.OK, edit.StatusCode);
+        Assert.All(await SeriesAsync(), t => Assert.Equal("Daily sync", t.GetProperty("title").GetString()));
+
+        var delete = await client.DeleteAsync($"api/tasks/{id}?scope=2");
+        Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
+        Assert.Empty(await SeriesAsync());
+    }
+
+    [Fact]
+    public async Task Delete_WithAnUnknownScope_IsRejected()
+    {
+        var (client, teamId) = await OwnerWithTeamAsync();
+        var created = await client.PostAsJsonAsync($"api/teams/{teamId}/tasks", new { title = "Report", impactScore = 5, deadlineUtc = Iso(TimeSpan.FromDays(3)) });
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var delete = await client.DeleteAsync($"api/tasks/{id}?scope=7");
+
+        Assert.Equal(HttpStatusCode.BadRequest, delete.StatusCode);
     }
 
     [Theory]

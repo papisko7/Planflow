@@ -7,7 +7,8 @@ import { deleteTask, updateTask } from '../services/taskService';
 import { toUpdateRequest } from '../utils/schedule';
 import type { RootStackParamList } from '../navigation/types';
 import type { ApiError } from '../types/api';
-import { TaskStatus, type TaskDto } from '../types/task';
+import { TaskStatus, type SeriesScope, type TaskDto } from '../types/task';
+import { askSeriesScope } from '../utils/seriesScope';
 
 // Quick actions on a task straight from a list (swipe / long-press menu). `reload` refreshes the calling
 // screen after a change. The API decides who may do what (Owner/Admin: any task, Member: own tasks),
@@ -31,25 +32,36 @@ export function useTaskActions(reload: () => unknown) {
     [navigation],
   );
 
+  const removeNow = useCallback(
+    async (task: TaskDto, scope?: SeriesScope) => {
+      try {
+        await deleteTask(task.id, task.teamId, scope);
+        await reload();
+      } catch (err) {
+        showError("Couldn't delete item", err);
+      }
+    },
+    [reload, showError],
+  );
+
   const remove = useCallback(
-    (task: TaskDto) => {
+    async (task: TaskDto) => {
+      // An item that repeats asks which occurrences go (this / this and following / all) instead of the plain confirmation.
+      if (task.seriesId) {
+        const scope = await askSeriesScope(`Delete "${task.title}"`, 'This item repeats. Which ones do you want to delete?');
+        if (scope !== null) await removeNow(task, scope);
+        return;
+      }
       Alert.alert(`Delete "${task.title}"?`, undefined, [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteTask(task.id, task.teamId);
-              await reload();
-            } catch (err) {
-              showError("Couldn't delete item", err);
-            }
-          },
+          onPress: () => removeNow(task),
         },
       ]);
     },
-    [reload, showError],
+    [removeNow],
   );
 
   // The update endpoint replaces the whole task, so every field is resent and only the changed one differs.

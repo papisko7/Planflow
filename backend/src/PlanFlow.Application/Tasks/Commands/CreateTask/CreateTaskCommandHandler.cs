@@ -52,9 +52,28 @@ public class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, TaskD
         var participantIds = await TaskParticipants.ResolveAsync(_context, task, request.ParticipantUserIds ?? [], cancellationToken);
         TaskParticipants.Replace(_context, task, participantIds);
 
+        // A repeating item is the first occurrence of a new series; an event also gets its occurrences for the next 90 days right away.
+        var nowUtc = DateTime.UtcNow;
+        RecurrenceSeries? series = null;
+        IReadOnlyList<CalendarItem> occurrences = [];
+        if (request.IsRecurring && task.DueUtc is not null)
+        {
+            var zoneId = await TaskSeries.ZoneOfAsync(_context, request.CreatedByUserId, cancellationToken);
+            series = TaskSeries.Start(_context, task, request, zoneId);
+            if (task.TaskType == TaskType.Event)
+            {
+                occurrences = TaskSeries.CreateAhead(
+                    _context, series, task, new AlertsAndPeople(reminders, participantIds), nowUtc, new HashSet<DateTime> { task.DueUtc.Value });
+            }
+        }
+
         // A new task can already be blocked by an existing one, and that blocker may now inherit urgency from it.
         var changedTaskIds = await TeamUrgencyRecalculator.RecalculateTeamAsync(
-            _context, task.TeamId, DateTime.UtcNow, ScoreTriggerSource.ManualCreate, task, cancellationToken);
+            _context, task.TeamId, nowUtc, ScoreTriggerSource.ManualCreate, task, cancellationToken);
+        if (occurrences.Count > 0)
+        {
+            changedTaskIds = changedTaskIds.Concat(TeamUrgencyRecalculator.Apply(_context, occurrences, nowUtc, ScoreTriggerSource.ManualCreate)).ToList();
+        }
 
         _context.TaskHistories.Add(new TaskHistory
         {
@@ -68,6 +87,6 @@ public class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, TaskD
         await _context.SaveChangesAsync(cancellationToken);
         await TeamUrgencyRecalculator.InvalidateCachesAsync(_cache, task.TeamId, changedTaskIds, cancellationToken);
 
-        return TaskDto.FromEntity(task) with { ParticipantUserIds = participantIds };
+        return TaskDto.FromEntity(task, series) with { ParticipantUserIds = participantIds };
     }
 }

@@ -1,4 +1,5 @@
 using PlanFlow.Domain.Entities;
+using PlanFlow.Domain.Services;
 
 namespace PlanFlow.Application.Tasks.Common;
 
@@ -11,7 +12,7 @@ namespace PlanFlow.Application.Tasks.Common;
 /// <see cref="ReasonText"/> is the latest urgency explanation; only the list query fills it (null elsewhere).
 /// <see cref="ParticipantUserIds"/> are the guests of an event / co-contractors of a task (not the assignee); empty when the entity was loaded without them.
 /// <see cref="IsAssignmentLocked"/> = an Owner/Admin assigned the item, so its assignee cannot give it back (<see cref="AssignedByUserId"/> is who did).
-/// <see cref="SeriesId"/> groups the occurrences of one repeating event (null = not part of a series); <see cref="ItemListId"/> is the team's own list the item sits in (null = none).
+/// <see cref="SeriesId"/> groups the occurrences of one repeating item, from the app or from Google (null = not part of a series); the <c>Recurrence*</c> fields are the app's own repeat rule (null for an imported series, which Google owns); <see cref="ItemListId"/> is the team's own list the item sits in (null = none).
 /// </summary>
 public record TaskDto(
     Guid Id,
@@ -33,7 +34,9 @@ public record TaskDto(
     DateTime? EndUtc,
     double? EstimatedEffortHours,
     bool IsRecurring,
-    int? RecurrenceIntervalHours,
+    Domain.Enums.RecurrenceFrequency? RecurrenceFrequency,
+    int? RecurrenceInterval,
+    int? RecurrenceWeekdays,
     DateTime? RecurrenceEndsAtUtc,
     bool UseAiEnhancement,
     double? AiImpactScore,
@@ -56,7 +59,9 @@ public record TaskDto(
     bool IsAssignmentLocked = false,
     Guid? AssignedByUserId = null)
 {
-    public static TaskDto FromEntity(CalendarItem task) => new(
+    public static TaskDto FromEntity(CalendarItem task, RecurrenceSeries? series = null) => FromEntityCore(task, series ?? task.RecurrenceSeries);
+
+    private static TaskDto FromEntityCore(CalendarItem task, RecurrenceSeries? series) => new(
         task.Id,
         task.TeamId,
         task.AssignedUserId,
@@ -76,8 +81,10 @@ public record TaskDto(
         task.EndUtc,
         task.EstimatedEffortHours,
         task.IsRecurring,
-        task.RecurrenceIntervalHours,
-        task.RecurrenceEndsAtUtc,
+        series?.Frequency,
+        series?.Interval,
+        series is { Frequency: Domain.Enums.RecurrenceFrequency.Weekly } ? RecurrenceRules.EffectiveWeekdays(series, task.IsAllDay) : null,
+        series?.EndsAtUtc,
         task.UseAiEnhancement,
         task.AiImpactScore,
         task.AiImpactReasoning,
@@ -93,7 +100,7 @@ public record TaskDto(
         task.ExternalTaskListId,
         task.ExternalTaskList?.Title,
         ParticipantUserIds: task.Participants.OrderBy(p => p.CreatedAtUtc).Select(p => p.UserId).ToList(),
-        SeriesId: task.SeriesId,
+        SeriesId: task.SeriesKey,
         ItemListId: task.ItemListId,
         IsAssignmentLocked: task.IsAssignmentLocked,
         AssignedByUserId: task.AssignedByUserId);

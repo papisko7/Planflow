@@ -25,6 +25,7 @@ public class CalendarItemConfiguration : IEntityTypeConfiguration<CalendarItem>
         // Dashboard's main query is "give me this team's tasks sorted by urgency" — both filter
         // and sort columns are indexed so Postgres can serve it without a full table scan.
         builder.HasIndex(t => t.TeamId);
+        builder.HasIndex(t => t.RecurrenceSeriesId); // "all occurrences of this series" (series pop-up, recurring job)
         builder.HasIndex(t => t.CurrentUrgencyScore)
             .IsDescending();
 

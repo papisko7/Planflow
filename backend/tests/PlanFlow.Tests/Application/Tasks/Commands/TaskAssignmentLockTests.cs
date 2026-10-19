@@ -216,15 +216,16 @@ public class TaskAssignmentLockTests
     {
         var finished = new CalendarItem
         {
-            TeamId = Guid.NewGuid(), Title = "Weekly", TaskType = TaskType.Task, Status = TaskStatus.Completed, IsRecurring = true,
-            RecurrenceIntervalHours = 24 * 7, DeadlineUtc = new DateTime(2026, 10, 19, 12, 0, 0, DateTimeKind.Utc),
+            TeamId = Guid.NewGuid(), Title = "Weekly", TaskType = TaskType.Task, Status = TaskStatus.Completed,
+            DeadlineUtc = new DateTime(2026, 10, 19, 12, 0, 0, DateTimeKind.Utc),
             AssignedUserId = Guid.NewGuid(), AssignedByUserId = Guid.NewGuid(), IsAssignmentLocked = true
         };
 
-        var next = RecurrenceScheduler.CreateNextInstance(finished, new DateTime(2026, 10, 19, 13, 0, 0, DateTimeKind.Utc));
+        var series = new RecurrenceSeries { Frequency = RecurrenceFrequency.Weekly, Interval = 1, AnchorUtc = finished.DeadlineUtc!.Value };
 
-        Assert.NotNull(next);
-        Assert.Equal(finished.AssignedUserId, next!.AssignedUserId);
+        var next = TaskSeries.CloneAt(finished, series, finished.DeadlineUtc!.Value.AddDays(7));
+
+        Assert.Equal(finished.AssignedUserId, next.AssignedUserId);
         Assert.Equal(finished.AssignedByUserId, next.AssignedByUserId);
         Assert.True(next.IsAssignmentLocked);
     }
