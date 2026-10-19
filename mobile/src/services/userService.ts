@@ -1,5 +1,6 @@
 import { http } from './httpClient';
 import { loadSession } from './tokenStorage';
+import type { CalendarSharingLevel } from '../types/availability';
 import type { UpdateProfileRequest, UserProfileDto } from '../types/user';
 
 export async function getProfile(): Promise<UserProfileDto> {
@@ -10,6 +11,11 @@ export async function getProfile(): Promise<UserProfileDto> {
 export async function updateProfile(request: UpdateProfileRequest): Promise<UserProfileDto> {
   const { data } = await http.put<UserProfileDto>('/api/users/me', request);
   return data;
+}
+
+// Chooses how much of the personal calendar teammates may see. The server applies it whenever a teammate asks.
+export async function updateCalendarSharing(level: CalendarSharingLevel): Promise<void> {
+  await http.put('/api/users/me/calendar-sharing', { level });
 }
 
 // Changes the password of the signed-in user. This device's own refresh token is sent along so the server keeps this

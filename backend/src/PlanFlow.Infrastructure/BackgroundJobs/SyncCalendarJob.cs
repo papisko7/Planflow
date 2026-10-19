@@ -253,6 +253,7 @@ public class SyncCalendarJob : IJob
                     Location = location,
                     ColorKey = colorKey,
                     IsBusy = isBusy,
+                    IsPrivate = calendarEvent.IsPrivate,
                     SeriesId = Truncate(calendarEvent.RecurringEventId, MaxSeriesIdLength),
                     ExternalSettings = Truncate(calendarEvent.SettingsText, MaxExternalSettingsLength),
                     ImpactScore = tag?.ImpactScore,
@@ -284,6 +285,7 @@ public class SyncCalendarJob : IJob
                 task.Location = location;
                 task.ColorKey = colorKey;
                 task.IsBusy = isBusy;
+                task.IsPrivate = calendarEvent.IsPrivate;
                 task.SeriesId = Truncate(calendarEvent.RecurringEventId, MaxSeriesIdLength);
                 task.ExternalSettings = Truncate(calendarEvent.SettingsText, MaxExternalSettingsLength);
 

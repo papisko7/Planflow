@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PlanFlow.Api.Common;
 using PlanFlow.Api.Contracts;
+using PlanFlow.Application.Availability.Queries.GetMemberCalendar;
+using PlanFlow.Application.Availability.Queries.GetTeamAvailability;
 using PlanFlow.Application.Teams.Commands.AddTeamMember;
 using PlanFlow.Application.Teams.Commands.ChangeMemberRole;
 using PlanFlow.Application.Teams.Commands.UpdateTeamNotificationSettings;
@@ -63,6 +65,26 @@ public class TeamsController : ControllerBase
     {
         var members = await _sender.Send(new GetTeamMembersQuery(teamId, User.GetUserId()), cancellationToken);
         return Ok(members);
+    }
+
+    // Who is free, busy or away, and how loaded they are. The handler checks the caller's membership; what a member shares of
+    // their personal calendar is decided on the server by their own sharing level.
+    [HttpGet("{teamId:guid}/availability")]
+    public async Task<IActionResult> GetAvailability(
+        Guid teamId, [FromQuery] DateTime? from, [FromQuery] int days = 7, CancellationToken cancellationToken = default)
+    {
+        var availability = await _sender.Send(
+            new GetTeamAvailabilityQuery(teamId, User.GetUserId(), from ?? DateTime.UtcNow.Date, days), cancellationToken);
+        return Ok(availability);
+    }
+
+    [HttpGet("{teamId:guid}/members/{userId:guid}/calendar")]
+    public async Task<IActionResult> GetMemberCalendar(
+        Guid teamId, Guid userId, [FromQuery] DateTime? from, [FromQuery] int days = 7, CancellationToken cancellationToken = default)
+    {
+        var calendar = await _sender.Send(
+            new GetMemberCalendarQuery(teamId, userId, User.GetUserId(), from ?? DateTime.UtcNow.Date, days), cancellationToken);
+        return Ok(calendar);
     }
 
     // No policy attribute here on purpose: AddTeamMemberCommandHandler already looks up the

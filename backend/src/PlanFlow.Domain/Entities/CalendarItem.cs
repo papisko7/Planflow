@@ -55,6 +55,12 @@ public class CalendarItem : BaseEntity
     /// <summary>Hash of the raw external title + description, so the [planflow] tag is applied only when Google's text really changed.</summary>
     public string? ExternalDescriptionHash { get; set; }
 
+    /// <summary>
+    /// Google's visibility of an imported event: true = "private" or "confidential". Null = not known (never imported, or imported before
+    /// the flag existed); for an imported event "not known" is treated as private, so a title can never leak because the flag is missing.
+    /// </summary>
+    public bool? IsPrivate { get; set; }
+
     /// <summary>Read-only note about Google-only settings of an imported Out of office / Focus time event (auto-decline, do-not-disturb, message). Shown, never edited.</summary>
     public string? ExternalSettings { get; set; }
 

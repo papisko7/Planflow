@@ -22,6 +22,7 @@ namespace PlanFlow.Application.Common.Interfaces;
 /// Minutes before the start for each reminder, with the calendar's default reminders already resolved when the event uses them.
 /// Empty = no reminders; null = the caller did not say (the stored reminders are left alone).
 /// </param>
+/// <param name="IsPrivate">True when Google's <c>visibility</c> is "private" or "confidential": teammates may see only that the person is busy, never the title.</param>
 public record GoogleCalendarEvent(
     string Id,
     string? Title,
@@ -37,7 +38,8 @@ public record GoogleCalendarEvent(
     string? RecurringEventId = null,
     string? Status = null,
     string? SettingsText = null,
-    IReadOnlyList<int>? ReminderMinutes = null);
+    IReadOnlyList<int>? ReminderMinutes = null,
+    bool IsPrivate = false);
 
 /// <summary>
 /// Talks to Google Calendar's REST API (events.list). Declared in Application so SyncCalendarJob

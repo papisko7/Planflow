@@ -7,6 +7,7 @@ using PlanFlow.Api.Contracts;
 using PlanFlow.Application.Auth.Commands.ChangePassword;
 using PlanFlow.Application.Auth.Commands.ResendEmailVerification;
 using PlanFlow.Application.Auth.Commands.VerifyEmail;
+using PlanFlow.Application.Users.Commands.UpdateCalendarSharing;
 using PlanFlow.Application.Users.Commands.UpdateNotificationPreferences;
 using PlanFlow.Application.Users.Commands.UpdateProfile;
 using PlanFlow.Application.Users.Commands.UpdateTimeZone;
@@ -50,6 +51,14 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> UpdateTimeZone(UpdateTimeZoneRequest request, CancellationToken cancellationToken)
     {
         await _sender.Send(new UpdateTimeZoneCommand(User.GetUserId(), request.TimeZoneId), cancellationToken);
+        return NoContent();
+    }
+
+    // What teammates may see of the caller's personal calendar. Trimmed on the server whenever a teammate asks.
+    [HttpPut("calendar-sharing")]
+    public async Task<IActionResult> UpdateCalendarSharing(UpdateCalendarSharingRequest request, CancellationToken cancellationToken)
+    {
+        await _sender.Send(new UpdateCalendarSharingCommand(User.GetUserId(), request.Level), cancellationToken);
         return NoContent();
     }
 

@@ -216,6 +216,9 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsDeadlineDefaulted")
                         .HasColumnType("boolean");
 
+                    b.Property<bool?>("IsPrivate")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsRecurring")
                         .HasColumnType("boolean");
 

@@ -120,7 +120,8 @@ public class GoogleCalendarClient : IGoogleCalendarClient
             RecurringEventId: item.RecurringEventId,
             Status: item.Status,
             SettingsText: SettingsText(item),
-            ReminderMinutes: ReminderMinutes(item.Reminders, calendarDefaults));
+            ReminderMinutes: ReminderMinutes(item.Reminders, calendarDefaults),
+            IsPrivate: item.Visibility is "private" or "confidential");
     };
 
     /// <summary>
@@ -201,6 +202,7 @@ public class GoogleCalendarClient : IGoogleCalendarClient
         [property: JsonPropertyName("colorId")] string? ColorId,
         [property: JsonPropertyName("location")] string? Location,
         [property: JsonPropertyName("transparency")] string? Transparency,
+        [property: JsonPropertyName("visibility")] string? Visibility,
         [property: JsonPropertyName("recurringEventId")] string? RecurringEventId,
         [property: JsonPropertyName("reminders")] GoogleReminders? Reminders,
         [property: JsonPropertyName("outOfOfficeProperties")] GoogleTemplateSettings? OutOfOfficeProperties,

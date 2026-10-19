@@ -66,6 +66,6 @@ public class UpdateProfileCommandHandler : IRequestHandler<UpdateProfileCommand,
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        return new UserProfileDto(user.Id, user.Email, user.DisplayName, user.IsEmailVerified, user.TimeZoneId);
+        return new UserProfileDto(user.Id, user.Email, user.DisplayName, user.IsEmailVerified, user.TimeZoneId, user.CalendarSharingLevel);
     }
 }

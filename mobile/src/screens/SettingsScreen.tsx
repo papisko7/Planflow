@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AccordionSection } from '../components/AccordionSection';
+import { CalendarSharingCard } from '../components/CalendarSharingCard';
 import { CredentialsSection } from '../components/CredentialsSection';
 import { EmailVerificationCard } from '../components/EmailVerificationCard';
 import { NotificationSettingsCard } from '../components/NotificationSettingsCard';
@@ -126,6 +127,8 @@ export default function SettingsScreen() {
       {!loading && !emailVerified ? <EmailVerificationCard email={savedEmail} onVerified={() => setEmailVerified(true)} /> : null}
 
       <CredentialsSection />
+
+      <CalendarSharingCard />
 
       <NotificationSettingsCard />
 

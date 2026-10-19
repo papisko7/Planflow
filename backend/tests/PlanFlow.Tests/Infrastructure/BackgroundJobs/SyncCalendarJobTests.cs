@@ -619,6 +619,20 @@ public class SyncCalendarJobTests
     }
 
     [Fact]
+    public async Task Execute_CarriesGooglesPrivacyFlag_OnImportAndOnLaterChange()
+    {
+        var (context, _) = SetUp();
+        var start = DateTime.UtcNow.AddDays(1);
+
+        await SyncAsync(context, new GoogleCalendarEvent("e1", "Dentist", start, start.AddHours(1), IsCancelled: false, IsPrivate: true));
+        Assert.True((await context.CalendarItems.SingleAsync()).IsPrivate);
+
+        // Google's visibility changed: the next sync follows it, so a title that became public is not hidden for good.
+        await SyncAsync(context, new GoogleCalendarEvent("e1", "Dentist", start, start.AddHours(1), IsCancelled: false, IsPrivate: false));
+        Assert.False((await context.CalendarItems.SingleAsync()).IsPrivate);
+    }
+
+    [Fact]
     public async Task Execute_FocusTime_KeepsPlaceAndReminders_AndIsAlwaysBusy()
     {
         var (context, _) = SetUp();

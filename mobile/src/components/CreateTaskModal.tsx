@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { getCurrentUserId } from '../services/authService';
 import { createTask } from '../services/taskService';
+import { useTeamAvailability } from '../hooks/useTeamAvailability';
 import { getTeamMembers } from '../services/teamService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { AssigneePicker } from './AssigneePicker';
@@ -117,6 +118,7 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
   const shownReminders = fitReminders(reminders, reminderContext);
   // Guests of an event / co-contractors of a task need other people: not in a personal workspace, not for a kind without guests.
   const assigneeId = canAssign ? assignedUserId : myUserId;
+  const availability = useTeamAvailability(teamId, visible && !team?.isPersonal && members.length > 1);
   const canInvite = !team?.isPersonal && members.length > 1 && (schedule.taskType === TaskType.Task || rules.allowsGuests);
   const shownParticipants = canInvite ? participants.filter((id) => id !== assigneeId) : [];
   // Only items that can really hold something up: not finished, not informational (a birthday, a day off, ...), and a repeating series
@@ -244,7 +246,7 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
               onChange={setItemListId}
             />
 
-            {canAssign ? <AssigneePicker members={members} value={assignedUserId} onChange={setAssignedUserId} /> : null}
+            {canAssign ? <AssigneePicker members={members} value={assignedUserId} onChange={setAssignedUserId} availability={availability} /> : null}
 
             {canInvite ? (
               <ParticipantPicker
@@ -253,6 +255,7 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
                 value={shownParticipants}
                 onChange={setParticipants}
                 label={schedule.taskType === TaskType.Task ? 'Co-contractors' : 'Guests'}
+                availability={availability}
               />
             ) : null}
 

@@ -143,6 +143,24 @@ public class GoogleCalendarClientTests
         Assert.Equal("series-1", e.RecurringEventId);
     }
 
+    [Theory]
+    [InlineData("private", true)]
+    [InlineData("confidential", true)]
+    [InlineData("public", false)]
+    [InlineData("default", false)]
+    public async Task Visibility_PrivateAndConfidential_AreMarkedPrivate(string visibility, bool expected)
+    {
+        var e = await OneEvent(TimedEvent("v", $", \"visibility\": \"{visibility}\""));
+
+        Assert.Equal(expected, e.IsPrivate);
+    }
+
+    [Fact]
+    public async Task EventWithoutVisibility_IsNotPrivate()
+    {
+        Assert.False((await OneEvent(TimedEvent("plain"))).IsPrivate);
+    }
+
     [Fact]
     public async Task EventWithoutOptionalFields_HasSafeDefaults()
     {

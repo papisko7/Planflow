@@ -5,6 +5,7 @@ import {
   type GestureResponderEvent,
   Pressable,
   RefreshControl,
+  ScrollView,
   SectionList,
   StyleSheet,
   Text,
@@ -16,6 +17,7 @@ import { CreateTaskModal } from '../components/CreateTaskModal';
 import { Fab } from '../components/Fab';
 import { GoogleCalendarBanner } from '../components/GoogleCalendarBanner';
 import { MonthGrid } from '../components/MonthGrid';
+import { PeopleView } from '../components/PeopleView';
 import { SelectionBar } from '../components/SelectionBar';
 import { TaskCard } from '../components/TaskCard';
 import { useAllTasks } from '../hooks/useAllTasks';
@@ -33,7 +35,9 @@ import { isFinishedStatus } from '../utils/taskStatus';
 
 const NO_LISTS: ItemListDto[] = [];
 
-type ViewMode = 'agenda' | 'month';
+type ViewMode = 'agenda' | 'month' | 'people';
+
+const MODE_LABEL: Record<ViewMode, string> = { agenda: 'Agenda', month: 'Month', people: 'People' };
 
 const TIER_COLOR = {
   critical: colors.urgencyCritical,
@@ -149,14 +153,14 @@ export default function CalendarScreen() {
 
   const modeToggle = (
     <View style={styles.toggleRow}>
-      {(['agenda', 'month'] as const).map((m) => (
+      {(['agenda', 'month', 'people'] as const).map((m) => (
         <Pressable
           key={m}
           testID={`calendar-mode-${m}`}
           onPress={() => setMode(m)}
           style={[styles.toggle, mode === m ? styles.toggleActive : null]}
         >
-          <Text style={mode === m ? styles.toggleTextActive : styles.toggleText}>{m === 'agenda' ? 'Agenda' : 'Month'}</Text>
+          <Text style={mode === m ? styles.toggleTextActive : styles.toggleText}>{MODE_LABEL[m]}</Text>
         </Pressable>
       ))}
     </View>
@@ -170,7 +174,17 @@ export default function CalendarScreen() {
       onTouchEnd={onTouchEnd}
       onTouchCancel={onTouchEnd}
     >
-      {mode === 'agenda' ? (
+      {mode === 'people' ? (
+        <ScrollView
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
+        >
+          <GoogleCalendarBanner onSynced={refresh} />
+          {modeToggle}
+          <PeopleView teams={teams} />
+        </ScrollView>
+      ) : mode === 'agenda' ? (
         <SectionList
           ref={listRef}
           style={styles.list}

@@ -11,3 +11,6 @@ public record VerifyEmailRequest(string Code);
 
 /// <summary><paramref name="TimeZoneId"/> is an IANA name from the device, e.g. "Europe/Warsaw".</summary>
 public record UpdateTimeZoneRequest(string TimeZoneId);
+
+/// <summary>How much of the personal calendar teammates may see: 0 = nothing, 1 = availability only, 2 = details.</summary>
+public record UpdateCalendarSharingRequest(PlanFlow.Domain.Enums.CalendarSharingLevel Level);

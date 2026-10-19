@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { updateTask } from '../services/taskService';
 import { colors, radius, spacing, typography } from '../theme/theme';
+import { useTeamAvailability } from '../hooks/useTeamAvailability';
 import { AssigneePicker } from './AssigneePicker';
 import { DeadlinePicker } from './DeadlinePicker';
 import { DurationInput } from './DurationInput';
@@ -75,6 +76,7 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
     hasDeadline: googleTask ? (task.isDeadlineDefaulted ? deadline !== null : task.deadlineUtc !== null) : schedule.deadlineUtc !== null,
   };
   const shownAlerts = fitReminders(alerts, reminderContext);
+  const availability = useTeamAvailability(task.teamId, members.length > 1);
   const canInvite = members.length > 1 && (!imported || googleTask) && (schedule.taskType === TaskType.Task || rules.allowsGuests);
   const shownParticipants = canInvite ? participants.filter((id) => id !== assignedUserId) : [];
 
@@ -259,7 +261,7 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
       />
 
       {canAssign && members.length > 1 ? (
-        <AssigneePicker members={members} value={assignedUserId} onChange={setAssignedUserId} />
+        <AssigneePicker members={members} value={assignedUserId} onChange={setAssignedUserId} availability={availability} />
       ) : null}
 
       {canInvite ? (
@@ -269,6 +271,7 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
           value={shownParticipants}
           onChange={setParticipants}
           label={schedule.taskType === TaskType.Task ? 'Co-contractors' : 'Guests'}
+          availability={availability}
         />
       ) : null}
 

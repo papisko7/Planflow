@@ -1,3 +1,5 @@
+import type { CalendarSharingLevel } from './availability';
+
 // Mirrors PlanFlow.Application.Users.Common.UserProfileDto
 export interface UserProfileDto {
   id: string;
@@ -7,6 +9,8 @@ export interface UserProfileDto {
   emailVerified: boolean;
   // IANA zone reported by the phone (null until the first sign-in after the update).
   timeZoneId?: string | null;
+  // What teammates may see of the personal (Google) calendar: nothing, availability only, or details.
+  calendarSharingLevel?: CalendarSharingLevel;
 }
 
 // Mirrors PlanFlow.Api.Contracts.UpdateProfileRequest; currentPassword is only needed when the e-mail changes.
