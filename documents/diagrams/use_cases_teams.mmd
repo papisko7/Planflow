@@ -1,0 +1,72 @@
+---
+title: PlanFlow - Use case diagram, teams, roles and chat
+---
+flowchart LR
+    user(["<b>User</b><br/>signed in"]):::actor
+    member(["<b>Team member</b>"]):::actor
+    admin(["<b>Team admin</b>"]):::actor
+    owner(["<b>Team owner</b>"]):::actor
+
+    member -.->|"is a"| user
+    admin -.->|"is a"| member
+    owner -.->|"is a"| admin
+
+    subgraph system ["PlanFlow system"]
+        direction TB
+
+        subgraph teamwork ["Team work"]
+            newteam(["Create team"]):::uc
+            myteams(["View my teams and members"]):::uc
+            avail(["View availability and workload"]):::uc
+            tmcal(["View a teammate's calendar"]):::uc
+            leaveitem(["Leave an item I was added to"]):::uc
+            mute(["Mute team notifications and chat"]):::uc
+            leaveteam(["Leave team"]):::uc
+        end
+
+        subgraph chat ["Team chat (optional)"]
+            chathist(["Read chat history"]):::uc
+            chatsend(["Send message"]):::uc
+            chatlive(["See who is typing and online"]):::uc
+        end
+
+        subgraph adminfn ["Team administration"]
+            editteam(["Edit team settings"]):::uc
+            members(["Add or remove members"]):::uc
+            assign(["Assign item to another member"]):::uc
+            manage(["Edit or delete any member's item"]):::uc
+        end
+
+        subgraph ownerfn ["Owner only"]
+            role(["Promote or demote an admin"]):::uc
+            delteam(["Delete team"]):::uc
+        end
+    end
+
+    user --- newteam
+
+    member --- myteams
+    member --- avail
+    member --- tmcal
+    member --- leaveitem
+    member --- mute
+    member --- leaveteam
+    member --- chathist
+    member --- chatsend
+    member --- chatlive
+
+    admin --- editteam
+    admin --- members
+    admin --- assign
+    admin --- manage
+
+    owner --- role
+    owner --- delteam
+
+    classDef actor fill:#08427b,stroke:#052e56,color:#fff
+    classDef uc fill:#fff,stroke:#438dd5,color:#000
+    style system fill:none,stroke:#444,stroke-dasharray:5 5
+    style teamwork fill:none,stroke:#999
+    style chat fill:none,stroke:#999
+    style adminfn fill:none,stroke:#999
+    style ownerfn fill:none,stroke:#999

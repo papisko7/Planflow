@@ -1,0 +1,57 @@
+---
+title: PlanFlow - Use case diagram, tasks, events and prioritisation
+---
+flowchart LR
+    user(["<b>User</b><br/>signed in<br/>(in a team: Team member)"]):::actor
+
+    subgraph system ["PlanFlow system"]
+        direction LR
+
+        subgraph items ["Tasks and events"]
+            create(["Create task or event"]):::uc
+            edit(["Edit item and change its status"]):::uc
+            delete(["Delete item"]):::uc
+            bulk(["Change or delete several items at once"]):::uc
+            lists(["Manage own lists"]):::uc
+            repeat(["Set repeat rule"]):::uc
+            remind(["Add reminders"]):::uc
+            timeoff(["Mark time off or focus time"]):::uc
+            block(["Mark item as blocked by another"]):::uc
+            complete(["Complete data of an imported item"]):::uc
+            override(["Override urgency manually"]):::uc
+            scope(["Choose scope of a series change"]):::uc
+            recalc(["Recalculate Urgency Score"]):::uc
+        end
+
+        subgraph views ["Prioritisation and views"]
+            dash(["View dashboard ranked by Urgency Score"]):::uc
+            detail(["Open item details"]):::uc
+            breakdown(["See score breakdown and reason"]):::uc
+            history(["See score history"]):::uc
+            cal(["View calendar"]):::uc
+        end
+    end
+
+
+    user --- items
+    user --- views
+
+    repeat -.->|"«extend»"| create
+    remind -.->|"«extend»"| create
+    timeoff -.->|"«extend»"| create
+    block -.->|"«extend»"| edit
+    complete -.->|"«extend»"| edit
+    override -.->|"«extend»"| edit
+    scope -.->|"«extend»"| edit
+    scope -.->|"«extend»"| delete
+    create -.->|"«include»"| recalc
+    edit -.->|"«include»"| recalc
+    bulk -.->|"«include»"| recalc
+    detail -.->|"«include»"| breakdown
+    history -.->|"«extend»"| detail
+
+    classDef actor fill:#08427b,stroke:#052e56,color:#fff
+    classDef uc fill:#fff,stroke:#438dd5,color:#000
+    style system fill:none,stroke:#444,stroke-dasharray:5 5
+    style items fill:none,stroke:#999
+    style views fill:none,stroke:#999

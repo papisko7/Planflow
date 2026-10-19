@@ -49,7 +49,7 @@ The primary objective of this project is to design and implement the **PlanFlow*
 
 * `backend/` – .NET 10 solution. `src/PlanFlow.Domain` (entities, pure rules such as `UrgencyScoreCalculator`), `src/PlanFlow.Application` (MediatR commands and queries), `src/PlanFlow.Infrastructure` (EF Core, Redis, Quartz jobs, Google/SMTP/Expo clients), `src/PlanFlow.Api` (controllers, SignalR chat hub); `tests/PlanFlow.Tests` (xUnit, Testcontainers PostgreSQL); `benchmarks/PlanFlow.Benchmarks` (NBomber load tests).
 * `mobile/` – React Native (Expo, TypeScript) app; unit tests with Jest and React Testing Library; end-to-end scenario in `.maestro/`.
-* `documents/diagrams/` – Mermaid diagrams: ERD (21 tables), C4 container diagram, Urgency Score activity diagram (algorithm v2).
+* `documents/diagrams/` – Mermaid diagrams: ERD (21 tables), C4 container diagram, Urgency Score activity diagram (algorithm v2), use case diagrams (overview, account, tasks and prioritisation, teams, automatic functions).
 * `scripts/` – `start-demo.cmd` / `start-demo.ps1`: one-command demo startup (containers, backend, tunnels, Expo).
 
 ## ▶️ Running and Testing

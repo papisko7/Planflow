@@ -1,0 +1,71 @@
+---
+title: PlanFlow - Use case diagram, account, notifications and Google integration
+---
+flowchart LR
+    guest(["<b>Guest</b><br/>not signed in"]):::actor
+    user(["<b>User</b><br/>signed in"]):::actor
+    google(["<b>Google</b><br/>Calendar, Tasks, OAuth"]):::external
+
+    subgraph system ["PlanFlow system"]
+        direction TB
+
+        subgraph signin ["Sign in"]
+            register(["Register account"]):::uc
+            login(["Log in"]):::uc
+            reset(["Reset forgotten password"]):::uc
+        end
+
+        subgraph account ["Account settings"]
+            refresh(["Refresh session (automatic)"]):::uc
+            verify(["Verify e-mail address"]):::uc
+            profile(["Edit profile and time zone"]):::uc
+            chpass(["Change password"]):::uc
+            pin(["Lock the app with a PIN"]):::uc
+            share(["Set calendar sharing level"]):::uc
+            logout(["Log out"]):::uc
+        end
+
+        subgraph notif ["Notifications"]
+            inbox(["View notification inbox"]):::uc
+            inboxmanage(["Mark as read or delete notifications"]):::uc
+            prefs(["Set notification preferences"]):::uc
+            push(["Enable push on this device"]):::uc
+        end
+
+        subgraph gint ["Google integration (read-only import)"]
+            connect(["Connect Google account"]):::uc
+            sync(["Sync now: import events and tasks"]):::uc
+            disconnect(["Disconnect Google account"]):::uc
+        end
+    end
+
+    guest --- register
+    guest --- login
+    guest --- reset
+
+    user --- refresh
+    user --- verify
+    user --- profile
+    user --- chpass
+    user --- pin
+    user --- share
+    user --- logout
+    user --- inbox
+    user --- inboxmanage
+    user --- prefs
+    user --- push
+    user --- connect
+    user --- sync
+    user --- disconnect
+
+    connect --- google
+    sync --- google
+
+    classDef actor fill:#08427b,stroke:#052e56,color:#fff
+    classDef external fill:#999,stroke:#6b6b6b,color:#fff
+    classDef uc fill:#fff,stroke:#438dd5,color:#000
+    style system fill:none,stroke:#444,stroke-dasharray:5 5
+    style signin fill:none,stroke:#999
+    style account fill:none,stroke:#999
+    style notif fill:none,stroke:#999
+    style gint fill:none,stroke:#999

@@ -1,0 +1,73 @@
+---
+title: PlanFlow - Use case diagram (automatic functions run by the system)
+---
+flowchart LR
+    scheduler(["<b>Scheduler</b><br/>Quartz.NET timers"]):::actor
+    user(["<b>User</b><br/>presses Sync now"]):::actor
+    smtp(["<b>SMTP server</b>"]):::external
+    expo(["<b>Expo push service</b>"]):::external
+    google(["<b>Google</b><br/>Calendar, Tasks, OAuth"]):::external
+
+    subgraph system ["PlanFlow system (background jobs in the API process)"]
+        direction LR
+
+        subgraph scoring ["Scoring and repeats"]
+            rescore(["Rescore all open items<br/>every hour"]):::uc
+            generate(["Generate occurrences of repeating items<br/>90 days ahead, every minute"]):::uc
+        end
+
+        subgraph alerts ["Alerts and reminders"]
+            alert(["Raise urgency alert<br/>score from 0.8, every minute"]):::uc
+            itemrem(["Send item reminders<br/>every minute"]):::uc
+            incomplete(["Remind about incomplete imported items<br/>once a day"]):::uc
+            digest(["Send chat digest to offline members<br/>every 15 minutes"]):::uc
+            notify(["Create notification<br/>inbox row, push and e-mail"]):::uc
+        end
+
+        subgraph delivery ["Delivery"]
+            outbox(["Deliver e-mail from the outbox<br/>retries up to 5 times"]):::uc
+            pushjob(["Deliver push notifications<br/>respects Focus time"]):::uc
+        end
+
+        subgraph import ["Google import"]
+            syncjob(["Import events and tasks<br/>only on Sync now"]):::uc
+            token(["Refresh Google access token"]):::uc
+        end
+
+        subgraph care ["Maintenance"]
+            cleanup(["Delete expired data<br/>daily at 02:00 UTC"]):::uc
+        end
+    end
+
+    scheduler --- rescore
+    scheduler --- generate
+    scheduler --- alert
+    scheduler --- itemrem
+    scheduler --- incomplete
+    scheduler --- digest
+    scheduler --- outbox
+    scheduler --- pushjob
+    scheduler --- cleanup
+
+    user --- syncjob
+
+    alert -.->|"«include»"| notify
+    itemrem -.->|"«include»"| notify
+    incomplete -.->|"«include»"| notify
+    digest -.->|"«include»"| notify
+    syncjob -.->|"«include»"| token
+
+    outbox --- smtp
+    pushjob --- expo
+    syncjob --- google
+    token --- google
+
+    classDef actor fill:#08427b,stroke:#052e56,color:#fff
+    classDef external fill:#999,stroke:#6b6b6b,color:#fff
+    classDef uc fill:#fff,stroke:#438dd5,color:#000
+    style system fill:none,stroke:#444,stroke-dasharray:5 5
+    style scoring fill:none,stroke:#999
+    style alerts fill:none,stroke:#999
+    style delivery fill:none,stroke:#999
+    style import fill:none,stroke:#999
+    style care fill:none,stroke:#999
