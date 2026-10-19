@@ -13,7 +13,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Application.Tasks.Commands;
 
 /// <summary>
-/// Step 7.5.3: a task imported from Google Tasks. Google owns its title, notes and due day; PlanFlow owns the planned start, effort, impact
+/// A task imported from Google Tasks. Google owns its title, notes and due day; PlanFlow owns the planned start, effort, impact
 /// and status. A task with no due day in Google carries a placeholder deadline that the user may replace until they confirm the item.
 /// </summary>
 public class GoogleTaskEditTests

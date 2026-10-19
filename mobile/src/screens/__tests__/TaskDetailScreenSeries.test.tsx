@@ -75,7 +75,7 @@ beforeEach(() => {
 
 afterEach(() => alertSpy.mockRestore());
 
-// Step 7.5.7: the detail view says how an item repeats, and deleting one of a series asks which occurrences go.
+// The detail view says how an item repeats, and deleting one of a series asks which occurrences go.
 describe('TaskDetailScreen - repeating item', () => {
   it('shows the repeat rule in words, with its end', async () => {
     await show({ ...repeating, recurrenceEndsAtUtc: '2031-01-01T12:00:00.000Z' });

@@ -8,7 +8,6 @@ export function useSelectionSet(ids: string[]) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const selecting = selected.size > 0;
 
-  // The ids as one string, so a new array with the same content does not count as a change.
   const key = useMemo(() => ids.join('|'), [ids]);
   useEffect(() => {
     const present = new Set(key ? key.split('|') : []);

@@ -7,8 +7,6 @@ import { formatAgo } from '../utils/dashboardStats';
 
 type Props = { onPress: () => void };
 
-// One-line integration status for the dashboard: green dot + last sync when Google Calendar is linked,
-// otherwise a warning that doubles as a shortcut to the Calendar tab, where it can be connected.
 export function CalendarStatusChip({ onPress }: Props) {
   const [status, setStatus] = useState<GoogleCalendarStatus | null>(null);
   const [failed, setFailed] = useState(false);

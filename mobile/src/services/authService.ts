@@ -38,7 +38,6 @@ export function getCurrentTeamId(): string | null {
   return currentTeamId;
 }
 
-// Shown in the "new sign-in" e-mail, e.g. "PlanFlow on Android".
 function deviceName(): string {
   const platform = Platform.OS === 'ios' ? 'iPhone / iPad' : Platform.OS === 'android' ? 'Android' : Platform.OS;
   return `PlanFlow on ${platform}`;
@@ -63,8 +62,6 @@ export async function register(request: RegisterRequest): Promise<AuthResultDto>
   return persist(data);
 }
 
-// Password reset: the server e-mails a 6-digit code (always answers 204, so it never reveals whether the address has an account),
-// then the code + a new password complete the reset and sign the account out everywhere.
 export async function requestPasswordReset(email: string): Promise<void> {
   await authHttp.post('/api/auth/forgot-password', { email });
 }
@@ -74,8 +71,6 @@ export async function resetPassword(request: ResetPasswordRequest): Promise<void
 }
 
 export async function refresh(teamId: string | null = currentTeamId): Promise<AuthResultDto> {
-  // loadRefreshCredentials() only needs refreshToken + userId, so it works even after a soft
-  // logout where the access token has been cleared from SecureStore.
   const creds = await loadRefreshCredentials();
   if (!creds) {
     throw new Error('No stored session to refresh.');
@@ -147,8 +142,6 @@ export async function softLogout(): Promise<void> {
   currentTeamId = null;
 }
 
-// Call once at app startup: restores a previous session optimistically (an expired access
-// token still triggers the normal 401 -> refresh flow on the first authenticated request).
 export async function restoreSession(): Promise<boolean> {
   const session = await loadSession();
   if (!session) {
@@ -159,8 +152,6 @@ export async function restoreSession(): Promise<boolean> {
   return true;
 }
 
-// SessionProvider registers this so a dead session sends the user to the login screen
-// instead of leaving every tab stuck on a "401" error.
 let onSessionExpired: (() => void) | null = null;
 
 export function setSessionExpiredHandler(handler: (() => void) | null): void {
@@ -197,8 +188,6 @@ function refreshShared(): Promise<string | null> {
 
 setUnauthorizedHandler(refreshShared);
 
-// For SignalR's `accessTokenFactory`, which runs on every (re)connect handshake: hands out a token
-// that is still valid, refreshing first if the current one has expired.
 export async function getFreshAccessToken(): Promise<string> {
   if (!isAccessTokenFresh()) {
     await refreshShared();

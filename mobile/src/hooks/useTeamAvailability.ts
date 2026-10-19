@@ -4,8 +4,6 @@ import type { MemberAvailabilityDto } from '../types/availability';
 
 const NONE: Record<string, MemberAvailabilityDto> = {};
 
-// Availability and load of a team's members by user id, for the hints in the assignee / co-contractor pickers.
-// Best effort: when it cannot be loaded the pickers simply show no hints.
 export function useTeamAvailability(teamId: string | null | undefined, enabled = true): Record<string, MemberAvailabilityDto> {
   const [byUser, setByUser] = useState<Record<string, MemberAvailabilityDto>>(NONE);
 

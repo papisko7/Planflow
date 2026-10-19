@@ -77,7 +77,7 @@ describe('buildRows', () => {
   });
 });
 
-// Step 7.5.3: tasks imported from Google Tasks are grouped under their list instead of being mixed in with your own.
+// Tasks imported from Google Tasks are grouped under their list instead of being mixed in with your own.
 describe('buildRows with Google Tasks lists', () => {
   const own = item({ id: 'own' });
   const google = (id: string, listId: string | null, listTitle: string | null, over: Partial<TaskDto> = {}) =>

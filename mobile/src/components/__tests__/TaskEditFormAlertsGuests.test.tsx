@@ -35,7 +35,7 @@ const task: TaskDto = {
 const form = (item: TaskDto, reminders?: ReminderDto[], team = members) =>
   render(<TaskEditForm task={item} members={team} canAssign={false} reminders={reminders} onSaved={jest.fn()} onCancel={jest.fn()} />);
 
-// Step 7.5.6: the edit form opens with the item's alerts and people, and saves them back.
+// The edit form opens with the item's alerts and people, and saves them back.
 describe('TaskEditForm - alerts and co-contractors', () => {
   beforeEach(() => {
     jest.clearAllMocks();

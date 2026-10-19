@@ -4,18 +4,13 @@ import { isPastEvent } from './schedule';
 
 export type ItemTab = 'all' | 'tasks' | 'events';
 
-// One line of the Items list: a section heading, an item card, or a collapsible group of cards: a Google Tasks list (read-only mirror) or,
-// when `list` is set, one of the team's own lists (it can be renamed or deleted, and may be empty).
 export type ItemRow<T extends TaskDto> =
   | { type: 'header'; key: string; title: string; count: number }
   | { type: 'item'; key: string; item: T }
   | { type: 'group'; key: string; title: string; items: T[]; list?: ItemListDto };
 
-// A task imported from Google Tasks. Such tasks are not mixed in with your own: each Google list becomes one group.
 const isGoogleTask = (t: TaskDto) => t.taskType !== TaskType.Event && t.isExternal;
 
-// The tasks of the Google lists, one group per list (alphabetical by list name; the tasks inside keep the urgency order they came in).
-// A task whose list is gone from Google keeps a generic "Google Tasks" group.
 function groupByGoogleList<T extends TaskDto>(tasks: T[]): ItemRow<T>[] {
   const groups = new Map<string, { title: string; items: T[] }>();
   for (const task of tasks) {
@@ -28,9 +23,6 @@ function groupByGoogleList<T extends TaskDto>(tasks: T[]): ItemRow<T>[] {
     .map(([key, group]) => ({ type: 'group', key: `google-list-${key}`, title: group.title, items: group.items }));
 }
 
-// Splits the unified list for the All / Tasks / Events tabs and orders each part the way people read it:
-// tasks keep the server order (most urgent first); events are chronological - what is still ahead
-// (or happening now) first, soonest on top, then the ones that already took place, newest first.
 export function filterByTab<T extends TaskDto>(items: T[], tab: ItemTab, now: Date = new Date()): T[] {
   if (tab === 'all') return [...filterByTab(items, 'tasks', now), ...filterByTab(items, 'events', now)];
   if (tab === 'tasks') return items.filter((t) => t.taskType !== TaskType.Event);
@@ -42,7 +34,6 @@ export function filterByTab<T extends TaskDto>(items: T[], tab: ItemTab, now: Da
   return [...upcoming, ...past];
 }
 
-// The own lists of one kind as groups (alphabetical; an empty list is still shown, so a new list can be seen before it has anything in it).
 function ownListGroups<T extends TaskDto>(items: T[], lists: ItemListDto[], kind: ItemListKind): ItemRow<T>[] {
   return lists
     .filter((l) => l.kind === kind)
@@ -50,9 +41,6 @@ function ownListGroups<T extends TaskDto>(items: T[], lists: ItemListDto[], kind
     .map((list) => ({ type: 'group', key: `list-${list.id}`, title: list.name, items: items.filter((i) => i.itemListId === list.id), list }));
 }
 
-// The rows to render. "All" is NOT one mixed list: it shows a Tasks section and an Events section, each under its own
-// heading (an empty one is left out). Tasks and Events tabs are plain lists. In the task part your tasks without a list come first, then
-// one collapsed group per own task list, then one per Google Tasks list. Events without a list come first, then the own meeting lists.
 export function buildRows<T extends TaskDto>(items: T[], tab: ItemTab, now: Date = new Date(), lists: ItemListDto[] = []): ItemRow<T>[] {
   const listIds = new Set(lists.map((l) => l.id));
   const inOwnList = (t: T) => !!t.itemListId && listIds.has(t.itemListId);

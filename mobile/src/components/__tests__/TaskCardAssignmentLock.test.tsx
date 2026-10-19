@@ -36,7 +36,7 @@ beforeEach(() => {
   (getMyAbsences as jest.Mock).mockResolvedValue([]);
 });
 
-// Step 7.5.10b: a task an Owner/Admin assigned cannot be given back, and a deadline inside the person's time off is flagged.
+// A task an Owner/Admin assigned cannot be given back, and a deadline inside the person's time off is flagged.
 describe('TaskCard - assignment lock', () => {
   it('offers "Abandon" on an own task that is not locked', async () => {
     await render(<TaskCard task={task} actions={actions} />);

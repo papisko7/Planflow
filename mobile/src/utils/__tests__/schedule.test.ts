@@ -26,7 +26,7 @@ const DAILY = { recurrenceFrequency: RecurrenceFrequency.Daily, recurrenceInterv
 describe('normalizeSchedule', () => {
   it('drops the end from a Task (it keeps its planned start) and the deadline from an Event', () => {
     const asTask = normalizeSchedule(task({ deadlineUtc: inHours(5), startUtc: inHours(1), endUtc: inHours(2) }));
-    expect(asTask.startUtc).not.toBeNull(); // a Task's optional planned start (step 7.5.4)
+    expect(asTask.startUtc).not.toBeNull(); // a Task's optional planned start
     expect(asTask.endUtc).toBeNull();
     expect(asTask.deadlineUtc).not.toBeNull();
 
@@ -248,7 +248,7 @@ describe('imported all-day events (dates stored as midnight UTC)', () => {
   });
 });
 
-// Step 7.5.4: a Task may carry a planned start, which can not be later than its deadline.
+// A Task may carry a planned start, which can not be later than its deadline.
 describe('validateSchedule - a task\'s planned start', () => {
   it('accepts a start before the deadline, and a task without a start', () => {
     expect(validateSchedule(task({ startUtc: inHours(2), deadlineUtc: inHours(10) }), true)).toBeNull();

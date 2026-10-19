@@ -200,7 +200,6 @@ internal static class TaskNotifications
 
         if (before.DeadlineUtc != after.DeadlineUtc)
         {
-            // For an event the tracked moment is its start, not a deadline.
             changes.Add($"{(after.TaskType == TaskType.Event ? "start" : "deadline")} {FormatDeadline(before.DeadlineUtc)} → {FormatDeadline(after.DeadlineUtc)}");
         }
 

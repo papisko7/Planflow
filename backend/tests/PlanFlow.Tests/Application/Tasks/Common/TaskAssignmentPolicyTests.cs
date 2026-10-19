@@ -4,7 +4,7 @@ using PlanFlow.Application.Tasks.Common;
 namespace PlanFlow.Tests.Application.Tasks.Common;
 
 /// <summary>
-/// Step 7.5.10b: who may change a task's assignee, and the lock an Owner/Admin puts on an assignment. The rules used to sit in the
+/// Who may change a task's assignee, and the lock an Owner/Admin puts on an assignment. The rules used to sit in the
 /// controller; here they are plain functions, so every row of the table below is a test.
 /// </summary>
 public class TaskAssignmentPolicyTests

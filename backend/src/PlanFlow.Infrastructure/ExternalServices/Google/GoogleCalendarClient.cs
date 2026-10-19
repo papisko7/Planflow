@@ -29,9 +29,7 @@ public class GoogleCalendarClient : IGoogleCalendarClient
         var events = new List<GoogleCalendarEvent>();
         string? pageToken = null;
 
-        // Google answers in pages of at most 250 events and hands out a token for the next one. Reading only the first page
-        // (as the first version did) silently dropped everything after it - with a daily repeating event in the calendar that
-        // was most of the future.
+        // Google answers in pages of at most 250 events and hands out a token for the next one; reading only the first page drops the rest.
         for (var page = 0; page < MaxPages; page++)
         {
             var body = await GetPageAsync(accessToken, BuildQuery(updatedSinceUtc, now, pageToken), cancellationToken);
@@ -53,7 +51,6 @@ public class GoogleCalendarClient : IGoogleCalendarClient
         query["singleEvents"] = "true"; // expands recurring events into individual instances so each has its own ID/time
         query["maxResults"] = PageSize.ToString();
 
-        // The same forward window for every request: never the account's history, and a bounded expansion of repeating events.
         query["timeMin"] = now.ToString("o");
         query["timeMax"] = now.AddDays(IGoogleCalendarClient.WindowDays).ToString("o");
 
@@ -92,10 +89,7 @@ public class GoogleCalendarClient : IGoogleCalendarClient
             throw new UnauthorizedException("Google rejected the Calendar events request (expired/revoked access token).");
         }
 
-        // Any other failure (429 rate limit, 5xx, or a transport-level timeout as HttpRequestException)
-        // is left to throw HttpRequestException via EnsureSuccessStatusCode, which the resilience
-        // handler registered in DependencyInjection retries with exponential backoff before it ever
-        // reaches SyncCalendarJob's per-integration catch block.
+        // Other failures (429, 5xx, timeouts) throw HttpRequestException; the resilience handler retries them with backoff first.
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadFromJsonAsync<GoogleEventsResponse>(cancellationToken)

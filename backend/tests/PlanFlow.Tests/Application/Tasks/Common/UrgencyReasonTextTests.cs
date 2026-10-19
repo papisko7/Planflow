@@ -6,7 +6,7 @@ using PlanFlow.Domain.Services;
 namespace PlanFlow.Tests.Application.Tasks.Common;
 
 /// <summary>
-/// Step 7.2: scenario tests for the urgency algorithm (overdue task, finished event, effort vs. time left,
+/// Scenario tests for the urgency algorithm (overdue task, finished event, effort vs. time left,
 /// unrated impact, Task vs. Event) together with the deterministic <c>ReasonText</c> shown next to every score.
 /// </summary>
 public class UrgencyReasonTextTests

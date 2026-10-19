@@ -34,37 +34,29 @@ import { isInformational, rulesFor } from '../utils/templateRules';
 type Props = {
   visible: boolean;
   teams: TeamDto[];
-  // Existing tasks, offered as "blocked by" candidates for the chosen team.
   tasks: TaskDto[];
-  // Team preselected when the sheet opens (e.g. the team currently shown); falls back to the first team.
   defaultTeamId?: string | null;
-  // Type the form starts as (the Items screen opens it as Event while its Events tab is showing).
   defaultType?: TaskType;
   onClose: () => void;
   onCreated: () => void;
 };
 
-// One "new task" sheet shared by every screen (Dashboard, Items, Calendar, Teams), so a task can be
-// added from wherever the user is without a trip to the Items tab.
 export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultType = TaskType.Task, onClose, onCreated }: Props) {
   const myUserId = getCurrentUserId();
   const [teamId, setTeamId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  // Type, template, dates, effort and recurrence live together: they depend on each other (Task vs Event).
   const [schedule, setSchedule] = useState<ScheduleFields>(() => emptySchedule(defaultType));
   const [impactScore, setImpactScore] = useState('');
   const [blockedByTaskId, setBlockedByTaskId] = useState<string | null>(null);
   const [itemListId, setItemListId] = useState<string | null>(null);
   const [assignedUserId, setAssignedUserId] = useState<string | null>(myUserId);
-  // Alerts and the people invited besides the assignee (guests of an event / co-contractors of a task).
   const [reminders, setReminders] = useState<ReminderInput[]>([]);
   const [participants, setParticipants] = useState<string[]>([]);
   const [members, setMembers] = useState<TeamMemberDto[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Every time the sheet opens it starts from a clean form on the default team.
   useEffect(() => {
     if (!visible) return;
     setTitle('');
@@ -83,7 +75,6 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  // The member list is only needed for the assignee picker, so it is loaded while the sheet is open.
   useEffect(() => {
     if (!visible || !teamId) return;
     let cancelled = false;
@@ -100,14 +91,12 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
     };
   }, [visible, teamId]);
 
-  // Owner/Admin of a shared team can hand a new task to any member; everyone else's new task is their own.
   const team = teams.find((t) => t.id === teamId) ?? null;
   const myRole = members.find((m) => m.userId === myUserId)?.role;
   const canAssign = !team?.isPersonal && (myRole === TeamRole.Owner || myRole === TeamRole.Admin);
   // What the chosen kind has: an Out of office / Focus time / Working location / Birthday item has no description (some),
   // no Impact and no blocker - those are PlanFlow's scoring fields and these kinds are not ranked.
   const rules = rulesFor(schedule.taskType, schedule.eventTemplate);
-  // Alerts that no longer fit after a change of kind are left out (and come back if the person switches back).
   const reminderContext: ReminderContext = {
     taskType: schedule.taskType,
     allowsAlerts: rules.allowsAlerts,
@@ -116,7 +105,6 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
     hasDeadline: schedule.deadlineUtc !== null,
   };
   const shownReminders = fitReminders(reminders, reminderContext);
-  // Guests of an event / co-contractors of a task need other people: not in a personal workspace, not for a kind without guests.
   const assigneeId = canAssign ? assignedUserId : myUserId;
   const availability = useTeamAvailability(teamId, visible && !team?.isPersonal && members.length > 1);
   const canInvite = !team?.isPersonal && members.length > 1 && (schedule.taskType === TaskType.Task || rules.allowsGuests);

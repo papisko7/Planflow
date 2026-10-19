@@ -19,7 +19,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Integration.PostgresIntegration;
 
 /// <summary>
-/// Step 7.8: the two Google sync jobs on a real PostgreSQL database, fed by the real Google clients over a stub transport (real JSON,
+/// The two Google sync jobs on a real PostgreSQL database, fed by the real Google clients over a stub transport (real JSON,
 /// real retry pipeline). The unit tests of the jobs run on InMemory, which does not enforce column widths, unique indexes or foreign-key
 /// behaviour, and translates queries its own way; these tests cover exactly that. Every run is a "Sync now" press for one account
 /// (the user id travels in the job data), which also keeps the tests apart on the shared database.

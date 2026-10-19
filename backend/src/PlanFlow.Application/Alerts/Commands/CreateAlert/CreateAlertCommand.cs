@@ -3,7 +3,7 @@ using PlanFlow.Application.Alerts.Common;
 
 namespace PlanFlow.Application.Alerts.Commands.CreateAlert;
 
-/// <summary>Creates a user-facing notification, typically raised by AlertingJob (Phase 1.5).</summary>
+/// <summary>Creates a user-facing notification, typically raised by AlertingJob.</summary>
 public record CreateAlertCommand(
     Guid UserId,
     Guid? CalendarItemId,

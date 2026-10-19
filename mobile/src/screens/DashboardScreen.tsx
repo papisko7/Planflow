@@ -45,7 +45,6 @@ export default function DashboardScreen() {
   const [emailUnconfirmed, setEmailUnconfirmed] = useState(false);
   const { count: unreadCount } = useUnreadCount();
 
-  // Re-read on every focus, so the "confirm your e-mail" banner disappears right after the code was entered in Settings.
   useFocusEffect(
     useCallback(() => {
       getProfile()
@@ -64,11 +63,9 @@ export default function DashboardScreen() {
     [tasks],
   );
   const stats = useMemo(() => computeDashboardStats(tasks), [tasks]);
-  // "Do now": the single most urgent actionable task is promoted above the list and left out of it.
   const nextTask = useMemo(() => selectOneNextAction(openTasks), [openTasks]);
   const sections = useMemo(() => groupTasksByUrgency(openTasks.filter((t) => t.id !== nextTask?.id)), [openTasks, nextTask]);
 
-  // Selection mode: a double tap ticks a card; the bar at the bottom then acts on the ticked ones.
   const openIds = useMemo(() => openTasks.map((t) => t.id), [openTasks]);
   const selection = useSelectionSet(openIds);
   const selectedEntries = useMemo(() => openTasks.filter((t) => selection.selected.has(t.id)), [openTasks, selection.selected]);

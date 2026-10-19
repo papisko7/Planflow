@@ -22,9 +22,6 @@ import type { InboxNotification } from '../types/notification';
 
 const PAGE_SIZE = 30;
 
-// The in-app inbox: everything PlanFlow told you, newest first.
-// Tap opens the item it is about (and marks the entry read). Swipe right deletes, swipe left marks read.
-// A long press or a quick double tap ticks an entry: then tapping ticks more, and the bar at the bottom reads or deletes them all at once.
 export default function NotificationsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [items, setItems] = useState<InboxNotification[]>([]);
@@ -35,7 +32,6 @@ export default function NotificationsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const loadingMoreRef = useRef(false);
-  // The first tap of a possible double tap: the entry opens only if no second tap follows within DOUBLE_TAP_MS.
   const pendingTap = useRef<{ id: string; timer: ReturnType<typeof setTimeout>; open: () => void } | null>(null);
   useEffect(
     () => () => {
@@ -51,7 +47,6 @@ export default function NotificationsScreen() {
       const page = await getInbox(undefined, PAGE_SIZE);
       setItems(page);
       setHasMore(page.length === PAGE_SIZE);
-      // An entry that vanished (deleted elsewhere, or by "clear all") can no longer stay ticked.
       setSelected((current) => {
         const stillThere = new Set(page.map((n) => n.id));
         const kept = [...current].filter((id) => stillThere.has(id));
@@ -66,7 +61,6 @@ export default function NotificationsScreen() {
     }
   }, []);
 
-  // Reload on every visit, so entries that arrived while the screen was in the background show up.
   useFocusEffect(
     useCallback(() => {
       void loadFirstPage();
@@ -82,14 +76,12 @@ export default function NotificationsScreen() {
       setItems((current) => [...current, ...page]);
       setHasMore(page.length === PAGE_SIZE);
     } catch {
-      // keep what is shown; pulling down retries
     } finally {
       loadingMoreRef.current = false;
       setLoadingMore(false);
     }
   };
 
-  // Every action below changes the list at once and, if the server refuses, reloads it so the screen shows the truth again.
   const markAllRead = useCallback(async () => {
     setItems((current) => current.map((n) => ({ ...n, isRead: true })));
     try {
@@ -216,7 +208,6 @@ export default function NotificationsScreen() {
     pendingTap.current = { id: notification.id, timer, open: () => open(notification) };
   };
 
-  // While ticking, the phone's back button first leaves the ticking mode instead of the screen.
   useEffect(() => {
     if (!selecting) return undefined;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {

@@ -15,7 +15,7 @@ using PlanFlow.Infrastructure.Persistence;
 namespace PlanFlow.Tests.Integration.PostgresIntegration;
 
 /// <summary>
-/// Step 7.8, the "Sync now" button from end to end: the HTTP call, the gate, Quartz starting the two jobs in the real host, the real Google
+/// The "Sync now" button from end to end: the HTTP call, the gate, Quartz starting the two jobs in the real host, the real Google
 /// clients reading a scripted Google, PostgreSQL storing the result, and the status endpoint reporting "syncing" until it is over.
 /// </summary>
 [Collection(PostgresCollection.Name)]

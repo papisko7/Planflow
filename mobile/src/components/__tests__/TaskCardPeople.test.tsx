@@ -23,7 +23,7 @@ const task: TaskDto = {
   ...PLAIN_TASK_FIELDS,
 };
 
-// Step 7.5.6: a card shows how many people take part besides the assignee, or "You" when the viewer is one of them.
+// A card shows how many people take part besides the assignee, or "You" when the viewer is one of them.
 describe('TaskCard - people', () => {
   it('shows nothing when nobody takes part', async () => {
     await render(<TaskCard task={task} />);

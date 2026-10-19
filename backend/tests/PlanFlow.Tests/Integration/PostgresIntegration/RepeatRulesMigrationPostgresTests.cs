@@ -9,7 +9,7 @@ using Xunit;
 namespace PlanFlow.Tests.Integration.PostgresIntegration;
 
 /// <summary>
-/// The 7.5.7 migration replaces the three repeat columns of an item (an interval in hours, an end, a flag) with a series that the
+/// The migration replaces the three repeat columns of an item (an interval in hours, an end, a flag) with a series that the
 /// occurrences point at. Every item that was still repeating must come out as the first occurrence of an equivalent series, and the
 /// migration must be reversible. Checked on a real PostgreSQL database.
 /// </summary>

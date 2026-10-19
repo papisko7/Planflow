@@ -10,8 +10,7 @@ namespace PlanFlow.Infrastructure.ExternalServices.Google;
 
 /// <summary>
 /// Raw HttpClient calls to Google's OAuth2/OpenID endpoints — no Google.Apis SDK dependency,
-/// since the flow only needs three well-documented REST calls (authorize/token/userinfo) and
-/// keeping the dependency surface small matters for a thesis defense walkthrough (Phase 4A).
+/// since the flow only needs three well-documented REST calls (authorize/token/userinfo).
 /// </summary>
 public class GoogleOAuthClient : IGoogleOAuthClient
 {

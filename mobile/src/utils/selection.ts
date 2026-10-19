@@ -19,7 +19,6 @@ export function expandToSeries<T extends TaskDto>(selected: T[], all: T[]): T[] 
   return all.filter((t) => selectedIds.has(t.id) || (t.taskType === TaskType.Event && !!t.seriesId && seriesIds.has(t.seriesId)));
 }
 
-// The kind of list the whole selection can go into: all tasks -> a task list, all events -> a meeting list; a mix (or nothing) fits none.
 export function listKindFor(items: Pick<TaskDto, 'taskType'>[]): ItemListKind | null {
   if (items.length === 0) return null;
   const events = items.filter((t) => t.taskType === TaskType.Event).length;
@@ -27,7 +26,6 @@ export function listKindFor(items: Pick<TaskDto, 'taskType'>[]): ItemListKind | 
   return events === items.length ? ItemListKind.MeetingList : null;
 }
 
-// Items by team (the API works on one team at a time).
 export function groupByTeam<T extends Pick<TaskDto, 'teamId'>>(items: T[]): Map<string, T[]> {
   const groups = new Map<string, T[]>();
   for (const item of items) {

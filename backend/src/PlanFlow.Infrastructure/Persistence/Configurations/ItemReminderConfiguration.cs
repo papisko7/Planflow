@@ -11,7 +11,6 @@ public class ItemReminderConfiguration : IEntityTypeConfiguration<ItemReminder>
         builder.ToTable("item_reminders");
         builder.HasKey(r => r.Id);
 
-        // A reminder has no meaning without its item: deleting the item deletes its reminders.
         builder.HasOne(r => r.CalendarItem)
             .WithMany(i => i.Reminders)
             .HasForeignKey(r => r.CalendarItemId)

@@ -9,8 +9,6 @@ import type { ApiError } from '../types/api';
 
 type Step = 'email' | 'code';
 
-// Two steps on one screen: (1) the e-mail address gets a 6-digit code, (2) the code plus a new password finish the reset.
-// The server answers step 1 the same way for unknown addresses, so the message below is deliberately vague.
 export default function ForgotPasswordScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const [step, setStep] = useState<Step>('email');

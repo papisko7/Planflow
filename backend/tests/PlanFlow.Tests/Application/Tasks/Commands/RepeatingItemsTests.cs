@@ -16,7 +16,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Application.Tasks.Commands;
 
 /// <summary>
-/// Step 7.5.7: creating, editing and deleting an item that repeats. An event series is created 90 days ahead; the "This / This and
+/// Creating, editing and deleting an item that repeats. An event series is created 90 days ahead; the "This / This and
 /// following / All" choice decides which occurrences an edit or a delete reaches.
 /// </summary>
 public class RepeatingItemsTests

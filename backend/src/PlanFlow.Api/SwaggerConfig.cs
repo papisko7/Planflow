@@ -15,7 +15,6 @@ public static class SwaggerConfig
                 Description = "Group scheduling API: Auth, Tasks, Teams, Calendar sync, Alerts and Chat endpoints."
             });
 
-            // JWT Bearer scheme so Swagger UI can call authenticated endpoints directly.
             options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
                 Name = "Authorization",

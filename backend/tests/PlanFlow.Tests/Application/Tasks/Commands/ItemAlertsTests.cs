@@ -15,7 +15,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Application.Tasks.Commands;
 
 /// <summary>
-/// Step 7.5.6: the alerts of an item. The shape of one alert is checked by the validator, what an item can carry (all-day, deadline,
+/// The alerts of an item. The shape of one alert is checked by the validator, what an item can carry (all-day, deadline,
 /// template) by the handler; saving keeps the rows that stay, so an alert that already went off does not go off again.
 /// </summary>
 public class ItemAlertsTests

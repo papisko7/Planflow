@@ -52,7 +52,7 @@ beforeEach(() => {
   (getMyAbsences as jest.Mock).mockResolvedValue([]);
 });
 
-// Step 7.5.10b: an assignment made by an Owner/Admin is locked to the assignee; the details say so and say who assigned it.
+// An assignment made by an Owner/Admin is locked to the assignee; the details say so and say who assigned it.
 describe('TaskDetailScreen - assignment lock', () => {
   it('lets the assignee give back a task they took themselves', async () => {
     await show(base);

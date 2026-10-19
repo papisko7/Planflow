@@ -3,8 +3,6 @@ import { colors, spacing } from '../theme/theme';
 
 type Props = { onPress: () => void; testID?: string; accessibilityLabel?: string };
 
-// Floating "+" button pinned to the bottom-right corner of its (positioned) parent: the one-tap
-// "add a task" entry point on every main screen.
 export function Fab({ onPress, testID = 'fab-new-task', accessibilityLabel = 'New task' }: Props) {
   return (
     <Pressable

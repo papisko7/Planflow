@@ -15,7 +15,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Api;
 
 /// <summary>
-/// Step 7.5.10b through the real HTTP pipeline and PostgreSQL: the lock on an assignment an Owner/Admin made, and the caller's own
+/// Through the real HTTP pipeline and PostgreSQL: the lock on an assignment an Owner/Admin made, and the caller's own
 /// time off that the app uses to warn about a deadline that falls in it.
 /// </summary>
 [Collection(PostgresCollection.Name)]

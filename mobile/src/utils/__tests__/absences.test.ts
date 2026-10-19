@@ -14,7 +14,7 @@ const task = (over: Partial<Parameters<typeof deadlineInAbsence>[0]> = {}) => ({
   ...over,
 });
 
-// Step 7.5.10b: the card and the details warn when an open task falls due while the person is out of office.
+// The card and the details warn when an open task falls due while the person is out of office.
 describe('deadlineInAbsence', () => {
   it('warns when the deadline lies inside an absence', () => {
     expect(deadlineInAbsence(task(), [away('2026-10-21T00:00:00Z', '2026-10-24T00:00:00Z')], NOW)).toBe(true);

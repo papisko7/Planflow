@@ -5,8 +5,8 @@ using PlanFlow.Domain.Enums;
 namespace PlanFlow.Api.AuthPolicy;
 
 /// <summary>
-/// Reads the caller's team role from the "team_role" claim (set on the JWT at login/team-switch,
-/// Phase 4.3) and grants access only if <see cref="RoleDefinitions"/> allows that role to perform
+/// Reads the caller's team role from the "team_role" claim (set on the JWT at login/team-switch)
+/// and grants access only if <see cref="RoleDefinitions"/> allows that role to perform
 /// the requirement's permission. This keeps the actual RBAC rules in one Domain-layer table instead
 /// of scattering role checks across every controller.
 /// </summary>

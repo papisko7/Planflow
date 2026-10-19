@@ -47,9 +47,7 @@ export function UrgencyBreakdown({ breakdown }: UrgencyBreakdownProps) {
 
       {COMPONENTS.map(({ key, label, weight, color }) => {
         const value = (breakdown[key] ?? null) as number | null;
-        // No planned start (or one that did not count) is simply not part of this score - no row at all.
         if (key === 'scheduledComponent' && value === null) return null;
-        // An unrated impact is not a zero: its weight is shared by the other factors, so show that instead of a bar.
         if (value === null) {
           return (
             <View key={key} style={styles.row}>

@@ -8,8 +8,6 @@ namespace PlanFlow.Application.Notifications;
 /// </summary>
 public static class EmailTemplates
 {
-    // ---------- Account ----------
-
     /// <summary>The first mail after signing up: a greeting plus the code that confirms the e-mail address.</summary>
     public static Func<string, EmailContent> Welcome(string verificationCode, int validMinutes) => name => EmailLayout.Build(
         "Welcome to PlanFlow — confirm your e-mail",
@@ -67,7 +65,6 @@ public static class EmailTemplates
             "If this was you, nothing to do. If not, change your password."
         });
 
-    // ---------- Tasks and events ----------
     // One CalendarItem, two kinds: the wording says "task" or "event" to match what the recipient actually got.
 
     public static Func<string, EmailContent> TaskAssigned(string taskTitle, string teamName, string byName, DateTime? dueUtc, TaskType type = TaskType.Task) => name => EmailLayout.Build(
@@ -174,10 +171,7 @@ public static class EmailTemplates
 
     public static string Capitalized(TaskType type) => type == TaskType.Event ? "Event" : "Task";
 
-    // An event has a start, not a deadline.
     private static string DueLabel(TaskType type) => type == TaskType.Event ? "Starts" : "Deadline";
-
-    // ---------- Team membership ----------
 
     public static Func<string, EmailContent> AddedToTeam(string teamName, TeamRole role, string byName) => name => EmailLayout.Build(
         $"You were added to {Clean(teamName)}",
@@ -200,8 +194,6 @@ public static class EmailTemplates
         $"Team {Clean(teamName)} was deleted",
         name,
         Lines($"{byName} deleted the team \"{teamName}\" together with its tasks, events and chat."));
-
-    // ---------- Chat / calendar ----------
 
     public static Func<string, EmailContent> ChatDigest(IReadOnlyList<(string TeamName, int Count)> teams) => name => EmailLayout.Build(
         "You have unread chat messages",
@@ -275,8 +267,6 @@ public static class EmailTemplates
         var more = titles.Count > MaxListedTitles ? $" and {titles.Count - MaxListedTitles} more" : "";
         return listed + more;
     }
-
-    // ---------- helpers ----------
 
     private static IReadOnlyList<string> Lines(params string?[] lines) => lines.Where(l => l is not null).Select(l => l!).ToList();
 

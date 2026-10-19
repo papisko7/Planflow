@@ -12,14 +12,11 @@ import { commonStatuses, expandToSeries, groupByTeam, listKindFor } from '../uti
 import { STATUS_LABEL } from '../utils/taskStatus';
 
 type Props = {
-  // The ticked entries of the list; an entry that stands for a repeating series acts for all of its occurrences (see expandToSeries).
   selected: TaskWithTeam[];
-  // Every item the screen knows, to find the other occurrences of a series.
   allItems: TaskWithTeam[];
   lists: ItemListDto[];
   teams: TeamDto[];
   onSelectAll: () => void;
-  // Leaves the selection mode (also what runs after an action went through).
   onCancel: () => void;
   reload: () => unknown;
 };
@@ -27,7 +24,6 @@ type Props = {
 const NONE = '__none';
 const NEW_LIST = '__new';
 
-// The bar at the bottom of a list while items are ticked: Status (the statuses every ticked item has), Move to list, Delete, Select all.
 export function SelectionBar({ selected, allItems, lists, teams, onSelectAll, onCancel, reload }: Props) {
   const bulk = useBulkActions(reload);
   const [sheet, setSheet] = useState<'status' | 'move' | null>(null);

@@ -16,8 +16,6 @@ public class GetUserTeamsQueryHandler : IRequestHandler<GetUserTeamsQuery, IRead
 
     public async Task<IReadOnlyList<TeamDto>> Handle(GetUserTeamsQuery request, CancellationToken cancellationToken)
     {
-        // Project member count as a subquery count rather than Include()-ing the full Members
-        // collection, since only the count is needed here.
         var teams = await _context.TeamMembers
             .AsNoTracking()
             .Where(m => m.UserId == request.UserId)

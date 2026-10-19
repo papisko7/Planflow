@@ -1,15 +1,11 @@
 import type { CalendarSharingLevel } from './availability';
 
-// Mirrors PlanFlow.Application.Users.Common.UserProfileDto
 export interface UserProfileDto {
   id: string;
   email: string;
   displayName: string;
-  // False until the owner types the code from the confirmation e-mail; optional mails only reach confirmed addresses.
   emailVerified: boolean;
-  // IANA zone reported by the phone (null until the first sign-in after the update).
   timeZoneId?: string | null;
-  // What teammates may see of the personal (Google) calendar: nothing, availability only, or details.
   calendarSharingLevel?: CalendarSharingLevel;
 }
 
@@ -20,7 +16,6 @@ export interface UpdateProfileRequest {
   currentPassword: string | null;
 }
 
-// Mirrors PlanFlow.Application.Availability.Queries.GetMyAbsences.MyAbsenceDto: one stretch of the caller's own Out of office time.
 export interface MyAbsence {
   itemId: string;
   startUtc: string;

@@ -13,7 +13,7 @@ const mockedGetTeamMembers = getTeamMembers as jest.MockedFunction<typeof getTea
 
 const personal: TeamDto = { id: 'p', name: 'Me', description: null, memberCount: 1, isPersonal: true, muteNotifications: false, muteChat: false };
 
-// The Task vs Event dimorphism of the unified CalendarItem form (step 7.3).
+// The Task vs Event dimorphism of the unified CalendarItem form.
 describe('CreateTaskModal - Task vs Event', () => {
   beforeEach(() => {
     jest.clearAllMocks();

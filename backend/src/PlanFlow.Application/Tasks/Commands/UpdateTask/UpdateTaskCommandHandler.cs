@@ -102,7 +102,6 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
         var nowUtc = DateTime.UtcNow;
         task.UpdatedAtUtc = nowUtc;
 
-        // A repeating item: the pop-up's choice (this / this and following / all) decides what the other occurrences get from this edit.
         var zoneId = !task.IsExternal && request.IsRecurring ? await TaskSeries.ZoneOfAsync(_context, request.UpdatedByUserId, cancellationToken) : null;
         var edit = new SeriesEdit(
             request, task, originalSeries, seriesBefore, originalDue, previousAssignedUserId != task.AssignedUserId, participantIds,

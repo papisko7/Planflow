@@ -7,18 +7,13 @@ import { assigneeWarning, pickerHint } from '../utils/availability';
 
 type Props = {
   members: TeamMemberDto[];
-  // The person in charge is not also a guest / co-contractor, so they are not offered.
   assigneeId: string | null;
   value: string[];
   onChange: (next: string[]) => void;
-  // "Guests" for an event, "Co-contractors" for a task.
   label: string;
-  // Availability and load by user id; when given, chips carry a hint and a warning shows for chosen people who are away or overloaded.
   availability?: Record<string, MemberAvailabilityDto>;
 };
 
-// Chip row for inviting team members to an item next to its assignee: guests of an event, co-contractors of a task.
-// Tapping a chip toggles the person. The backend checks the same rules (team members only, at most ten).
 export function ParticipantPicker({ members, assigneeId, value, onChange, label, availability }: Props) {
   const myUserId = getCurrentUserId();
   const candidates = members.filter((m) => m.userId !== assigneeId);

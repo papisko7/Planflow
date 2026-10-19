@@ -6,7 +6,7 @@ using PlanFlow.Domain.Enums;
 
 namespace PlanFlow.Tests.Application.Notifications;
 
-/// <summary>Step 7.5.8: deleting inbox entries (one, ticked ones, everything) and marking several as read.</summary>
+/// <summary>Deleting inbox entries (one, ticked ones, everything) and marking several as read.</summary>
 public class InboxCleanupTests
 {
     private static Notification Entry(Guid userId, PushDeliveryState push = PushDeliveryState.Sent, bool read = false) => new()

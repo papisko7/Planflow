@@ -2,7 +2,7 @@ namespace PlanFlow.Application.Common.Exceptions;
 
 /// <summary>
 /// Thrown by a handler when a request references an entity that does not exist.
-/// Mapped to HTTP 404 by the Api layer (Phase 1.4).
+/// Mapped to HTTP 404 by the Api layer.
 /// </summary>
 public class NotFoundException : Exception
 {

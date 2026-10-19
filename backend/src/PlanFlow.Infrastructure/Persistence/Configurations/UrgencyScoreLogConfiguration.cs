@@ -13,7 +13,6 @@ public class UrgencyScoreLogConfiguration : IEntityTypeConfiguration<UrgencyScor
 
         builder.Property(l => l.ReasonText).HasMaxLength(512);
 
-        // Evaluation-chapter charts read "score history for task X over time".
         builder.HasIndex(l => new { l.CalendarItemId, l.CreatedAtUtc });
 
         builder.HasOne(l => l.CalendarItem)

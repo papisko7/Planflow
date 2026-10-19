@@ -14,7 +14,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Api;
 
 /// <summary>
-/// Step 7.5.10 through the real HTTP pipeline and PostgreSQL: the sharing level of a personal calendar, the team availability grid and a
+/// Through the real HTTP pipeline and PostgreSQL: the sharing level of a personal calendar, the team availability grid and a
 /// member's calendar. What a level hides must be absent from the response itself, not just from the screen.
 /// </summary>
 [Collection(PostgresCollection.Name)]

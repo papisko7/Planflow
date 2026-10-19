@@ -20,7 +20,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Application.Tasks.Commands;
 
 /// <summary>
-/// Step 7.5.6: guests of an event and co-contractors of a task. Only team members can take part, the assignee never also does,
+/// Guests of an event and co-contractors of a task. Only team members can take part, the assignee never also does,
 /// and everybody concerned hears about joining, leaving, edits and deletion.
 /// </summary>
 public class TaskParticipantsTests

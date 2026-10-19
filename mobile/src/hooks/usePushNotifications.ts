@@ -6,7 +6,6 @@ import type { RootStackParamList } from '../navigation/types';
 
 type NavRef = NavigationContainerRefWithCurrent<RootStackParamList>;
 
-// The data the server attaches to every push (see PushDeliveryJob): enough to open the right screen.
 function openFromPush(navigationRef: NavRef, data: PushData): void {
   const taskId = typeof data?.taskId === 'string' ? data.taskId : null;
   const teamId = typeof data?.teamId === 'string' ? data.teamId : null;
@@ -23,7 +22,6 @@ function openFromPush(navigationRef: NavRef, data: PushData): void {
   else setTimeout(() => navigationRef.isReady() && go(), 600);
 }
 
-// While signed in: signs the phone up for pushes and opens the right screen when the user taps one.
 export function usePushNotifications(signedIn: boolean, navigationRef: NavRef): void {
   useEffect(() => {
     if (!signedIn) return;

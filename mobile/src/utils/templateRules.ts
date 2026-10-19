@@ -1,6 +1,6 @@
 import { EventTemplate, TaskType } from '../types/task';
 
-// Mirrors the backend table PlanFlow.Domain.Services.EventTemplateRules (plan point 4): what each kind of item has.
+// Mirrors the backend table PlanFlow.Domain.Services.EventTemplateRules: what each kind of item has.
 // The backend enforces it (and drops what a template does not use); this copy lets the form hide those fields up front.
 // If a row changes there, change it here as well - utils/__tests__/templateRules.test.ts pins the values.
 
@@ -16,11 +16,9 @@ export interface TemplateRules {
   location: LocationMode;
   allowsColor: boolean;
   allowsDescription: boolean;
-  // Alerts (reminders) and guests. A Task has alerts but no guests: it has co-contractors instead (see PlanFlow EventTemplateRules).
   allowsAlerts: boolean;
   allowsGuests: boolean;
   busy: BusyMode;
-  // Informational items (Out of office, Focus time, ...) have no Impact / Effort / score: they are shown in the calendar only.
   informational: boolean;
 }
 
@@ -106,13 +104,10 @@ const EVENT_RULES: Record<EventTemplate, TemplateRules> = {
   },
 };
 
-// A Task always uses the task rules; only an Event can use a special template.
 export function rulesFor(type: TaskType, template: EventTemplate): TemplateRules {
   return type === TaskType.Task ? TASK : EVENT_RULES[template];
 }
 
-// Informational items (Out of office, Focus time, Working location, Birthday) are outside the ranking: the backend gives them no
-// score, so the app shows no score for them and leaves them out of the "Do now" card, the urgency groups and the statistics.
 export function isInformational(item: { taskType: TaskType; eventTemplate: EventTemplate }): boolean {
   return rulesFor(item.taskType, item.eventTemplate).informational;
 }
@@ -125,12 +120,10 @@ export function resolveAllDay(type: TaskType, template: EventTemplate, requested
   return mode === 'always' ? true : mode === 'never' ? false : requested;
 }
 
-// Busy/Free is a real choice only for a plain event; everything else is stored as busy.
 export function resolveBusy(type: TaskType, template: EventTemplate, requested: boolean): boolean {
   return rulesFor(type, template).busy !== 'choice' || requested;
 }
 
-// The chips of the form: a chip is a type plus a template (as in Google Calendar). The first two keep the ids the e2e flow uses.
 export interface ItemKind {
   id: string;
   label: string;
@@ -148,5 +141,4 @@ export const ITEM_KINDS: readonly ItemKind[] = [
   { id: 'birthday', label: 'Birthday', testID: 'schedule-template-birthday', taskType: TaskType.Event, template: EventTemplate.Birthday },
 ];
 
-// The three ways to say where you work from: two quick choices and a free-text label.
 export const WORKING_LOCATION_PRESETS = ['Home', 'Office'] as const;

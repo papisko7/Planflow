@@ -5,7 +5,7 @@ namespace PlanFlow.Application.Tasks.Common;
 
 /// <summary>
 /// Snapshot of one <see cref="UrgencyScoreLog"/> entry, exposed so the mobile dashboard can
-/// render the "why is this urgent" breakdown UI planned for Phase 3.4.
+/// render the "why is this urgent" breakdown.
 /// </summary>
 public record UrgencyScoreBreakdownDto(
     double DeadlineComponent,

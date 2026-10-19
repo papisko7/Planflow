@@ -10,7 +10,6 @@ public enum NotificationEvent
     NewDeviceLogin = 3,
     EmailVerification = 4,
 
-    // Tasks
     TaskAssignedToYou = 10,
     TaskUnassigned = 11,
     TaskChanged = 12,
@@ -30,16 +29,13 @@ public enum NotificationEvent
     /// <summary>A Member gave a task they had taken back to the unassigned pool; sent to the team's Owners and Admins.</summary>
     TaskReturnedToPool = 19,
 
-    // Team membership
     AddedToTeam = 20,
     TeamRoleChanged = 21,
     RemovedFromTeam = 22,
     TeamDeleted = 23,
 
-    // Chat
     ChatDigest = 30,
 
-    // Calendar
     CalendarConnectionLost = 40,
     CalendarItemsIncomplete = 41,
 

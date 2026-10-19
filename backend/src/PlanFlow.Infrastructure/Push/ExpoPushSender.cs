@@ -71,7 +71,6 @@ public class ExpoPushSender : IPushSender
         using var response = await _http.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            // The whole call failed (service down, rate limited, ...): the job retries the batch later.
             throw new HttpRequestException($"Expo push service answered {(int)response.StatusCode}.");
         }
 

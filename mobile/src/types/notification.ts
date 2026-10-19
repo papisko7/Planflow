@@ -1,11 +1,9 @@
-// Mirrors PlanFlow.Domain.Enums.LoginNotificationMode (the API serialises enums as numbers).
 export enum LoginNotificationMode {
   NewDevice = 0,
   EveryLogin = 1,
   Off = 2,
 }
 
-// Mirrors PlanFlow.Application.Users.Common.NotificationPreferencesDto
 export interface NotificationPreferences {
   emailEnabled: boolean;
   pushEnabled: boolean;
@@ -21,16 +19,13 @@ export interface NotificationPreferences {
   itemReminders: boolean;
 }
 
-// The on/off switches (everything except loginAlerts), in the order they are shown.
 export type NotificationSwitch = Exclude<keyof NotificationPreferences, 'loginAlerts' | 'emailEnabled' | 'pushEnabled'>;
 
-// Mirrors PlanFlow.Api.Contracts.TeamNotificationSettingsRequest
 export interface TeamNotificationSettings {
   muteNotifications: boolean;
   muteChat: boolean;
 }
 
-// Mirrors PlanFlow.Domain.Enums.NotificationEvent (the API serialises enums as numbers). Only the ones that reach the inbox matter here.
 export enum NotificationEvent {
   TaskAssignedToYou = 10,
   TaskUnassigned = 11,
@@ -51,7 +46,6 @@ export enum NotificationEvent {
   IncompleteItemsReminder = 42,
 }
 
-// Mirrors PlanFlow.Application.Notifications.Inbox.NotificationDto
 export interface InboxNotification {
   id: string;
   event: NotificationEvent;

@@ -3,7 +3,7 @@ import { dueUtc, isPastEvent } from './schedule';
 import { isFinishedStatus } from './taskStatus';
 import { isInformational } from './templateRules';
 
-// Deterministic local ranking for the dashboard "Do now" card — no LLM/API call, so it works
+// Deterministic local ranking for the dashboard "Do now" card — no API call, so it works
 // offline and returns instantly. Tie-break order: urgency score -> earliest deadline (tasks with
 // no deadline sort last) -> highest impact -> oldest creation date.
 export function selectOneNextAction<T extends TaskDto>(tasks: T[]): T | null {
@@ -21,7 +21,6 @@ export function selectOneNextAction<T extends TaskDto>(tasks: T[]): T | null {
   return candidates.reduce((best, task) => (compareTasks(task, best) < 0 ? task : best));
 }
 
-// Negative if `a` should rank above `b`.
 function compareTasks(a: TaskDto, b: TaskDto): number {
   if (a.currentUrgencyScore !== b.currentUrgencyScore) {
     return b.currentUrgencyScore - a.currentUrgencyScore;

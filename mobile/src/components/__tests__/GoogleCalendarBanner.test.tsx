@@ -20,7 +20,7 @@ const status = (over: Partial<GoogleCalendarStatus> = {}): GoogleCalendarStatus 
   ...over,
 });
 
-// Step 7.5.3: an account linked before Google Tasks existed has no tasks permission, so the banner offers a one-tap reconnect.
+// An account linked before Google Tasks existed has no tasks permission, so the banner offers a one-tap reconnect.
 describe('GoogleCalendarBanner - Google Tasks', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -57,7 +57,7 @@ describe('GoogleCalendarBanner - Google Tasks', () => {
     expect(screen.getByText(/Google Calendar:/)).toBeTruthy(); // the calendar itself is still shown as connected
   });
 
-  // Step 7.5.9: Google is fetched only on the button; the banner follows the server's `syncing` flag until the sync is over.
+  // Google is fetched only on the button; the banner follows the server's `syncing` flag until the sync is over.
   describe('Sync now', () => {
     const SYNC_NOW = 'Sync now';
 

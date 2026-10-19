@@ -19,7 +19,6 @@ public class UpdateTeamCommandHandler : IRequestHandler<UpdateTeamCommand, TeamD
 
     public async Task<TeamDto> Handle(UpdateTeamCommand request, CancellationToken cancellationToken)
     {
-        // Permission comes from the caller's real membership row for THIS team, not from a JWT claim.
         var requesting = await _context.TeamMembers
             .AsNoTracking()
             .FirstOrDefaultAsync(m => m.TeamId == request.TeamId && m.UserId == request.RequestingUserId, cancellationToken)

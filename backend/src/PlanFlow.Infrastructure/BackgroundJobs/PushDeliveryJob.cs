@@ -51,7 +51,6 @@ public class PushDeliveryJob : IJob
                 .ToListAsync(cancellationToken))
             .ToLookup(t => t.UserId);
 
-        // The number shown on the app icon: how many entries the user has not opened.
         var unreadByUser = await _context.Notifications
             .Where(n => userIds.Contains(n.UserId) && n.ReadAtUtc == null)
             .GroupBy(n => n.UserId)
@@ -156,7 +155,6 @@ public class PushDeliveryJob : IJob
         }
     }
 
-    // What the app receives next to the text: enough to open the right screen when the push is tapped.
     private static Dictionary<string, string> DataFor(Notification n)
     {
         var data = new Dictionary<string, string>

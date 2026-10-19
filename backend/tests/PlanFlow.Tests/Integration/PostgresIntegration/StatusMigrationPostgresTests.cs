@@ -9,7 +9,7 @@ using Xunit;
 namespace PlanFlow.Tests.Integration.PostgresIntegration;
 
 /// <summary>
-/// Proves the 7.5.1 migration on a real PostgreSQL database that already holds data: rows written under the OLD schema
+/// Proves the migration on a real PostgreSQL database that already holds data: rows written under the OLD schema
 /// (Todo/Blocked/Done statuses, no new columns) must come out with the new statuses and sensible defaults.
 /// Uses its own container because it has to stop at the previous migration, fill it with data and only then migrate on.
 /// </summary>

@@ -25,22 +25,17 @@ type Props = {
   value: ReminderInput[];
   onChange: (next: ReminderInput[]) => void;
   taskType: TaskType;
-  // A whole-day item is only reminded some days before, at a time of day ("minutes before midnight" means nothing to a person).
   isAllDay: boolean;
 };
 
-// The "Alerts" part of the create/edit forms: up to four reminders, each "N minutes/hours/days before" (or, for a whole-day item,
-// "N days before at HH:MM"). A task picks what it counts back from - its planned start or its deadline; an event always counts from its start.
 export function RemindersEditor({ value, onChange, taskType, isAllDay }: Props) {
   const isTask = taskType === TaskType.Task;
-  // A task is most often reminded before its deadline; an event ignores this (it only has a start).
   const [anchor, setAnchor] = useState<ReminderAnchor>(ReminderAnchor.Deadline);
   const [amount, setAmount] = useState('10');
   const [unit, setUnit] = useState<Unit>('minutes');
   const [time, setTime] = useState('09:00');
   const [error, setError] = useState<string | null>(null);
 
-  // An event can only count from its start, whatever the task chip last said.
   const effectiveAnchor = isTask ? anchor : ReminderAnchor.Start;
 
   const add = () => {

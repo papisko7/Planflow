@@ -8,9 +8,7 @@ import type { TeamDto } from '../types/team';
 
 type Props = {
   visible: boolean;
-  // The teams a new list can be made in (the sheet asks only when there is more than one).
   teams: TeamDto[];
-  // Given: the sheet renames this list instead of making a new one (the kind and the team of a list never change).
   list?: ItemListDto | null;
   defaultKind?: ItemListKind;
   defaultTeamId?: string | null;
@@ -23,7 +21,6 @@ const KIND_LABEL: Record<ItemListKind, string> = {
   [ItemListKind.MeetingList]: 'Meeting list',
 };
 
-// One small sheet for "+ New list" (Items, the form of an item, the Dashboard "+") and for renaming a list.
 export function ListFormModal({ visible, teams, list = null, defaultKind = ItemListKind.TaskList, defaultTeamId, onClose, onSaved }: Props) {
   const renaming = !!list;
   const [name, setName] = useState('');
@@ -32,7 +29,6 @@ export function ListFormModal({ visible, teams, list = null, defaultKind = ItemL
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Every time the sheet opens it starts clean.
   useEffect(() => {
     if (!visible) return;
     setName(list?.name ?? '');

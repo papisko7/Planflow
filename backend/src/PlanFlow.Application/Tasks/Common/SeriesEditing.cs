@@ -54,7 +54,6 @@ public static class SeriesEditing
 
         if (series is null)
         {
-            // Repeats switched on for an item that did not repeat: it becomes the first occurrence.
             if (!request.IsRecurring || task.DueUtc is null)
             {
                 return new SeriesEditResult([], null);

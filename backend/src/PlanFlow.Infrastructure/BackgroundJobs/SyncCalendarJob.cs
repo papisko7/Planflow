@@ -108,9 +108,6 @@ public class SyncCalendarJob : IJob
             }
             catch (Exception ex)
             {
-                // A single account's failure (expired/revoked refresh token, Google outage, an
-                // account with no team to sync into) is logged and skipped — it never aborts the
-                // rest of this run.
                 failedAccounts++;
                 _logger.LogWarning(ex, "SyncCalendarJob failed for CalendarIntegration {IntegrationId} (user {UserId}); skipping this account for this run.",
                     integration.Id, integration.UserId);
@@ -143,7 +140,6 @@ public class SyncCalendarJob : IJob
 
     private async Task<(int Created, int Updated)> SyncIntegrationAsync(CalendarIntegration integration, CancellationToken cancellationToken)
     {
-        // Calendar events are personal, so they go into the user's personal team (see SyncDestination).
         var destinationTeamId = await SyncDestination.FindTeamIdAsync(_context, integration.UserId, cancellationToken);
 
         if (destinationTeamId is null)
@@ -169,11 +165,8 @@ public class SyncCalendarJob : IJob
         }
         catch (UnauthorizedException)
         {
-            // Google rejected the token even though our locally stored expiry said it was still
-            // valid (e.g. consent was revoked and re-granted out of band). Force a refresh and
-            // retry exactly once instead of failing this run and making the user press the button
-            // again — a second UnauthorizedException here is a genuine failure and propagates to
-            // the caller's per-integration catch block like any other.
+            // Google rejected the token though our stored expiry said it was valid (e.g. consent revoked and re-granted). Refresh and
+            // retry exactly once; a second UnauthorizedException is a real failure and goes to the per-integration catch block.
             accessToken = await _accessTokenProvider.RefreshAccessTokenAsync(integration, cancellationToken);
             events = await _calendarClient.ListEventsAsync(accessToken, updatedSinceUtc, cancellationToken);
         }
@@ -209,7 +202,6 @@ public class SyncCalendarJob : IJob
 
             if (calendarEvent.StartUtc is null)
             {
-                // An event with no start cannot be placed on the timeline (Google always sends one for live events).
                 _logger.LogWarning("Skipping Google event {EventId} of integration {IntegrationId}: it has no start time.",
                     calendarEvent.Id, integration.Id);
                 continue;
@@ -236,7 +228,6 @@ public class SyncCalendarJob : IJob
 
             if (task is null)
             {
-                // A calendar entry is a fixed-time happening, so it is imported as an Event (start–end), never as a Task.
                 var fallbackTitle = rules.DefaultTitle ?? "(untitled Google Calendar event)";
                 task = new CalendarItem
                 {
@@ -338,8 +329,6 @@ public class SyncCalendarJob : IJob
 
         if (incompleteItems.Count > 0)
         {
-            // One message per run listing every newly imported event that needs details (inbox + push + e-mail by preference),
-            // saved in the same transaction as the events themselves. A single event opens directly when tapped.
             await _notifications.NotifyAsync(
                 NotificationEvent.CalendarItemsIncomplete,
                 new[] { integration.UserId },
@@ -372,7 +361,7 @@ public class SyncCalendarJob : IJob
 
     /// <summary>
     /// Clean-up of the daily full pass: an imported item that starts after the far end of the import window is deleted. Before the window
-    /// existed (step 7.5.2) Google expanded a yearly event (a birthday) up to 2099 and every copy was stored; they would otherwise clutter
+    /// existed Google expanded a yearly event (a birthday) up to 2099 and every copy was stored; they would otherwise clutter
     /// every list for good. Google stays the source of truth: an item returns on its own when its day comes into the window.
     /// </summary>
     private async Task RemoveItemsBeyondWindowAsync(

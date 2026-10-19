@@ -21,10 +21,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
-        // WebApplicationFactory-based integration tests (PlanFlow.Tests/Api) run the real Api host
-        // under the "Testing" environment so they get a throwaway InMemory database and cache
-        // instead of needing a real PostgreSQL/Redis instance — everything else in this method
-        // (Quartz, data protection, HTTP clients) still runs unchanged for those tests.
+        // The test environments swap the database and cache for in-memory ones; everything else runs unchanged.
         if (environment.IsEnvironment("Testing"))
         {
             // The database name must be captured once outside the options delegate — AddDbContext
@@ -39,14 +36,8 @@ public static class DependencyInjection
         }
         else if (environment.IsEnvironment("PostgresIntegrationTesting"))
         {
-            // PlanFlow.Tests/Integration/Postgres runs the real Api host against a real,
-            // Testcontainers-provisioned PostgreSQL instance (ConnectionStrings:PlanFlowDb points at
-            // the container) instead of InMemory, so real SQL translation/migrations/FK cascades are
-            // actually exercised. Kept as its own branch (not layered onto "Testing" above) because
-            // registering both UseInMemoryDatabase and UseNpgsql on the same IServiceCollection makes
-            // EF Core throw ("multiple database providers registered") — only one AddDbContext call
-            // may ever run per service collection. Cache stays in-memory, same as "Testing", since
-            // these tests don't need a real Redis instance either.
+            // The same host against a real PostgreSQL (Testcontainers). Its own branch: EF Core rejects two database providers
+            // registered on one service collection.
             services.AddDbContext<PlanFlowDbContext>(options =>
                 options.UseNpgsql(configuration.GetConnectionString("PlanFlowDb")));
             services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<PlanFlowDbContext>());
@@ -55,13 +46,10 @@ public static class DependencyInjection
         }
         else
         {
-            // Pooled context (vs. AddDbContext's per-request "new instance") reuses a fixed number of
-            // DbContext instances across requests, which in turn reuses Npgsql's own connection pool
-            // instead of opening/closing a physical connection per request.
+            // Pooled context: reuses DbContext instances and, with them, Npgsql's connection pool.
             services.AddDbContextPool<PlanFlowDbContext>(options =>
                 options.UseNpgsql(configuration.GetConnectionString("PlanFlowDb")));
 
-            // Resolve the Application-layer abstraction to the same pooled DbContext instance.
             services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<PlanFlowDbContext>());
 
             var redisConnectionString = configuration.GetConnectionString("Redis");
@@ -119,8 +107,6 @@ public static class DependencyInjection
 
         services.AddQuartz(quartz =>
         {
-            // Each job gets its own JobKey/trigger pair; Quartz's DI integration opens a fresh
-            // DI scope per execution, so jobs can safely take scoped services like IApplicationDbContext.
             // Google is fetched only when a user presses "Sync now": these two jobs are stored without a trigger and started by
             // GoogleSyncTrigger. That keeps the number of requests to Google under the user's control and "Last sync" truthful.
             quartz.AddJob<SyncCalendarJob>(opts => opts.WithIdentity(GoogleSyncTrigger.CalendarJob).StoreDurably());

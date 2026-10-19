@@ -32,11 +32,9 @@ export function collapseSeries<T extends TaskDto>(items: T[], now: Date = new Da
     if (group.length < 2) continue;
     for (const t of group) hidden.add(t.id);
   }
-  // The original order is kept; each series appears where its entry was.
   return items.flatMap((item) => (!hidden.has(item.id) ? [item] : shown.has(item.id) ? [shown.get(item.id)!] : []));
 }
 
-// "+3 more" for the card of a series entry.
 export function formatSeriesMore(more: number | undefined): string | null {
   return more && more > 0 ? `+${more} more` : null;
 }

@@ -2,7 +2,7 @@ using PlanFlow.Domain.Services;
 
 namespace PlanFlow.Tests.Domain.Services;
 
-/// <summary>Step 7.5.10b: out-of-office time taken off a deadline - merged, clipped to the window and capped at 7 days.</summary>
+/// <summary>Out-of-office time taken off a deadline - merged, clipped to the window and capped at 7 days.</summary>
 public class AbsenceDeadlineTests
 {
     private static readonly DateTime Now = new(2026, 10, 19, 8, 0, 0, DateTimeKind.Utc);

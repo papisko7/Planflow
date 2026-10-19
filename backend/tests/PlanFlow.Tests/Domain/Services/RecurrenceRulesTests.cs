@@ -4,7 +4,7 @@ using PlanFlow.Domain.Services;
 
 namespace PlanFlow.Tests.Domain.Services;
 
-/// <summary>Step 7.5.7: the arithmetic of a repeat rule - which moments are its occurrences.</summary>
+/// <summary>The arithmetic of a repeat rule - which moments are its occurrences.</summary>
 public class RecurrenceRulesTests
 {
     private static DateTime Utc(int year, int month, int day, int hour = 0, int minute = 0) =>

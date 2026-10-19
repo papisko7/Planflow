@@ -1,4 +1,3 @@
-// Central style tokens so every screen pulls colors/spacing from one place instead of hardcoding values.
 export const colors = {
   background: '#F5F6FA',
   surface: '#FFFFFF',

@@ -9,7 +9,7 @@ using PlanFlow.Domain.Authorization;
 namespace PlanFlow.Api.Controllers;
 
 /// <summary>
-/// The team's own lists of tasks and of meetings (step 7.5.11). Any member sees and creates lists; renaming or deleting one is for the
+/// The team's own lists of tasks and of meetings. Any member sees and creates lists; renaming or deleting one is for the
 /// person who made it and for Owner/Admin (decided in the handler). Deleting a list never deletes the items in it.
 /// </summary>
 [ApiController]

@@ -67,7 +67,6 @@ public static class UrgencyScoreCalculator
             UserOverrideWeight * Clamp(userOverrideComponent);
         var presentWeight = DeadlineWeight + BlockingWeight + UserOverrideWeight;
 
-        // A factor that is absent is left out and the remaining weights are scaled back up to add to 1.
         if (impactComponent is { } impact)
         {
             weightedSum += ImpactWeight * Clamp(impact);

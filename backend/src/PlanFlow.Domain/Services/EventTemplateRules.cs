@@ -30,7 +30,7 @@ public sealed record TemplateRules(
     ScoringProfile Profile);
 
 /// <summary>
-/// Per-template field configuration (plan point 4) and the scoring profile of an item (point 5). One table in one place,
+/// Per-template field configuration and the scoring profile of an item. One table in one place,
 /// so adding a template means adding one row, not editing validators and screens separately.
 /// </summary>
 public static class EventTemplateRules

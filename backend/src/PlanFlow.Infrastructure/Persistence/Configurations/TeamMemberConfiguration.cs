@@ -11,7 +11,6 @@ public class TeamMemberConfiguration : IEntityTypeConfiguration<TeamMember>
         builder.ToTable("team_members");
         builder.HasKey(tm => tm.Id);
 
-        // A user can only join a given team once.
         builder.HasIndex(tm => new { tm.UserId, tm.TeamId }).IsUnique();
 
         builder.HasOne(tm => tm.User)

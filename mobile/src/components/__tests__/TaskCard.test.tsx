@@ -77,7 +77,7 @@ describe('TaskCard long-press menu', () => {
     expect(screen.queryByTestId('task-menu-delete')).toBeNull();
   });
 
-  // Step 7.5.11: the double tap no longer completes a task - it ticks the card and starts the selection mode.
+  // The double tap no longer completes a task - it ticks the card and starts the selection mode.
   it('ticks the card on a double tap (starting the selection mode), without opening it or completing it', async () => {
     jest.useFakeTimers();
     const onPress = jest.fn();
@@ -249,7 +249,7 @@ describe('TaskCard long-press menu', () => {
   });
 });
 
-// Step 7.5.4: an informational item (Out of office, ...) is shown in the calendar but is not ranked.
+// An informational item (Out of office, ...) is shown in the calendar but is not ranked.
 describe('TaskCard - informational items', () => {
   const leave: TaskDto = {
     ...task, id: 'leave', title: 'Holiday', taskType: TaskType.Event, eventTemplate: EventTemplate.OutOfOffice, status: TaskStatus.Confirmed,

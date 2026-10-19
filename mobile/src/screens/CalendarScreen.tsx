@@ -46,7 +46,6 @@ const TIER_COLOR = {
   low: colors.urgencyLow,
 } as const;
 
-// Distance between the first two fingers on the screen.
 function fingerDistance(e: GestureResponderEvent): number {
   const [a, b] = e.nativeEvent.touches;
   return Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
@@ -69,7 +68,6 @@ export default function CalendarScreen() {
     [sections, undated],
   );
 
-  // Month view: one dot per day, coloured by the most urgent open task due that day.
   const markers = useMemo(() => {
     const map = new Map<string, string>();
     for (const section of sections) {
@@ -78,7 +76,6 @@ export default function CalendarScreen() {
         map.set(section.dateKey, colors.border);
         continue;
       }
-      // Informational items (a day off, a birthday) have no score, so only ranked ones colour the dot by urgency.
       const ranked = open.filter((t) => !isInformational(t));
       const top = ranked.length > 0 ? Math.max(...ranked.map((t) => t.currentUrgencyScore)) : 0;
       map.set(section.dateKey, TIER_COLOR[getUrgencyTier(top)]);
@@ -91,8 +88,6 @@ export default function CalendarScreen() {
     [sections, selectedKey],
   );
 
-  // Selection mode. The Agenda keeps every occurrence of a repeating event on its own day, so a ticked card is exactly that one occurrence;
-  // "Select all" ticks what the open view lists (all items in the Agenda, the chosen day in Month).
   const listedIds = useMemo(() => (mode === 'agenda' ? tasks : selectedTasks).map((t) => t.id), [mode, tasks, selectedTasks]);
   const selection = useSelectionSet(listedIds);
   const selectedEntries = useMemo(() => tasks.filter((t) => selection.selected.has(t.id)), [tasks, selection.selected]);

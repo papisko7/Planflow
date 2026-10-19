@@ -1,5 +1,3 @@
-// The backend stores a duration (the effort) as plain hours; the UI lets the user
-// think in whatever unit is natural ("2 days", "90 minutes"). These helpers convert both ways.
 export type DurationUnit = 'minute' | 'hour' | 'day' | 'week' | 'month';
 
 // A "month" is a flat 30 days - good enough for an estimate, and it keeps the conversion exact both ways.
@@ -19,7 +17,6 @@ export const DURATION_UNIT_LABEL: Record<DurationUnit, { short: string; long: st
   month: { short: 'mo', long: 'Months' },
 };
 
-// Effort can be tiny (minutes) or huge (months).
 export const EFFORT_UNITS: DurationUnit[] = ['minute', 'hour', 'day', 'week', 'month'];
 
 export function toHours(value: number, unit: DurationUnit): number {
@@ -39,7 +36,6 @@ export function fromHours(hours: number, units: DurationUnit[] = EFFORT_UNITS): 
   return { value: even ? Math.round(value) : Math.round(value * 100) / 100, unit };
 }
 
-// "2 d", "90 min" - the compact form used on cards and in the detail view.
 export function formatDuration(hours: number, units: DurationUnit[] = EFFORT_UNITS): string {
   const { value, unit } = fromHours(hours, units);
   return `${value} ${DURATION_UNIT_LABEL[unit].short}`;

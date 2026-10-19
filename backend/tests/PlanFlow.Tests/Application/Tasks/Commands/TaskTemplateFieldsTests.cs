@@ -11,7 +11,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Application.Tasks.Commands;
 
 /// <summary>
-/// Step 7.5.5: what the template of an item allows (place, colour, description, all-day, busy/free) is enforced by the server
+/// What the template of an item allows (place, colour, description, all-day, busy/free) is enforced by the server
 /// on create and update, and an item imported from Google keeps the fields Google owns.
 /// </summary>
 public class TaskTemplateFieldsTests

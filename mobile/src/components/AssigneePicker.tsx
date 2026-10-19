@@ -9,11 +9,9 @@ type Props = {
   members: TeamMemberDto[];
   value: string | null;
   onChange: (userId: string | null) => void;
-  // Availability and load by user id; when given, each chip says how free the person is and a warning shows for the chosen one.
   availability?: Record<string, MemberAvailabilityDto>;
 };
 
-// Chip row for choosing who a task is assigned to. Only shown to Owner/Admin; the backend enforces it too.
 export function AssigneePicker({ members, value, onChange, availability }: Props) {
   const myUserId = getCurrentUserId();
   return (

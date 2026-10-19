@@ -4,7 +4,7 @@ using PlanFlow.Domain.Enums;
 namespace PlanFlow.Domain.Entities;
 
 /// <summary>
-/// A notification generated for a user, typically by the AlertingJob (Phase 1.5).
+/// A notification generated for a user, typically by the AlertingJob.
 /// </summary>
 public class Alert : BaseEntity
 {

@@ -15,7 +15,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Application.Tasks.Commands;
 
 /// <summary>
-/// Step 7.5.10b: an item an Owner/Admin assigned is locked to its assignee (who cannot give it back, but can still work on it and
+/// An item an Owner/Admin assigned is locked to its assignee (who cannot give it back, but can still work on it and
 /// invite co-contractors); the lock is stored with who assigned it, follows the role at that moment and is cleared when the assignee changes.
 /// </summary>
 public class TaskAssignmentLockTests

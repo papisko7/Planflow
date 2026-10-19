@@ -1,8 +1,6 @@
 import type { TaskDto } from '../types/task';
 import { isInformational } from './templateRules';
 
-// Thresholds mirror the backend's UrgencyScoreLog.FinalScore range (0..1) — kept client-side
-// since they're purely a display concern, not part of the score algorithm itself.
 export type UrgencyTier = 'critical' | 'high' | 'medium' | 'low';
 
 export const URGENCY_TIER_META: Record<UrgencyTier, { label: string; badge: string; minScore: number }> = {
@@ -27,9 +25,6 @@ export interface UrgencySection<T extends TaskDto = TaskDto> {
 
 const TIER_ORDER: UrgencyTier[] = ['critical', 'high', 'medium', 'low'];
 
-// Groups tasks into the four urgency tiers, sorted by score descending within each tier,
-// and drops any tier that has no tasks so the SectionList doesn't render empty headers.
-// Informational items (Out of office, ...) have no score and are not part of the ranking.
 export function groupTasksByUrgency<T extends TaskDto>(tasks: T[]): UrgencySection<T>[] {
   const buckets: Record<UrgencyTier, T[]> = { critical: [], high: [], medium: [], low: [] };
 

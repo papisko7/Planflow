@@ -8,7 +8,6 @@ export interface DashboardStats {
   overdue: number;
   dueToday: number;
   done: number;
-  // Done + still open; cancelled tasks are left out so "8/10 done" is not diluted by dropped work.
   total: number;
 }
 
@@ -44,7 +43,6 @@ export function computeDashboardStats(tasks: TaskDto[], now: Date = new Date()):
   return { open, overdue, dueToday, done, total: open + done };
 }
 
-// "just now", "5 min ago", "3 h ago", "2 d ago" — for the last-sync / last-refresh hints.
 export function formatAgo(iso: string | Date, now: Date = new Date()): string {
   const diffMin = Math.max(0, Math.round((now.getTime() - new Date(iso).getTime()) / 60_000));
   if (diffMin < 1) return 'just now';

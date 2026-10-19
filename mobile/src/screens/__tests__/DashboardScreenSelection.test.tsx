@@ -57,7 +57,7 @@ const pressAlertButton = async (text: string) => {
   });
 };
 
-// Step 7.5.11 on the Dashboard: a repeating event is one card, a double tap starts the selection mode, "+" also makes a list.
+// On the Dashboard: a repeating event is one card, a double tap starts the selection mode, "+" also makes a list.
 describe('DashboardScreen - selection mode, series and lists', () => {
   beforeEach(() => {
     jest.clearAllMocks();

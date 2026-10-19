@@ -13,7 +13,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 
 namespace PlanFlow.Tests.Api;
 
-/// <summary>Step 7.5.11 through the real HTTP pipeline and PostgreSQL: the bulk endpoints and the team's own lists, with the permissions of each role.</summary>
+/// <summary>Through the real HTTP pipeline and PostgreSQL: the bulk endpoints and the team's own lists, with the permissions of each role.</summary>
 [Collection(PostgresCollection.Name)]
 public class BulkAndListsApiTests : IClassFixture<CustomWebApplicationFactory>
 {

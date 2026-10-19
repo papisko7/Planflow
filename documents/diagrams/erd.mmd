@@ -1,0 +1,216 @@
+---
+title: PlanFlow - Entity Relationship Diagram (PostgreSQL, 21 tables)
+---
+%% Every table also has Id (uuid, PK), CreatedAtUtc and UpdatedAtUtc (BaseEntity); they are not repeated below.
+%% Only keys and the columns that carry the model are listed. Enums are stored as integers.
+%% The label of a relation names what happens to the child row when the parent is deleted:
+%% CASCADE = deleted with it, SET NULL = kept without the link, RESTRICT = deletion refused.
+erDiagram
+    users {
+        text Email UK
+        text DisplayName
+        text PasswordHash
+        text TimeZoneId "IANA zone reported by the phone"
+        int CalendarSharingLevel "off / availability / details"
+        timestamptz EmailVerifiedAtUtc
+    }
+    teams {
+        text Name
+        text Description
+        bool IsPersonal "one per user, holds imported Google items"
+    }
+    team_members {
+        uuid UserId FK "unique with TeamId"
+        uuid TeamId FK
+        int Role "Owner / Admin / Member"
+        bool MuteNotifications
+        bool MuteChat
+    }
+    calendar_items {
+        uuid TeamId FK
+        uuid AssignedUserId FK
+        uuid AssignedByUserId FK
+        uuid BlockedByTaskId FK "self reference, one blocker"
+        uuid RecurrenceSeriesId FK
+        uuid ItemListId FK
+        uuid ExternalTaskListId FK
+        uuid SourceCalendarIntegrationId FK
+        text Title
+        int TaskType "Task / Event"
+        int EventTemplate "Default, Out of office, Focus time ..."
+        int Status
+        timestamptz StartUtc
+        timestamptz EndUtc "events"
+        timestamptz DeadlineUtc "tasks"
+        bool IsAllDay
+        float EstimatedEffortHours
+        int ImpactScore "0-10, null = not rated"
+        float ManualUrgencyOverride
+        float CurrentUrgencyScore "cached, 0-1"
+        bool IsAssignmentLocked
+        bool IsDataIncomplete "imported, not verified yet"
+        text ExternalCalendarEventId "Google event id"
+        text ExternalTaskId "Google task id"
+        bool UseAiEnhancement "reserved, not used"
+        float AiImpactScore "reserved, not used"
+    }
+    item_reminders {
+        uuid CalendarItemId FK
+        int Anchor "start / deadline"
+        int OffsetMinutes "offset form"
+        int DaysBefore "day form"
+        int TimeOfDayMinutes "day form"
+        timestamptz LastFiredForUtc
+    }
+    item_participants {
+        uuid CalendarItemId FK "unique with UserId"
+        uuid UserId FK
+        int Role "guest / co-contractor"
+    }
+    item_lists {
+        uuid TeamId FK
+        uuid CreatedByUserId FK
+        text Name
+        int Kind "task list / meeting list"
+    }
+    recurrence_series {
+        uuid TeamId FK
+        int Frequency "day / week / month / year"
+        int Interval
+        int Weekdays "bit mask"
+        timestamptz AnchorUtc
+        timestamptz EndsAtUtc
+        timestamptz GeneratedThroughUtc "occurrences exist up to here"
+    }
+    urgency_score_logs {
+        uuid CalendarItemId FK
+        float DeadlineComponent
+        float BlockingComponent
+        float ImpactComponent
+        float UserOverrideComponent
+        float ScheduledComponent
+        float FinalScore
+        bool IsBlocked
+        int AlgorithmVersion
+        int TriggerSource
+        text ReasonText "why this score, in words"
+    }
+    task_histories {
+        uuid CalendarItemId FK
+        uuid ChangedByUserId FK
+        int ChangeType
+        text FieldName
+        text OldValue
+        text NewValue
+    }
+    alerts {
+        uuid UserId FK
+        uuid CalendarItemId FK
+        int Type
+        text Message
+        bool IsRead
+    }
+    calendar_integrations {
+        uuid UserId FK
+        text ExternalAccountId UK "Google account"
+        text EncryptedAccessToken
+        text EncryptedRefreshToken
+        text GrantedScopes "tells whether Tasks may be read"
+        timestamptz LastSyncedAtUtc
+        timestamptz LastTasksSyncedAtUtc
+        bool IsActive
+    }
+    external_task_lists {
+        uuid CalendarIntegrationId FK "unique with ExternalId"
+        text ExternalId "Google task list id"
+        text Title
+    }
+    chat_messages {
+        uuid TeamId FK
+        uuid SenderUserId FK
+        text Content
+    }
+    notification_preferences {
+        uuid UserId FK "unique"
+        bool EmailEnabled
+        bool PushEnabled
+        bool TaskAssignments
+        bool ItemReminders
+        bool TaskUrgency
+        bool ChatDigest
+    }
+    notifications {
+        uuid UserId FK
+        int Event
+        text Title
+        text Body
+        uuid TeamId "plain column, no FK"
+        uuid TaskId "plain column, no FK"
+        timestamptz ReadAtUtc
+        int PushState "not wanted / pending / sent / failed"
+    }
+    push_tokens {
+        uuid UserId FK
+        text Token UK "Expo push token"
+        text Platform
+    }
+    user_devices {
+        uuid UserId FK "unique with DeviceId"
+        text DeviceId
+        text Name
+    }
+    refresh_sessions {
+        uuid UserId FK
+        text TokenHash
+        timestamptz ExpiresAtUtc
+    }
+    one_time_codes {
+        uuid UserId FK
+        int Purpose "e-mail verification / password reset"
+        text CodeHash
+        int FailedAttempts
+        timestamptz ExpiresAtUtc
+    }
+    email_outbox {
+        text ToEmail
+        text Subject
+        int Attempts
+        timestamptz NextAttemptAtUtc
+        timestamptz SentAtUtc
+    }
+
+    users ||--o{ team_members : "joins (CASCADE)"
+    teams ||--o{ team_members : "has members (CASCADE)"
+    teams ||--o{ calendar_items : "owns (CASCADE)"
+    teams ||--o{ item_lists : "owns (CASCADE)"
+    teams ||--o{ recurrence_series : "owns (CASCADE)"
+    teams ||--o{ chat_messages : "has (CASCADE)"
+    users ||--o{ chat_messages : "sends (RESTRICT)"
+    users |o--o{ item_lists : "created (SET NULL)"
+
+    users |o--o{ calendar_items : "assigned to (SET NULL)"
+    users |o--o{ calendar_items : "assigned by (SET NULL)"
+    calendar_items |o--o{ calendar_items : "blocks (SET NULL)"
+    recurrence_series |o--o{ calendar_items : "occurrences (SET NULL)"
+    item_lists |o--o{ calendar_items : "groups (SET NULL)"
+    external_task_lists |o--o{ calendar_items : "groups imports (SET NULL)"
+    calendar_integrations |o--o{ calendar_items : "imported through (SET NULL)"
+
+    calendar_items ||--o{ item_reminders : "alerts (CASCADE)"
+    calendar_items ||--o{ item_participants : "people (CASCADE)"
+    users ||--o{ item_participants : "takes part (CASCADE)"
+    calendar_items ||--o{ urgency_score_logs : "score history (CASCADE)"
+    calendar_items ||--o{ task_histories : "change history (CASCADE)"
+    users |o--o{ task_histories : "changed by (SET NULL)"
+    calendar_items |o--o{ alerts : "about (SET NULL)"
+    users ||--o{ alerts : "gets (CASCADE)"
+
+    users ||--o{ calendar_integrations : "connects Google (CASCADE)"
+    calendar_integrations ||--o{ external_task_lists : "has (CASCADE)"
+
+    users ||--o| notification_preferences : "settings (CASCADE)"
+    users ||--o{ notifications : "inbox (CASCADE)"
+    users ||--o{ push_tokens : "phones (CASCADE)"
+    users ||--o{ user_devices : "known devices (CASCADE)"
+    users ||--o{ refresh_sessions : "sessions (CASCADE)"
+    users ||--o{ one_time_codes : "codes (CASCADE)"

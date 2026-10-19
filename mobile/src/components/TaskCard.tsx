@@ -24,8 +24,6 @@ const TIER_COLOR = {
   low: colors.urgencyLow,
 } as const;
 
-// Quick actions (see useTaskActions). When given, the card gets swipe gestures
-// (right = delete, left = edit) and a long-press menu.
 export interface TaskCardActions {
   edit: (task: TaskDto) => void;
   remove: (task: TaskDto) => void;
@@ -36,12 +34,9 @@ export interface TaskCardActions {
 }
 
 export interface TaskCardProps {
-  // teamName is shown as a chip so tasks from different teams are distinguishable in mixed lists.
   task: TaskDto & { teamName?: string };
   onPress?: (task: TaskDto & { teamName?: string }) => void;
   actions?: TaskCardActions;
-  // Selection mode (step 7.5.11). Given, a double tap ticks the card (that starts the mode). While `selectionMode` is on, a tap ticks or
-  // unticks, a long press does too, and the swipes are off. Cards of a list without it open instantly, with no double-tap wait.
   onToggleSelect?: (task: TaskDto & { teamName?: string }) => void;
   selectionMode?: boolean;
   selected?: boolean;
@@ -50,14 +45,12 @@ export interface TaskCardProps {
 function TaskCardComponent({ task, onPress, actions, onToggleSelect, selectionMode = false, selected = false }: TaskCardProps) {
   const [menuVisible, setMenuVisible] = useState(false);
   const tier = getUrgencyTier(task.currentUrgencyScore);
-  // A day off, a focus block, a working place or a birthday is not ranked: no score pill, no urgency colour, no "why".
   const ranked = !isInformational(task);
   const isEvent = task.taskType === TaskType.Event;
   const when = formatWhen(task);
   const recurrence = formatRecurrence(task);
   const templateLabel = TEMPLATE_LABEL[task.eventTemplate];
   const reason = splitReason(task.reasonText);
-  // A list that shows one entry for a whole repeating series says how many other occurrences it stands for.
   const seriesMore = formatSeriesMore(task.seriesMore);
 
   // Double tap ticks the card and starts the selection mode (done / not done moved to the long-press menu and the selection bar). To tell
@@ -65,10 +58,8 @@ function TaskCardComponent({ task, onPress, actions, onToggleSelect, selectionMo
   // without selection open instantly.
   const isDone = task.status === TaskStatus.Completed;
   const isUnassigned = !task.assignedUserId;
-  // Only the current assignee can abandon a task, and not one an Owner/Admin assigned to them (the API enforces the same).
   const isMine = !!task.assignedUserId && task.assignedUserId === getCurrentUserId();
   const canAbandon = isMine && !task.isAssignmentLocked;
-  // Guests of an event / co-contractors of a task: shown as a head count, or as "You" when the viewer is one of them.
   const participantIds = task.participantUserIds ?? [];
   const me = getCurrentUserId();
   const takesPart = !!me && participantIds.includes(me);
@@ -165,7 +156,6 @@ function TaskCardComponent({ task, onPress, actions, onToggleSelect, selectionMo
         {task.manualUrgencyOverride !== null ? <Text style={styles.metaText}>✋ Manual override</Text> : null}
       </View>
 
-      {/* The backend's one-line explanation ("[High] due in 2d, impact 8/10"); older rows without one fall back to the tier. */}
       {!ranked ? null : reason ? (
         <Text style={styles.reasonText} numberOfLines={3}>
           {reason.label ? <Text style={[styles.reasonLabel, { color: TIER_COLOR[tier] }]}>{reason.label} </Text> : null}
@@ -211,8 +201,6 @@ function TaskCardComponent({ task, onPress, actions, onToggleSelect, selectionMo
   );
 }
 
-// Real-time TaskHub events will patch individual tasks in place (see DashboardScreen); memoizing
-// on the task reference keeps re-renders scoped to the one card that actually changed.
 export const TaskCard = memo(TaskCardComponent);
 
 const styles = StyleSheet.create({

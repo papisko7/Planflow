@@ -7,12 +7,10 @@ namespace PlanFlow.Domain.Enums;
 /// </summary>
 public enum TaskStatus
 {
-    // Task statuses
     Backlog = 0,
     InProgress = 1,
     Completed = 3,
 
-    // Both types
     Cancelled = 4,
 
     // Event statuses (same words as Google Calendar's event status)

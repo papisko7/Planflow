@@ -8,13 +8,10 @@ import type { ApiError } from '../types/api';
 
 type Props = {
   team: TeamDto;
-  // Called after a rename so the parent can reload the team list.
   onChanged: () => void;
-  // Called after the team was deleted.
   onDeleted: () => void;
 };
 
-// Rename (Owner/Admin) and delete (Owner only). Mirrors the backend; the server stays the authority.
 export function TeamSettingsCard({ team, onChanged, onDeleted }: Props) {
   const [role, setRole] = useState<TeamRole | null>(null);
   const [editing, setEditing] = useState(false);

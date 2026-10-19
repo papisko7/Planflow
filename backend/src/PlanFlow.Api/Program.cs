@@ -7,8 +7,6 @@ using PlanFlow.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 builder.Services.AddControllers().AddJsonOptions(o =>
@@ -37,7 +35,6 @@ var app = builder.Build();
 // consistent ProblemDetails responses for Application-layer exceptions.
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwaggerDocumentation();

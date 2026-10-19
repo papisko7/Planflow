@@ -1,14 +1,12 @@
 import type { TaskStatus } from './task';
 import type { TeamRole } from './team';
 
-// Mirrors PlanFlow.Domain.Enums.CalendarSharingLevel (the API serialises enums as numbers).
 export enum CalendarSharingLevel {
   Off = 0,
   Availability = 1,
   Details = 2,
 }
 
-// Mirrors PlanFlow.Domain.Services.MemberStatus
 export enum MemberStatus {
   NoData = 0,
   Free = 1,
@@ -17,7 +15,6 @@ export enum MemberStatus {
   OutOfOffice = 4,
 }
 
-// Mirrors PlanFlow.Domain.Services.DayAvailability
 export enum DayAvailability {
   NoData = 0,
   Free = 1,
@@ -26,14 +23,12 @@ export enum DayAvailability {
   OutOfOffice = 4,
 }
 
-// Mirrors PlanFlow.Domain.Services.LoadLevel
 export enum LoadLevel {
   Light = 0,
   Balanced = 1,
   Overloaded = 2,
 }
 
-// Mirrors PlanFlow.Domain.Services.BlockKind
 export enum BlockKind {
   Busy = 0,
   Free = 1,
@@ -53,24 +48,20 @@ export interface DayAvailabilityDto {
   loadLevel: LoadLevel;
 }
 
-// Mirrors PlanFlow.Application.Availability.Common.MemberAvailabilityDto
 export interface MemberAvailabilityDto {
   userId: string;
   displayName: string;
   role: TeamRole;
   sharingLevel: CalendarSharingLevel;
   currentStatus: MemberStatus;
-  // Filled only when the person shares details ("Home", "Office"...).
   currentWorkingLocation: string | null;
   windowLoadPercent: number | null;
   loadLevel: LoadLevel;
   openTasks: number;
-  // Open tasks the load cannot count because they have no effort estimate.
   tasksWithoutEffort: number;
   days: DayAvailabilityDto[];
 }
 
-// Mirrors PlanFlow.Application.Availability.Common.TeamAvailabilityDto
 export interface TeamAvailabilityDto {
   teamId: string;
   from: string;
@@ -92,7 +83,6 @@ export interface MemberCalendarEntryDto {
   location: string | null;
 }
 
-// Mirrors PlanFlow.Application.Availability.Common.MemberTaskDto
 export interface MemberTaskDto {
   itemId: string;
   title: string;
@@ -103,7 +93,6 @@ export interface MemberTaskDto {
   urgencyScore: number;
 }
 
-// Mirrors PlanFlow.Application.Availability.Common.MemberCalendarDto
 export interface MemberCalendarDto {
   teamId: string;
   member: MemberAvailabilityDto;

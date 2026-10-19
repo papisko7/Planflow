@@ -28,7 +28,6 @@ import {
 } from '../utils/availability';
 
 type Props = {
-  // Every team of the user; the personal workspace has no teammates, so it is left out.
   teams: TeamDto[];
 };
 

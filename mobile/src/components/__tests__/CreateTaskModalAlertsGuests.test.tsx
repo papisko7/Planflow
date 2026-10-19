@@ -30,7 +30,7 @@ async function pickEventStartInAWeek() {
   await fireEvent.press(screen.getByTestId('event-start-picker-set'));
 }
 
-// Step 7.5.6: alerts and the people invited are part of the create form.
+// Alerts and the people invited are part of the create form.
 describe('CreateTaskModal - alerts and guests', () => {
   beforeEach(() => {
     jest.clearAllMocks();

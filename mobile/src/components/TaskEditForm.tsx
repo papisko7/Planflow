@@ -33,9 +33,7 @@ import { normalizeStatus, STATUS_LABEL, statusesFor } from '../utils/taskStatus'
 type Props = {
   task: TaskDto;
   members: TeamMemberDto[];
-  // Owner/Admin may reassign; a Member keeps the task on themselves (the API rejects anything else).
   canAssign: boolean;
-  // The item's alerts as the detail view loaded them (the task itself does not carry them).
   reminders?: ReminderDto[];
   onSaved: () => void;
   onCancel: () => void;
@@ -47,7 +45,6 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
   const [schedule, setSchedule] = useState<ScheduleFields>(() => scheduleForEditing(task));
   const [impact, setImpact] = useState(task.impactScore === null ? "" : String(task.impactScore));
   const [pickedStatus, setPickedStatus] = useState(task.status);
-  // A Task and an Event have different statuses; switching the type in the form swaps the list and resets an illegal pick.
   const status = normalizeStatus(schedule.taskType, pickedStatus);
   const [assignedUserId, setAssignedUserId] = useState(task.assignedUserId);
   const [itemListId, setItemListId] = useState<string | null>(task.itemListId ?? null);
@@ -56,7 +53,6 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
   // An item imported from Google: Google owns its title, time, place, description and colour (the next sync would overwrite
   // them, and the server ignores edits), so they are shown read-only here; what PlanFlow adds stays editable.
   const imported = task.isExternal;
-  // A task from Google Tasks: Google owns its title, notes and due day; PlanFlow adds when to start, effort and impact.
   const googleTask = imported && task.taskType === TaskType.Task;
   // An imported item keeps Google's schedule, but the effort (and, for a Google task, the start) are PlanFlow's own to set.
   // A Google task's days are stored as midnight UTC; the date pickers work with local timestamps, hence the conversions.
@@ -67,8 +63,6 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
   const [participants, setParticipants] = useState<string[]>(task.participantUserIds ?? []);
   const [error, setError] = useState<string | null>(null);
 
-  // An imported event's alerts and people are Google's (shown on the detail screen, not edited here); a task from Google Tasks has
-  // none in Google, so its alerts are the person's own.
   const ownAlerts = rules.allowsAlerts && (!imported || googleTask);
   const reminderContext: ReminderContext = {
     taskType: schedule.taskType,
@@ -111,7 +105,6 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
       return;
     }
 
-    // An item that repeats: which occurrences does this change reach? (this / this and following / all)
     let scope: SeriesScope | undefined;
     if (task.seriesId) {
       const ruleChanged = !imported && recurrenceChanged(task, schedule);
@@ -246,7 +239,6 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
                     onChange={setStart}
                   />
                   {task.isDeadlineDefaulted ? (
-                    // Google had no due day, so the deadline is only a placeholder ("tomorrow"): it can be set here until the item is saved.
                     <DeadlinePicker label="Deadline" optional={false} allowAllDay={false} dateOnly value={deadline} onChange={setDeadline} />
                   ) : null}
                 </>

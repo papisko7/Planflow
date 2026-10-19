@@ -38,7 +38,6 @@ export function PinEntryModal({ visible, title, error, onComplete, onCancel }: P
         <View style={styles.card}>
           <Text style={styles.title}>{title}</Text>
 
-          {/* Hidden input that drives the keyboard */}
           <TextInput
             ref={inputRef}
             style={styles.hiddenInput}
@@ -49,7 +48,6 @@ export function PinEntryModal({ visible, title, error, onComplete, onCancel }: P
             caretHidden
           />
 
-          {/* Visual PIN dots — tap to re-focus keyboard */}
           <Pressable style={styles.dots} onPress={() => inputRef.current?.focus()}>
             {[0, 1, 2, 3].map((i) => (
               <View key={i} style={[styles.dot, pin.length > i && styles.dotFilled]} />

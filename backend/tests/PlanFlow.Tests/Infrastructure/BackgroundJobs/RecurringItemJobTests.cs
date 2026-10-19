@@ -12,7 +12,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Infrastructure.BackgroundJobs;
 
 /// <summary>
-/// Repeating items (step 7.5.7): an event series is kept created 90 days ahead, a task series gets its next occurrence when one is
+/// Repeating items: an event series is kept created 90 days ahead, a task series gets its next occurrence when one is
 /// completed. The series' cursor is what stops a second run, or a deleted occurrence, from creating anything twice.
 /// </summary>
 public class RecurringItemJobTests

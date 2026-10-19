@@ -24,7 +24,6 @@ public class NotificationService : INotificationService
         CancellationToken cancellationToken = default,
         Guid? taskId = null)
     {
-        // You never get a notification about something you did yourself.
         var recipientIds = recipientUserIds.Distinct().Where(id => id != actorUserId).ToList();
         if (recipientIds.Count == 0)
         {

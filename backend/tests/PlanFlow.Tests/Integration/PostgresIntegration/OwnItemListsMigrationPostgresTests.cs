@@ -11,7 +11,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Integration.PostgresIntegration;
 
 /// <summary>
-/// The 7.5.11 migration adds the team's own lists and a nullable list link on every item. Items that already exist must come through
+/// The migration adds the team's own lists and a nullable list link on every item. Items that already exist must come through
 /// untouched (no list), and deleting a list must keep its items. Checked on a real PostgreSQL database.
 /// </summary>
 public class OwnItemListsMigrationPostgresTests : IAsyncLifetime

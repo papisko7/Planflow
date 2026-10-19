@@ -5,14 +5,10 @@ import { colors, radius, spacing, typography } from '../theme/theme';
 
 type Props = {
   title: string;
-  // One muted line shown under the title while the section is collapsed, so you can read the state without opening it.
   summary?: string;
-  // `nested` is a section inside another one: no card background of its own, only a divider above it.
   nested?: boolean;
   defaultExpanded?: boolean;
-  // Long-pressing the header (e.g. the rename / delete menu of a list); a plain tap still opens and closes the section.
   onHeaderLongPress?: () => void;
-  // Header gets `${testID}-header`, the content `${testID}-body`.
   testID: string;
   children: ReactNode;
 };

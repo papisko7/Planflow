@@ -40,7 +40,6 @@ export default function LoginScreen() {
 
   const showForgotHint = passwordFailures >= MAX_PASSWORD_FAILURES;
 
-  // Step 1: look up the email on the server to get the userId, then check if that user has a PIN.
   const onIdentify = async () => {
     if (!email.trim()) {
       setError('Please enter your email.');
@@ -77,7 +76,6 @@ export default function LoginScreen() {
     setPasswordFailures(0);
   };
 
-  // Step 2: password login
   const onSubmit = async () => {
     if (!password) {
       setError('Please enter your password.');
@@ -107,7 +105,7 @@ export default function LoginScreen() {
     }
   };
 
-  // Step 2: PIN login — verifies against the already-identified user, so two users with the
+  // PIN login — verifies against the already-identified user, so two users with the
   // same PIN never collide (only this user's PIN slot is checked).
   const onPinLogin = async (pin: string) => {
     if (!identifiedUserId) return;

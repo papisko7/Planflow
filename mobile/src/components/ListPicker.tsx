@@ -7,14 +7,11 @@ import type { ApiError } from '../types/api';
 
 type Props = {
   teamId: string | null;
-  // A task goes in a task list, an event in a meeting list.
   kind: ItemListKind;
   value: string | null;
   onChange: (listId: string | null) => void;
 };
 
-// "List (optional)" in the form of an item: None, the team's own lists of the right kind, and "+ New list" to make one on the spot
-// (it is created at once and picked). Loads the team's lists itself, so every form that has a team can use it as it is.
 export function ListPicker({ teamId, kind, value, onChange }: Props) {
   const [lists, setLists] = useState<ItemListDto[] | null>(null); // null = not loaded yet
   const [adding, setAdding] = useState(false);
@@ -41,7 +38,6 @@ export function ListPicker({ teamId, kind, value, onChange }: Props) {
 
   const choices = (lists ?? []).filter((l) => l.kind === kind);
 
-  // A pick that does not fit any more (the item became an event, the team changed) is dropped.
   useEffect(() => {
     if (value && lists && !choices.some((l) => l.id === value)) onChange(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps

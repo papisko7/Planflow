@@ -43,7 +43,6 @@ public class TeamsController : ControllerBase
         return Ok(teams);
     }
 
-    // Like the member endpoints, the handler checks the caller's real membership row (Owner/Admin may edit).
     [HttpPut("{teamId:guid}")]
     public async Task<IActionResult> UpdateTeam(Guid teamId, UpdateTeamRequest request, CancellationToken cancellationToken)
     {
@@ -51,7 +50,6 @@ public class TeamsController : ControllerBase
         return Ok(team);
     }
 
-    // Owner only; the handler enforces it.
     [HttpDelete("{teamId:guid}")]
     public async Task<IActionResult> DeleteTeam(Guid teamId, CancellationToken cancellationToken)
     {
@@ -59,7 +57,6 @@ public class TeamsController : ControllerBase
         return NoContent();
     }
 
-    // Membership (not a JWT claim) is verified inside the handler, for the same reason as AddMember.
     [HttpGet("{teamId:guid}/members")]
     public async Task<IActionResult> GetMembers(Guid teamId, CancellationToken cancellationToken)
     {
@@ -101,7 +98,6 @@ public class TeamsController : ControllerBase
         return Ok(member);
     }
 
-    // Handler enforces ManageMembers plus the owner-only rules for Admin (same reasoning as AddMember).
     [HttpPut("{teamId:guid}/members/{userId:guid}/role")]
     public async Task<IActionResult> ChangeMemberRole(Guid teamId, Guid userId, ChangeMemberRoleRequest request, CancellationToken cancellationToken)
     {
@@ -109,7 +105,6 @@ public class TeamsController : ControllerBase
         return Ok(member);
     }
 
-    // The caller's own per-team e-mail mutes (any member may set them for themselves).
     [HttpPut("{teamId:guid}/notification-settings")]
     public async Task<IActionResult> UpdateNotificationSettings(Guid teamId, TeamNotificationSettingsRequest request, CancellationToken cancellationToken)
     {
@@ -117,7 +112,6 @@ public class TeamsController : ControllerBase
         return NoContent();
     }
 
-    // Same reasoning as AddMember: the handler checks the caller's real membership for this team.
     // Also serves as "leave team" when userId is the caller's own id.
     [HttpDelete("{teamId:guid}/members/{userId:guid}")]
     public async Task<IActionResult> RemoveMember(Guid teamId, Guid userId, CancellationToken cancellationToken)

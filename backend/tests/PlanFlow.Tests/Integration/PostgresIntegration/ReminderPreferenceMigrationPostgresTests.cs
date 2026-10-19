@@ -9,7 +9,7 @@ using Xunit;
 namespace PlanFlow.Tests.Integration.PostgresIntegration;
 
 /// <summary>
-/// The 7.5.8 migration adds a "daily reminder" switch to settings rows that already exist. EF would fill them with false;
+/// The migration adds a "daily reminder" switch to settings rows that already exist. EF would fill them with false;
 /// the migration is edited so that existing users get the same default as new ones (on). Checked on a real PostgreSQL database.
 /// </summary>
 public class ReminderPreferenceMigrationPostgresTests : IAsyncLifetime

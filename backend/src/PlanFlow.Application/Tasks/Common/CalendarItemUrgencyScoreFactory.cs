@@ -64,7 +64,6 @@ public static class CalendarItemUrgencyScoreFactory
         bool StillBlocks(Guid blockerId) =>
             byId.TryGetValue(blockerId, out var blocker) && !IsPastEvent(blocker, nowUtc, zoneOf(blocker));
 
-        // blocker id -> the active tasks it blocks.
         var blockedBy = ranked
             .Where(t => t.BlockedByTaskId is { } blockerId && StillBlocks(blockerId))
             .ToLookup(t => t.BlockedByTaskId!.Value);

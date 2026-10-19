@@ -5,7 +5,6 @@ import type { MyAbsence } from '../types/user';
 const NONE: MyAbsence[] = [];
 const MAX_AGE_MS = 5 * 60_000;
 
-// One shared copy for every card on screen: the first caller fetches, the others wait for the same answer.
 let cached: { at: number; data: MyAbsence[] } | null = null;
 let inflight: Promise<MyAbsence[]> | null = null;
 
@@ -14,7 +13,6 @@ export function resetMyAbsencesCache(): void {
   inflight = null;
 }
 
-// The signed-in user's own Out of office time ahead. Best effort: when it cannot be loaded there is simply no warning.
 export function useMyAbsences(): MyAbsence[] {
   const [absences, setAbsences] = useState<MyAbsence[]>(cached?.data ?? NONE);
 

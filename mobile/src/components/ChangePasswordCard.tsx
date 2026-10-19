@@ -5,8 +5,6 @@ import { changePassword } from '../services/userService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import type { ApiError } from '../types/api';
 
-// Change the password while signed in (a nested, collapsed-by-default section of Credentials): the current password proves it is really the owner holding the phone, and the
-// server signs every OTHER device out (this one stays signed in).
 export function ChangePasswordCard() {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');

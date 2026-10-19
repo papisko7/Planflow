@@ -12,7 +12,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Application.Tasks.Commands;
 
 /// <summary>
-/// Step 7.5.11: selection mode and "Clear" act on many items in one request. The permission is checked per item (Owner/Admin: any item, a
+/// Selection mode and "Clear" act on many items in one request. The permission is checked per item (Owner/Admin: any item, a
 /// Member: only their own), what could not be changed is reported instead of failing the batch, and the team is rescored once.
 /// </summary>
 public class BulkTasksTests

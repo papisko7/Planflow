@@ -6,7 +6,6 @@ type Props = {
   title: string;
   onClose: () => void;
   onOpen: () => void;
-  // Starts the selection mode with this item ticked (the same as a double tap).
   onSelect?: () => void;
   onClaim?: () => void;
   onAbandon?: () => void;
@@ -16,7 +15,6 @@ type Props = {
   onDelete?: () => void;
 };
 
-// Bottom sheet shown on long-press of a task: every quick action in one place, no extra screen.
 export function TaskActionMenu({ visible, title, onClose, onOpen, onSelect, onClaim, onAbandon, onEdit, onComplete, onReopen, onDelete }: Props) {
   // Close first, then run the action, so an Alert/navigation never opens underneath the sheet.
   const run = (action?: () => void) => () => {

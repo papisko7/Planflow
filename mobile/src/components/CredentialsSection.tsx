@@ -3,7 +3,6 @@ import { AccordionSection } from './AccordionSection';
 import { ChangePasswordCard } from './ChangePasswordCard';
 import { PinSettingsCard } from './PinSettingsCard';
 
-// "Credentials": everything that proves who you are - PIN login (set, change, turn off) and the account password.
 export function CredentialsSection() {
   const [pinEnabled, setPinEnabled] = useState(false);
 

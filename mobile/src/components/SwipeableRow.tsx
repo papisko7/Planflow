@@ -2,15 +2,12 @@ import { useRef, type ReactNode } from 'react';
 import { Animated, PanResponder, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing } from '../theme/theme';
 
-// How far (px) a row must be dragged before releasing triggers the action.
 const TRIGGER_DISTANCE = 90;
 const MAX_DISTANCE = 130;
 
 type Props = {
   children: ReactNode;
-  // Swipe right -> reveals the red "Delete" action.
   onSwipeRight?: () => void;
-  // Swipe left -> reveals the blue "Edit" action.
   onSwipeLeft?: () => void;
   rightLabel?: string;
   leftLabel?: string;

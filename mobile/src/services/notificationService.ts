@@ -11,14 +11,10 @@ export async function updateNotificationPreferences(preferences: NotificationPre
   return data;
 }
 
-// The caller's own mutes for one team (task e-mails / chat e-mails).
 export async function updateTeamNotificationSettings(teamId: string, settings: TeamNotificationSettings): Promise<void> {
   await http.put(`/api/teams/${teamId}/notification-settings`, settings);
 }
 
-// ---------- in-app inbox ----------
-
-// Newest first. Pass the createdAtUtc of the last entry you have to load older ones.
 export async function getInbox(before?: string, limit = 30): Promise<InboxNotification[]> {
   const { data } = await http.get<InboxNotification[]>('/api/notifications', { params: { before, limit } });
   return data;
@@ -37,7 +33,6 @@ export async function markAllNotificationsRead(): Promise<void> {
   await http.post('/api/notifications/read-all');
 }
 
-// The ticked entries (the server ignores ids that are not yours).
 export async function markNotificationsRead(ids: string[]): Promise<void> {
   await http.post('/api/notifications/read', { ids });
 }
@@ -54,8 +49,6 @@ export async function deleteNotifications(ids: string[]): Promise<void> {
 export async function clearNotifications(): Promise<void> {
   await http.delete('/api/notifications');
 }
-
-// ---------- push token of this phone ----------
 
 export async function registerPushToken(token: string, platform: string): Promise<void> {
   await http.put('/api/notifications/push-token', { token, platform });

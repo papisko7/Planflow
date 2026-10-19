@@ -27,7 +27,6 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, A
 
         var providedHash = TokenHasher.Hash(request.RefreshToken);
 
-        // Look the token up among this user's device sessions; each refresh replaces only that session's token.
         var session = await _context.RefreshSessions
             .FirstOrDefaultAsync(s => s.UserId == user.Id && s.TokenHash == providedHash, cancellationToken);
 

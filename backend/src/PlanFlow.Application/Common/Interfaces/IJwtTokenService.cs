@@ -4,7 +4,7 @@ using PlanFlow.Domain.Enums;
 namespace PlanFlow.Application.Common.Interfaces;
 
 /// <summary>
-/// Issues JWT access tokens and opaque refresh tokens. Implemented in Infrastructure (Phase 1.4)
+/// Issues JWT access tokens and opaque refresh tokens. Implemented in Infrastructure
 /// so Application handlers never touch a JWT/crypto library directly.
 /// </summary>
 public interface IJwtTokenService

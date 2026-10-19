@@ -25,7 +25,7 @@ const event = (id: string, startUtc: string): TaskDto => ({
   endUtc: new Date(new Date(startUtc).getTime() + 86_400_000).toISOString(),
 });
 
-// Step 7.5.11: the same yearly or weekly event shows up under many dates, so the year is always written.
+// The same yearly or weekly event shows up under many dates, so the year is always written.
 describe('the year is always shown', () => {
   it('on a card, so a birthday of 2027 is not mistaken for the one of 2026', () => {
     expect(formatWhen(event('a', '2026-10-20T00:00:00Z'))).toContain('2026');

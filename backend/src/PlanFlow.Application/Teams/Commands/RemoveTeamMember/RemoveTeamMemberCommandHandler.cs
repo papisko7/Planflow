@@ -47,7 +47,6 @@ public class RemoveTeamMemberCommandHandler : IRequestHandler<RemoveTeamMemberCo
                 throw new ForbiddenAccessException("You do not have permission to manage this team's members.");
             }
 
-            // Admins manage regular members; removing another admin is reserved for the owner.
             if (target.Role == TeamRole.Admin && requesting.Role != TeamRole.Owner)
             {
                 throw new ForbiddenAccessException("Only the team owner can remove admins.");

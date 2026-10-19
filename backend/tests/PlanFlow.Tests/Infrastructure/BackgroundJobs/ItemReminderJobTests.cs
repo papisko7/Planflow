@@ -11,7 +11,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Infrastructure.BackgroundJobs;
 
 /// <summary>
-/// Step 7.5.6: the job that sends the alerts. A reminder goes off once per trigger moment, to the assignee, the participants and the
+/// The job that sends the alerts. A reminder goes off once per trigger moment, to the assignee, the participants and the
 /// creator, through the people's own notification settings, and never for an item that is finished or for a moment long gone.
 /// </summary>
 public class ItemReminderJobTests

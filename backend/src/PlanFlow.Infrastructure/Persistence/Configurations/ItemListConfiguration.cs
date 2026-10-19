@@ -15,13 +15,11 @@ public class ItemListConfiguration : IEntityTypeConfiguration<ItemList>
 
         builder.HasIndex(l => l.TeamId);
 
-        // A list belongs to its team and goes with it.
         builder.HasOne(l => l.Team)
             .WithMany()
             .HasForeignKey(l => l.TeamId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Who made it is a reference: removing that account leaves the list, minus the "who".
         builder.HasOne(l => l.CreatedByUser)
             .WithMany()
             .HasForeignKey(l => l.CreatedByUserId)

@@ -11,7 +11,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Application.Availability;
 
 /// <summary>
-/// Step 7.5.10: the team availability grid and a member's calendar. The server trims a member's personal calendar by their own sharing
+/// The team availability grid and a member's calendar. The server trims a member's personal calendar by their own sharing
 /// level before anything leaves it; only members of the team may ask; work is counted from this team's tasks only.
 /// </summary>
 public class TeamAvailabilityTests

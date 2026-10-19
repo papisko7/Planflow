@@ -23,7 +23,7 @@ async function pickStartInAWeek() {
   await fireEvent.press(screen.getByTestId('event-start-picker-set'));
 }
 
-// Step 7.5.5: the template chips of the form and the fields each template shows.
+// The template chips of the form and the fields each template shows.
 describe('CreateTaskModal - templates', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -212,7 +212,7 @@ describe('CreateTaskModal - templates', () => {
   });
 });
 
-// Step 7.5.4: the optional planned start of a Task.
+// The optional planned start of a Task.
 describe('CreateTaskModal - a task\'s planned start', () => {
   beforeEach(() => {
     jest.clearAllMocks();

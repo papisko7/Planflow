@@ -91,8 +91,6 @@ public class TasksController : ControllerBase
         return CreatedAtAction(nameof(GetTask), new { taskId = task.Id }, task);
     }
 
-    // Bulk actions: the selection bar of the lists and "Clear". Team-scoped like the list/create routes. The permission is checked per
-    // item inside the handler (Owner/Admin: any item; a Member: only the ones assigned to them) and the items it left alone are reported back.
     [HttpPost("api/teams/{teamId:guid}/tasks/bulk-delete")]
     [Authorize(Policy = nameof(Permission.DeleteOwnTask))]
     public async Task<IActionResult> BulkDelete(Guid teamId, BulkTasksRequest request, CancellationToken cancellationToken)
@@ -135,12 +133,8 @@ public class TasksController : ControllerBase
         return Ok(result);
     }
 
-    // Single-task routes below don't carry a {teamId} in the URL, so the [Authorize(Policy=...)]
-    // attribute alone only proves the caller holds the permission for SOME team (via the
-    // "team_role" claim) — not that it's for THIS task's team. We close that gap with an explicit
-    // resource-ownership check against the task's real TeamId (Phase 4.3). A full fix would carry
-    // {teamId} in the route like the team-scoped endpoints above; that needs the multi-team
-    // JWT/team-switch redesign, out of scope here.
+    // Single-task routes carry no {teamId}, so [Authorize(Policy=...)] only proves the caller holds the permission for SOME team
+    // (the "team_role" claim), not for THIS task's team. The handler closes the gap by checking the task's real TeamId.
     [HttpGet("api/tasks/{taskId:guid}")]
     [Authorize(Policy = nameof(Permission.ViewTasks))]
     public async Task<IActionResult> GetTask(Guid taskId, CancellationToken cancellationToken)
@@ -155,7 +149,6 @@ public class TasksController : ControllerBase
         return Ok(task);
     }
 
-    // Full audit trail of the deterministic Urgency Score: one entry per computation, newest first.
     [HttpGet("api/tasks/{taskId:guid}/score-history")]
     [Authorize(Policy = nameof(Permission.ViewTasks))]
     public async Task<IActionResult> GetScoreHistory(Guid taskId, CancellationToken cancellationToken)
@@ -185,11 +178,9 @@ public class TasksController : ControllerBase
         // Who may change the assignee (a Member: keep their own task, claim an unassigned one, give back one they took themselves;
         // never one an Owner/Admin assigned) is decided by TaskAssignmentPolicy inside the command, which gets the caller's role.
 
-        // A client that predates the scheduling fields sends no TaskType: keep what is stored, otherwise an edit
-        // of the title would silently turn an Event into a plain Task and wipe its effort and recurrence.
         var stored = existing.Task;
         var keepStored = request.TaskType is null;
-        var keepTemplate = request.EventTemplate is null; // same for a client from before the template fields (7.5.5)
+        var keepTemplate = request.EventTemplate is null; // same for a client that predates the template fields
 
         var task = await _sender.Send(
             new UpdateTaskCommand(
@@ -257,7 +248,6 @@ public class TasksController : ControllerBase
             return Forbid();
         }
 
-        // Owner/Admin delete any task; a Member only their own (assigned to them).
         if (!User.HasPermission(Permission.DeleteTask) && existing.Task.AssignedUserId != User.GetUserId())
         {
             return Forbid();

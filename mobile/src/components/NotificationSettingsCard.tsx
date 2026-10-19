@@ -11,8 +11,6 @@ import type { TeamDto } from '../types/team';
 
 type SwitchRow = { key: NotificationSwitch; label: string; hint?: string };
 
-// "Item" = a task or an event: one switch covers both; the notification itself says which one it is.
-// One row per category the server lets a user switch on/off (see PlanFlow NotificationPolicy).
 const SWITCH_ROWS: SwitchRow[] = [
   { key: 'taskAssignments', label: 'Item assigned to you or taken from you' },
   { key: 'taskChanges', label: 'Someone edits or deletes your item' },
@@ -35,7 +33,6 @@ const LOGIN_OPTIONS: { value: LoginNotificationMode; label: string }[] = [
   { value: LoginNotificationMode.Off, label: 'Off' },
 ];
 
-// What a collapsed team block says: which of its two switches are on.
 function teamMuteSummary(team: TeamDto): string {
   if (team.muteNotifications && team.muteChat) return 'Items and chat muted';
   if (team.muteNotifications) return 'Items muted';
@@ -50,7 +47,6 @@ export function NotificationSettingsCard() {
   const [error, setError] = useState<string | null>(null);
   const [pushStatus, setPushStatus] = useState<PushStatus | null>(getLastPushStatus());
 
-  // What this phone can actually do with pushes (permission, Expo Go limits, ...). Registering again is harmless.
   useEffect(() => {
     registerForPush().then(setPushStatus);
   }, []);
@@ -59,14 +55,12 @@ export function NotificationSettingsCard() {
     Promise.all([getNotificationPreferences(), getMyTeams()])
       .then(([prefs, myTeams]) => {
         setPreferences(prefs);
-        // The personal workspace has no other members and no chat, so there is nothing to mute there.
         setTeams(myTeams.filter((team) => !team.isPersonal));
       })
       .catch((err: ApiError) => setError(err.message ?? 'Failed to load notification settings.'))
       .finally(() => setLoading(false));
   }, []);
 
-  // Optimistic: the switch moves at once, and snaps back with a message if the server refuses.
   const savePreferences = async (next: NotificationPreferences) => {
     const previous = preferences;
     setPreferences(next);
@@ -91,7 +85,6 @@ export function NotificationSettingsCard() {
     }
   };
 
-  // Shown while collapsed: how many of the switches are on.
   const switches = preferences ? [preferences.pushEnabled, preferences.emailEnabled, ...SWITCH_ROWS.map((row) => preferences[row.key])] : [];
   const summary = preferences ? `${switches.filter(Boolean).length} of ${switches.length} on` : undefined;
   const mutedTeams = teams.filter((team) => team.muteNotifications || team.muteChat).length;
@@ -147,7 +140,6 @@ export function NotificationSettingsCard() {
             </>
           ) : null}
 
-          {/* The categories decide what reaches the inbox, the phone and the mailbox alike. */}
           <Text style={styles.groupLabel}>Tell me when…</Text>
           {SWITCH_ROWS.map((row) => (
             <View key={row.key} style={styles.row}>
@@ -170,7 +162,6 @@ export function NotificationSettingsCard() {
               title="Teams"
               summary={mutedTeams === 0 ? 'None muted' : `${mutedTeams} muted`}
             >
-              {/* One accordion per team, like Notifications and Teams themselves; collapsed it says what is muted. */}
               {teams.map((team) => (
                 <AccordionSection
                   key={team.id}

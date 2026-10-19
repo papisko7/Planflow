@@ -16,7 +16,7 @@ using Quartz;
 namespace PlanFlow.Tests.Integration;
 
 /// <summary>
-/// Phase 4B / Step 4.4 — exercises SyncCalendarJob against a real GoogleCalendarClient/
+/// Exercises SyncCalendarJob against a real GoogleCalendarClient/
 /// GoogleOAuthClient (including the resilience/retry handler from GoogleCalendarResilience),
 /// with Google's servers replaced by <see cref="StubHttpMessageHandler"/> instead of a mocked
 /// IGoogleCalendarClient interface. This is what distinguishes these from the existing interface-

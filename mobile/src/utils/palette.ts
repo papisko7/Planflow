@@ -1,4 +1,4 @@
-// The 24 Google Calendar colours (plan point 14). The backend stores only the name (ItemColors.Keys); the shade is chosen
+// The 24 Google Calendar colours. The backend stores only the name (ItemColors.Keys); the shade is chosen
 // here, so a dark theme could remap it later. null = "Default colour": the app's own look. Hex values were measured from
 // Google Calendar screenshots (about +-3 per channel).
 export interface PaletteColor {
@@ -36,7 +36,6 @@ export const PALETTE: readonly PaletteColor[] = [
 
 const BY_KEY = new Map(PALETTE.map((c) => [c.key, c]));
 
-// The shade for a stored key; null for the default colour or a key this app version does not know (a newer server).
 export function colorHex(key: string | null | undefined): string | null {
   return (key && BY_KEY.get(key)?.hex) || null;
 }

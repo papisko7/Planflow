@@ -4,7 +4,6 @@ import * as Device from 'expo-device';
 import type * as NotificationsModule from 'expo-notifications';
 import { registerPushToken, unregisterPushToken } from './notificationService';
 
-// Why a phone may not be able to receive pushes - shown in Settings so it is clear what to do about it.
 export type PushStatus =
   | 'registered' // this phone is signed up and the server can push to it
   | 'denied' // the user refused the system permission
@@ -36,7 +35,6 @@ function notifications(): typeof NotificationsModule | null {
 let registeredToken: string | null = null;
 let lastStatus: PushStatus | null = null;
 
-// While the app is open a push should still show as a banner (the system hides it by default).
 export function configureNotificationHandler(): void {
   notifications()?.setNotificationHandler({
     handleNotification: async () => ({
@@ -93,7 +91,6 @@ async function tryRegister(): Promise<PushStatus> {
   }
 }
 
-// On sign-out: stop pushes for the account that is leaving this phone (the next user registers it again).
 export async function unregisterPush(): Promise<void> {
   const token = registeredToken;
   registeredToken = null;
@@ -106,7 +103,6 @@ export async function unregisterPush(): Promise<void> {
   }
 }
 
-// The number on the app icon. Best effort: not every launcher supports badges.
 export async function setAppBadge(count: number): Promise<void> {
   try {
     await notifications()?.setBadgeCountAsync(count);
@@ -115,7 +111,6 @@ export async function setAppBadge(count: number): Promise<void> {
   }
 }
 
-// A push arrived while the app is open. Returns the function that stops listening (a no-op where push is not available).
 export function onPushReceived(callback: () => void): () => void {
   const subscription = notifications()?.addNotificationReceivedListener(callback);
   return () => subscription?.remove();
@@ -123,7 +118,6 @@ export function onPushReceived(callback: () => void): () => void {
 
 export type PushData = Record<string, unknown> | undefined;
 
-// The user tapped a push - also one that started the closed app. Returns the function that stops listening.
 export function onPushTapped(callback: (data: PushData) => void): () => void {
   const Notifications = notifications();
   if (!Notifications) return () => undefined;

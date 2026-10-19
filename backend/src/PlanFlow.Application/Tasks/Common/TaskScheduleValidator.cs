@@ -56,7 +56,6 @@ public static class TaskScheduleMapper
         // A Task is due at a deadline; an Event occupies a time range. The fields of the other type are dropped,
         // so switching Event <-> Task never leaves stale dates behind.
         task.DeadlineUtc = isEvent ? null : fields.DeadlineUtc;
-        // A Task may also carry a planned start (optional); it feeds the "Scheduled" part of its score.
         task.StartUtc = staleEventStart ? null : fields.StartUtc;
         // An all-day event without an end lasts that one day (end = the midnight after it, the exclusive end Google uses too).
         task.EndUtc = !isEvent ? null : allDay && fields.EndUtc is null && fields.StartUtc is { } start ? start.AddDays(1) : fields.EndUtc;
@@ -81,7 +80,6 @@ public abstract class TaskScheduleValidator<T> : AbstractValidator<T> where T : 
     {
         RuleFor(x => x.TaskType).IsInEnum();
 
-        // A Task is always the Default template; an Event can be any known one.
         RuleFor(x => x.EventTemplate)
             .Must((x, template) => EventTemplateRules.IsValid(x.TaskType, template))
             .WithMessage("A task can only use the default template, and the template must be a known one.");
@@ -131,14 +129,12 @@ public abstract class TaskScheduleValidator<T> : AbstractValidator<T> where T : 
             .When(x => x.TaskType == Domain.Enums.TaskType.Event)
             .WithMessage("An event needs a start time.");
 
-        // The end of an event may be left out (a default duration is assumed), but if given it cannot precede the start.
         RuleFor(x => x)
             .Must(x => x.StartUtc!.Value <= x.EndUtc!.Value)
             .When(x => x.TaskType == Domain.Enums.TaskType.Event && x.StartUtc.HasValue && x.EndUtc.HasValue)
             .OverridePropertyName("EndUtc")
             .WithMessage("End must not be earlier than the start.");
 
-        // A task cannot be planned to start after it is due.
         RuleFor(x => x)
             .Must(x => x.StartUtc!.Value <= x.DeadlineUtc!.Value)
             .When(x => x.TaskType == Domain.Enums.TaskType.Task && x.StartUtc.HasValue && x.DeadlineUtc.HasValue)

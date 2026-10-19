@@ -8,7 +8,7 @@ using PlanFlow.Infrastructure.ExternalServices.Google;
 namespace PlanFlow.Tests.Integration;
 
 /// <summary>
-/// Step 7.5.3: the real <see cref="GoogleTasksClient"/> through the production retry pipeline, with Google replaced by a stub transport
+/// The real <see cref="GoogleTasksClient"/> through the production retry pipeline, with Google replaced by a stub transport
 /// (same approach as <see cref="CalendarSyncIntegrationTests"/>): real JSON, real paging, real query strings.
 /// </summary>
 public class GoogleTasksClientTests

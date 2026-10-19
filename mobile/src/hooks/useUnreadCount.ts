@@ -6,8 +6,6 @@ import { onPushReceived, setAppBadge } from '../services/pushService';
 
 const POLL_MS = 30_000;
 
-// The number on the bell. Re-read when the screen gets focus, every 30 s while it is visible, when the app comes back to the
-// foreground and the moment a push arrives while the app is open - so the bell is current without any extra server channel.
 export function useUnreadCount(): { count: number; refresh: () => void } {
   const [count, setCount] = useState(0);
 
@@ -31,7 +29,6 @@ export function useUnreadCount(): { count: number; refresh: () => void } {
     }, [refresh]),
   );
 
-  // Keep the number on the app icon equal to the bell.
   useEffect(() => {
     void setAppBadge(count);
   }, [count]);

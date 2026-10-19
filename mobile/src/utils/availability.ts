@@ -80,13 +80,11 @@ export function formatLoad(percent: number | null): string {
   return `${Math.round(percent)}%`;
 }
 
-// The first 10 characters of a calendar date from the API ("2026-10-19T00:00:00" -> local 19 Oct 2026).
 export function parseApiDay(value: string): Date {
   const [y, m, d] = value.slice(0, 10).split('-').map(Number);
   return new Date(y, m - 1, d);
 }
 
-// Short note shown on a person's chip in the assignee / co-contractor pickers: their state right now and their load this week.
 export function pickerHint(member: MemberAvailabilityDto | undefined): string | null {
   if (!member) return null;
   const parts: string[] = [];
@@ -97,7 +95,6 @@ export function pickerHint(member: MemberAvailabilityDto | undefined): string | 
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
-// A sentence of warning for the person picked in the form, or null when there is nothing to warn about.
 export function assigneeWarning(member: MemberAvailabilityDto | undefined): string | null {
   if (!member) return null;
   if (member.currentStatus === MemberStatus.OutOfOffice) return `${member.displayName} is out of office right now.`;
@@ -128,7 +125,6 @@ export function taskDueOnDay(task: MemberTaskDto, day: Date): boolean {
 const pad = (n: number) => String(n).padStart(2, '0');
 const clock = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
-// "all day" or "10:00-11:30" for one entry (a block that crosses midnight shows its clock times only).
 export function entryTime(entry: MemberCalendarEntryDto): string {
   if (entry.isAllDay) return 'all day';
   return `${clock(new Date(entry.startUtc))}-${clock(new Date(entry.endUtc))}`;

@@ -14,7 +14,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 
 namespace PlanFlow.Tests.Infrastructure.BackgroundJobs;
 
-/// <summary>Step 7.5.3: the Google Tasks import (lists, due day as deadline, first-seen day as start, unverified by default).</summary>
+/// <summary>The Google Tasks import (lists, due day as deadline, first-seen day as start, unverified by default).</summary>
 public class SyncTasksJobTests
 {
     /// <summary>A scripted Google Tasks account: lists, their tasks, and a record of how each list was asked for.</summary>

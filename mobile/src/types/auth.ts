@@ -1,4 +1,3 @@
-// Mirrors PlanFlow.Application.Auth.Common.AuthResultDto
 export interface AuthResultDto {
   userId: string;
   email: string;
@@ -8,7 +7,6 @@ export interface AuthResultDto {
   refreshToken: string;
 }
 
-// Mirrors PlanFlow.Api.Contracts.LoginRequest
 export interface LoginRequest {
   email: string;
   password: string;
@@ -18,7 +16,6 @@ export interface LoginRequest {
   deviceName?: string;
 }
 
-// Mirrors PlanFlow.Api.Contracts.RegisterRequest
 export interface RegisterRequest {
   email: string;
   password: string;
@@ -27,14 +24,12 @@ export interface RegisterRequest {
   deviceName?: string;
 }
 
-// Mirrors PlanFlow.Api.Contracts.ResetPasswordRequest
 export interface ResetPasswordRequest {
   email: string;
   code: string;
   newPassword: string;
 }
 
-// Mirrors PlanFlow.Api.Contracts.RefreshRequest
 export interface RefreshRequest {
   userId: string;
   refreshToken: string;

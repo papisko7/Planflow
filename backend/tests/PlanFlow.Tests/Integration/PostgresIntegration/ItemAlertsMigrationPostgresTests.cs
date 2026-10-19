@@ -12,7 +12,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Integration.PostgresIntegration;
 
 /// <summary>
-/// The 7.5.6 migration adds the reminders switch to settings rows that already exist (EF would fill them with false; the migration is
+/// The migration adds the reminders switch to settings rows that already exist (EF would fill them with false; the migration is
 /// edited so existing users get the same default as new ones), gives the reminders imported from Google an anchor (the start) and
 /// creates the participants table. Checked on a real PostgreSQL database.
 /// </summary>

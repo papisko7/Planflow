@@ -11,7 +11,6 @@ type Props = {
   onCreated: (team: TeamDto) => void;
 };
 
-// "New team" sheet, so a team can be created straight from the Dashboard "+" without a trip to the Teams tab.
 export function CreateTeamModal({ visible, onClose, onCreated }: Props) {
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);

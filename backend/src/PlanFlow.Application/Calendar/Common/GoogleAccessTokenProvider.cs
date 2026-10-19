@@ -7,7 +7,7 @@ namespace PlanFlow.Application.Calendar.Common;
 /// <summary>
 /// Returns a live Google access token for a stored <see cref="CalendarIntegration"/>, transparently
 /// refreshing it first when expired. Used by anything that needs to call the Google Calendar API on
-/// a user's behalf (the Phase 4A sync job); callers never see a persisted plaintext token — this is
+/// a user's behalf (the sync jobs); callers never see a persisted plaintext token — this is
 /// the only place ciphertext is decrypted, and a refreshed token is re-encrypted before being saved.
 /// </summary>
 public class GoogleAccessTokenProvider

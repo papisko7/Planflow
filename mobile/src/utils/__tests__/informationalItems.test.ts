@@ -35,7 +35,7 @@ const eventWith = (eventTemplate: EventTemplate, over: Partial<TaskDto> = {}) =>
     startUtc: new Date(Date.now() + 3_600_000).toISOString(), endUtc: new Date(Date.now() + 7_200_000).toISOString(), ...over,
   });
 
-// Step 7.5.4: Out of office, Focus time, Working location and Birthday have no score and are outside the ranking.
+// Out of office, Focus time, Working location and Birthday have no score and are outside the ranking.
 describe('informational items', () => {
   it('are recognised by their template; tasks and plain events are ranked', () => {
     expect(isInformational({ taskType: TaskType.Task, eventTemplate: EventTemplate.Default })).toBe(false);

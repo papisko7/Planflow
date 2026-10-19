@@ -7,7 +7,6 @@ export interface NotificationIcon {
   color: string;
 }
 
-// One icon per kind of event, so the inbox can be skimmed without reading.
 export function notificationIcon(event: NotificationEvent): NotificationIcon {
   switch (event) {
     case NotificationEvent.TaskAssignedToYou:
@@ -45,7 +44,6 @@ export function notificationIcon(event: NotificationEvent): NotificationIcon {
   }
 }
 
-// "just now", "5 min ago", "3 h ago", "yesterday", then the date - short enough for a list row.
 export function timeAgo(iso: string, now: Date = new Date()): string {
   // The server sends UTC without a zone suffix in some serialisations; treat a bare timestamp as UTC.
   const created = new Date(/[zZ]|[+-]\d\d:\d\d$/.test(iso) ? iso : `${iso}Z`);

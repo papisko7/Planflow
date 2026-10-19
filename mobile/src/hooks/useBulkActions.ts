@@ -34,7 +34,6 @@ export function useBulkActions(reload: () => unknown) {
     [reload],
   );
 
-  // Asks first, with the number in the title; `note` adds a line (e.g. what comes back after a Google sync).
   const deleteItems = useCallback(
     (items: TaskDto[], options: { title: string; note?: string; confirmLabel?: string; onDone?: () => void }) => {
       if (items.length === 0) return;

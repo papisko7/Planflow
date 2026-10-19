@@ -3,7 +3,7 @@ using PlanFlow.Domain.Common;
 namespace PlanFlow.Domain.Entities;
 
 /// <summary>
-/// [EXT] A message sent to a team's chat channel (Phase 5, SignalR ChatHub).
+/// A message sent to a team's chat channel (SignalR ChatHub).
 /// </summary>
 public class ChatMessage : BaseEntity
 {

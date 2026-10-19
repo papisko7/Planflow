@@ -3,13 +3,10 @@ import { colors, radius, spacing, typography } from '../theme/theme';
 import { colorHex, colorLabel, PALETTE, readableTextColor } from '../utils/palette';
 
 type Props = {
-  // Palette name (e.g. "tomato") or null for the default colour.
   value: string | null;
   onChange: (colorKey: string | null) => void;
 };
 
-// The 24 Google Calendar colours as round swatches, plus "Default colour" (the app's own look). The chosen one shows a tick,
-// drawn in black or white depending on how light the colour is.
 export function ColorPicker({ value, onChange }: Props) {
   return (
     <View style={styles.wrapper}>

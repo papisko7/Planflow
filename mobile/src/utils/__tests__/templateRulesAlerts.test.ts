@@ -1,7 +1,7 @@
 import { EventTemplate, TaskType } from '../../types/task';
 import { rulesFor } from '../templateRules';
 
-// Step 7.5.6: the form hides the alerts and guests a kind of item does not have. This is the mirror of the backend's
+// The form hides the alerts and guests a kind of item does not have. This is the mirror of the backend's
 // EventTemplateRules (AllowsAlerts / AllowsGuests); if a row changes there, change it here as well.
 describe('templateRules - alerts and guests', () => {
   it.each([

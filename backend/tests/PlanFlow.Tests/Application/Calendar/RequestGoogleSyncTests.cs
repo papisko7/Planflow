@@ -8,7 +8,7 @@ using Xunit;
 
 namespace PlanFlow.Tests.Application.Calendar;
 
-/// <summary>Step 7.5.9: "Sync now" is the only way Google is fetched, and a repeat press within a minute of the last sync starts nothing.</summary>
+/// <summary>"Sync now" is the only way Google is fetched, and a repeat press within a minute of the last sync starts nothing.</summary>
 public class RequestGoogleSyncTests
 {
     private static PlanFlowDbContext CreateDb() =>

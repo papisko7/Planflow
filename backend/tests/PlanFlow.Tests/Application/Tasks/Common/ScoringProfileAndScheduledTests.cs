@@ -7,7 +7,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Application.Tasks.Common;
 
 /// <summary>
-/// Step 7.5.4 (algorithm version 2): informational items stay out of the ranking, an unverified item gets no "imminent"
+/// Algorithm version 2: informational items stay out of the ranking, an unverified item gets no "imminent"
 /// floor, a task's planned start feeds the Scheduled component, and all-day items are read in the assignee's time zone.
 /// </summary>
 public class ScoringProfileAndScheduledTests

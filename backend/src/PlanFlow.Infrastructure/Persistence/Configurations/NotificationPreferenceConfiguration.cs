@@ -11,7 +11,6 @@ public class NotificationPreferenceConfiguration : IEntityTypeConfiguration<Noti
         builder.ToTable("notification_preferences");
         builder.HasKey(p => p.Id);
 
-        // One settings row per user.
         builder.HasIndex(p => p.UserId).IsUnique();
 
         builder.HasOne(p => p.User)

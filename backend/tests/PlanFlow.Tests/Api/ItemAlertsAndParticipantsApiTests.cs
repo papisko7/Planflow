@@ -11,7 +11,7 @@ using PlanFlow.Tests.Integration.PostgresIntegration;
 
 namespace PlanFlow.Tests.Api;
 
-/// <summary>Step 7.5.6 through the real HTTP pipeline: alerts and participants on create, edit and detail, the "no list = no change" rule, and leaving an item.</summary>
+/// <summary>Through the real HTTP pipeline: alerts and participants on create, edit and detail, the "no list = no change" rule, and leaving an item.</summary>
 [Collection(PostgresCollection.Name)]
 public class ItemAlertsAndParticipantsApiTests : IClassFixture<CustomWebApplicationFactory>
 {

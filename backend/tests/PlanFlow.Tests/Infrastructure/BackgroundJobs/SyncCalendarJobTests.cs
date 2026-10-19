@@ -357,7 +357,7 @@ public class SyncCalendarJobTests
         calendarClient.Verify(c => c.ListEventsAsync(It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    // ---------- step 7.4: Event import, [planflow] tag, IsDataIncomplete ----------
+    // ---------- Event import, [planflow] tag, IsDataIncomplete ----------
 
     private static Mock<IGoogleCalendarClient> ClientReturning(params GoogleCalendarEvent[] events)
     {
@@ -574,7 +574,7 @@ public class SyncCalendarJobTests
         Assert.Empty(context.EmailOutbox);
     }
 
-    // ---------- step 7.5.2: template, colour, place, all-day, series, status, reminders, full pass ----------
+    // ---------- Template, colour, place, all-day, series, status, reminders, full pass ----------
 
     private static (PlanFlowDbContext Context, CalendarIntegration Integration) SetUp()
     {
@@ -960,7 +960,7 @@ public class SyncCalendarJobTests
         Assert.Null(integration.LastFullSyncAtUtc);
     }
 
-    // --- clean-up of items beyond the import window (step 7.5.11) ---
+    // --- clean-up of items beyond the import window ---
 
     private static CalendarItem ImportedItem(PlanFlowDbContext context, CalendarIntegration integration, string eventId, DateTime start, string? seriesId = "birthday-series")
     {
@@ -1063,7 +1063,7 @@ public class SyncCalendarJobTests
         Assert.Null(kept.BlockedByTaskId);
     }
 
-    // --- Google is fetched only on the "Sync now" button, for the pressing user's account (step 7.5.9) ---
+    // --- Google is fetched only on the "Sync now" button, for the pressing user's account ---
 
     [Fact]
     public async Task Execute_SyncNowPressed_SyncsOnlyThePressingUsersAccount()

@@ -4,7 +4,6 @@ import type { AddTeamMemberRequest, CreateTeamRequest, TeamDto, TeamMemberDto, T
 
 export async function getMyTeams(): Promise<TeamDto[]> {
   const { data } = await http.get<TeamDto[]>('/api/teams');
-  // Personal workspace first, so it is the default target for new tasks.
   return [...data].sort((a, b) => Number(b.isPersonal) - Number(a.isPersonal));
 }
 
@@ -35,14 +34,12 @@ export async function addTeamMember(teamId: string, request: AddTeamMemberReques
   return data;
 }
 
-// Owner/Admin only (the server decides); the member gets an e-mail about the new role.
 export async function changeMemberRole(teamId: string, userId: string, role: TeamRole): Promise<TeamMemberDto> {
   const { data } = await http.put<TeamMemberDto>(`/api/teams/${teamId}/members/${userId}/role`, { role });
   invalidateAllTasksCache();
   return data;
 }
 
-// Also used to leave a team: pass the caller's own userId.
 export async function removeTeamMember(teamId: string, userId: string): Promise<void> {
   await http.delete(`/api/teams/${teamId}/members/${userId}`);
   invalidateAllTasksCache();

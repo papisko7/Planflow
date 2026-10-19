@@ -34,7 +34,6 @@ export default function SettingsScreen() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Changing the e-mail (the login) asks for the current password; changing only the name does not.
   const emailChanged = email.trim() !== savedEmail;
 
   const save = async () => {

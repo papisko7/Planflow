@@ -46,7 +46,7 @@ const show = async (detail: TaskDetailDto) => {
   await waitFor(() => expect(screen.getByText('Sprint retro')).toBeTruthy());
 };
 
-// Step 7.5.6: who takes part in the item, its alerts with what they count from, and leaving.
+// Who takes part in the item, its alerts with what they count from, and leaving.
 describe('TaskDetailScreen - guests and co-contractors', () => {
   beforeEach(() => jest.clearAllMocks());
 

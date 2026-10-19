@@ -6,7 +6,7 @@ namespace PlanFlow.Domain.Entities;
 /// A scheduled item owned by a team: either a Task (work with a deadline) or an Event (fixed time range).
 /// One entity for both, so lists, sync and scoring share one pipeline. Named "CalendarItem" to avoid colliding
 /// with System.Threading.Tasks.Task. Carries the current Urgency Score (computed by
-/// UrgencyScoreCalculator in Phase 1) alongside the raw fields the algorithm reads.
+/// UrgencyScoreCalculator) alongside the raw fields the algorithm reads.
 /// </summary>
 public class CalendarItem : BaseEntity
 {
@@ -96,10 +96,10 @@ public class CalendarItem : BaseEntity
     /// <summary>True for an occurrence of a repeating item created in the app. Derived, not stored.</summary>
     public bool IsRecurring => RecurrenceSeriesId is not null;
 
-    /// <summary>Opt-in per task: allow the Gemini layer to suggest an impact for it. Off by default; the core algorithm never depends on it.</summary>
+    /// <summary>Reserved for an optional AI impact suggestion; neither the app nor the algorithm uses it.</summary>
     public bool UseAiEnhancement { get; set; }
 
-    /// <summary>Impact (0–10) suggested by the AI layer. Never replaces <see cref="ImpactScore"/> — the user accepts or rejects it.</summary>
+    /// <summary>Reserved with <see cref="UseAiEnhancement"/>; would only ever be a suggestion, never a replacement for <see cref="ImpactScore"/>.</summary>
     public double? AiImpactScore { get; set; }
     public string? AiImpactReasoning { get; set; }
 

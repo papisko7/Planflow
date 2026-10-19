@@ -32,7 +32,7 @@ const base: TaskDto = {
 const form = (task: TaskDto) =>
   render(<TaskEditForm task={task} members={[]} canAssign={false} onSaved={jest.fn()} onCancel={jest.fn()} />);
 
-// Step 7.5.5: the edit form follows the item's template, and an item imported from Google keeps Google's fields read-only.
+// The edit form follows the item's template, and an item imported from Google keeps Google's fields read-only.
 describe('TaskEditForm', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -120,7 +120,7 @@ describe('TaskEditForm', () => {
   });
 });
 
-// Step 7.5.3: a task imported from Google Tasks. Google owns its title, notes and due day; the user plans it (start, effort, impact).
+// A task imported from Google Tasks. Google owns its title, notes and due day; the user plans it (start, effort, impact).
 describe('TaskEditForm - task from Google Tasks', () => {
   const googleTask: TaskDto = {
     ...base,

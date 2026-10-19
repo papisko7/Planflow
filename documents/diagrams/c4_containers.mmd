@@ -1,0 +1,39 @@
+---
+title: PlanFlow - Container diagram (C4 level 2)
+---
+flowchart TB
+    user(["<b>User</b><br/>[Person]<br/>Plans tasks and events alone or in a team<br/>and decides what to do next"]):::person
+
+    subgraph planflow ["PlanFlow system"]
+        direction TB
+        mobile["<b>Mobile app</b><br/>[React Native, TypeScript]<br/>Dashboard ranked by Urgency Score, calendar,<br/>task and event forms, team availability, chat, inbox"]:::container
+        api["<b>Backend API</b><br/>[ASP.NET Core 10, MediatR, EF Core, Quartz.NET]<br/>REST with JWT and role checks, Urgency Score algorithm,<br/>SignalR chat hub, background jobs in the same process:<br/>rescoring, reminders, Google sync, repeats, e-mail and push"]:::container
+        db[("<b>Database</b><br/>[PostgreSQL 16]<br/>Users, teams, calendar items,<br/>score history, Google connections,<br/>notifications")]:::container
+        redis[("<b>Cache</b><br/>[Redis]<br/>Cached score breakdown,<br/>who is online in the chat,<br/>optional SignalR backplane")]:::container
+    end
+
+    subgraph ext ["External systems"]
+        direction LR
+        gcal["<b>Google Calendar API</b><br/>[External system]<br/>Events of the user's calendar"]:::external
+        gtasks["<b>Google Tasks API</b><br/>[External system]<br/>Task lists and tasks of the user"]:::external
+        goauth["<b>Google OAuth 2.0</b><br/>[External system]<br/>Consent screen and tokens"]:::external
+        expo["<b>Expo push service</b><br/>[External system]<br/>Delivers push notifications to phones"]:::external
+        smtp["<b>SMTP server</b><br/>[External system]<br/>Delivers e-mail: codes, invitations, reminders"]:::external
+    end
+
+    user -->|Uses| mobile
+    mobile -->|"HTTPS, JSON<br/>SignalR over WebSocket"| api
+    mobile -.->|"Opens the consent screen<br/>in the phone's browser"| goauth
+    api -->|"EF Core, Npgsql"| db
+    api -->|"StackExchange.Redis"| redis
+    api -->|"HTTPS, REST<br/>imports events on Sync now"| gcal
+    api -->|"HTTPS, REST<br/>imports tasks on Sync now"| gtasks
+    api -->|"HTTPS, OAuth 2.0 with PKCE<br/>code for tokens, token refresh"| goauth
+    api -->|HTTPS| expo
+    api -->|SMTP| smtp
+
+    classDef person fill:#08427b,stroke:#052e56,color:#fff
+    classDef container fill:#438dd5,stroke:#2e6295,color:#fff
+    classDef external fill:#999,stroke:#6b6b6b,color:#fff
+    style ext fill:none,stroke:#999,stroke-dasharray:5 5
+    style planflow fill:none,stroke:#444,stroke-dasharray:5 5

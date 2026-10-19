@@ -13,7 +13,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Api;
 
 /// <summary>
-/// Step 7.1 through the real HTTP pipeline: clients that predate the scheduling fields must not wipe them on edit,
+/// Through the real HTTP pipeline: clients that predate the scheduling fields must not wipe them on edit,
 /// and dates sent without a zone or with an offset are understood as UTC instead of crashing with a 500.
 /// </summary>
 [Collection(PostgresCollection.Name)]
@@ -371,7 +371,7 @@ public class TaskSchedulingApiTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal((int)TaskStatus.Tentative, after.GetProperty("status").GetInt32());
     }
 
-    // Step 7.5.7 through the real pipeline: a repeating event gets its occurrences, "scope" travels as a number in the body and in the query.
+    // Through the real pipeline: a repeating event gets its occurrences, "scope" travels as a number in the body and in the query.
     [Fact]
     public async Task RepeatingEvent_EditAndDeleteWithAScope_ReachTheRightOccurrences()
     {

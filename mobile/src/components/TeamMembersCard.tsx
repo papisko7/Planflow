@@ -8,7 +8,6 @@ import type { ApiError } from '../types/api';
 
 type Props = {
   teamId: string;
-  // Lets the parent refresh its own "N members" counter after an add/remove/leave.
   onChanged: () => void;
 };
 
@@ -27,7 +26,6 @@ function canRemove(me: TeamMemberDto | undefined, target: TeamMemberDto): boolea
   return canManage && (target.role !== TeamRole.Admin || me.role === TeamRole.Owner);
 }
 
-// Only the owner hands out or takes away Admin (the server enforces it too); the owner's own role never changes.
 function canChangeRole(me: TeamMemberDto | undefined, target: TeamMemberDto): boolean {
   return me?.role === TeamRole.Owner && target.role !== TeamRole.Owner && me.userId !== target.userId;
 }
@@ -59,7 +57,6 @@ export function TeamMembersCard({ teamId, onChanged }: Props) {
   const myUserId = getCurrentUserId();
   const me = members.find((m) => m.userId === myUserId);
   const canManage = me?.role === TeamRole.Owner || me?.role === TeamRole.Admin;
-  // Only the owner can appoint admins.
   const assignableRoles = me?.role === TeamRole.Owner ? [TeamRole.Member, TeamRole.Admin] : [TeamRole.Member];
 
   const load = useCallback(async () => {

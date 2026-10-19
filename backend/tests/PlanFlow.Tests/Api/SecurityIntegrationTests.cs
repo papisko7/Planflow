@@ -10,7 +10,7 @@ using PlanFlow.Tests.Integration.PostgresIntegration;
 namespace PlanFlow.Tests.Api;
 
 /// <summary>
-/// Black-box verification of Phase 4B's security controls, exercised through the real ASP.NET Core
+/// Black-box verification of the security controls, exercised through the real ASP.NET Core
 /// pipeline (JWT authentication, RBAC policies, rate limiting) via <see cref="CustomWebApplicationFactory"/>
 /// instead of unit-testing each piece in isolation.
 /// </summary>

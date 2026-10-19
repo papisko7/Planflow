@@ -28,7 +28,6 @@ interface WorkloadRow {
   avgScore: number;
 }
 
-// Workload is grouped by assignedUserId; names come from the team's member list.
 function buildWorkload(tasks: TaskDto[], names: Map<string, string>): WorkloadRow[] {
   const buckets = new Map<string, TaskDto[]>();
   for (const task of tasks) {
@@ -68,11 +67,9 @@ export default function TeamsScreen() {
       setState('signedOut');
       return;
     }
-    // The personal workspace is managed from the Items tab; this screen is only for shared teams.
     const data = (await getMyTeams()).filter((t) => !t.isPersonal);
     setTeams(data);
     setState('ready');
-    // Keep the current selection only while the user is still in that team (they may have just left it).
     setSelectedTeamId((current) => (data.some((t) => t.id === current) ? current : (data[0]?.id ?? null)));
   }, []);
 
@@ -86,7 +83,6 @@ export default function TeamsScreen() {
     }
   }, [loadTeams]);
 
-  // Tabs stay mounted: reload teams on every focus so changes made elsewhere show up without an app reload.
   useFocusEffect(
     useCallback(() => {
       load();
@@ -100,7 +96,6 @@ export default function TeamsScreen() {
     }, []),
   );
 
-  // Swipe / long-press actions on the team's task cards; reloading = refetching this team's tasks.
   const taskActions = useTaskActions(useCallback(() => setReloadTick((n) => n + 1), []));
   const listRef = useRef<FlatList<TeamDto>>(null);
   useScrollToTop(listRef);

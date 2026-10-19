@@ -143,7 +143,6 @@ public class TeamUrgencyRecalculatorTests
         Assert.Equal(0.0, done.CurrentUrgencyScore);
     }
 
-    // ---- Step 7.5.4 ----
 
     [Fact]
     public async Task RecalculateTeam_InformationalItem_KeepsAZeroScoreAndGetsNoAuditRow()

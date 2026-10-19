@@ -58,7 +58,7 @@ const doubleTap = async (testID: string) => {
   await fireEvent.press(screen.getByTestId(testID));
 };
 
-// Step 7.5.11: selection mode, the bar, "Clear" and the team's own lists on the Items screen.
+// Selection mode, the bar, "Clear" and the team's own lists on the Items screen.
 describe('ItemsScreen - selection mode', () => {
   beforeEach(() => {
     jest.clearAllMocks();

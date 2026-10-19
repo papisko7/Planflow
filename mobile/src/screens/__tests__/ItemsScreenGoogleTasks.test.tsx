@@ -31,7 +31,7 @@ jest.mock('../../hooks/useAllTasks', () => ({
 jest.mock('../../hooks/useTaskActions', () => ({ useTaskActions: () => ({}) }));
 jest.mock('@react-navigation/native', () => ({ useNavigation: () => ({ navigate: jest.fn() }), useScrollToTop: jest.fn() }));
 
-// Step 7.5.3: the tasks of each Google Tasks list sit in their own collapsed group under your own tasks.
+// The tasks of each Google Tasks list sit in their own collapsed group under your own tasks.
 describe('ItemsScreen - Google Tasks lists', () => {
   it('shows one collapsed group per list with a count, and your own tasks as usual', async () => {
     await render(<ItemsScreen />);

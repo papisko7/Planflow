@@ -27,7 +27,7 @@ const item = (id: string, over: Partial<TaskDto> = {}): TaskDto => ({
 
 const list = (id: string, name: string, kind: ItemListKind = ItemListKind.TaskList): ItemListDto => ({ id, teamId: 't', name, kind, createdByUserId: 'u' });
 
-// Step 7.5.11: the team's own lists show as groups next to the Google Tasks lists.
+// The team's own lists show as groups next to the Google Tasks lists.
 describe('buildRows with the team\'s own lists', () => {
   const sprint = list('l-sprint', 'Sprint');
   const home = list('l-home', 'Home');

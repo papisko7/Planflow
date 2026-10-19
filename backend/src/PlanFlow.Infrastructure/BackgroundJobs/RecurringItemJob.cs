@@ -49,7 +49,6 @@ public class RecurringItemJob : IJob
             return;
         }
 
-        // Give the new occurrences an urgency score right away instead of waiting for the hourly job.
         var changedTaskIds = created.Count == 0
             ? []
             : TeamUrgencyRecalculator.Apply(_context, created, nowUtc, ScoreTriggerSource.ScheduledRecalculation);

@@ -28,7 +28,7 @@ const event = (id: string, daysFromNow: number, over: Partial<TaskDto> = {}): Ta
   ...over,
 });
 
-// Step 7.5.11: a repeating event is one entry in the lists about "what is there", not a copy per date.
+// A repeating event is one entry in the lists about "what is there", not a copy per date.
 describe('collapseSeries', () => {
   it('shows one entry per series: the next open occurrence, with the number of the others', () => {
     const items = [

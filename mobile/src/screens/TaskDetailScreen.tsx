@@ -42,7 +42,6 @@ export default function TaskDetailScreen() {
   const { taskId, teamId, edit } = route.params;
 
   const [members, setMembers] = useState<TeamMemberDto[]>([]);
-  // `edit` comes from the swipe-left gesture / long-press menu; the API still rejects it for non-owners.
   const [editing, setEditing] = useState(edit === true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -55,7 +54,6 @@ export default function TaskDetailScreen() {
   const [blockedTasks, setBlockedTasks] = useState<TaskDto[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // `silent` (pull-to-refresh) keeps the current content on screen instead of showing the spinner.
   const load = useCallback(async (silent = false) => {
     if (!silent) setState('loading');
     try {
@@ -121,7 +119,6 @@ export default function TaskDetailScreen() {
   const createdDate = formatDateTime(task.createdAtUtc);
   const participantIds = task.participantUserIds ?? [];
 
-  // Same rule as the API: Owner/Admin act on any task, a Member only on tasks assigned to them.
   const myUserId = getCurrentUserId();
   const myRole = members.find((m) => m.userId === myUserId)?.role;
   const isPrivileged = myRole === TeamRole.Owner || myRole === TeamRole.Admin;
@@ -130,7 +127,6 @@ export default function TaskDetailScreen() {
     ? (members.find((m) => m.userId === task.assignedUserId)?.userDisplayName ?? 'Former member')
     : 'Unassigned';
 
-  // One-tap done / not done; the update endpoint replaces the whole task, so the other fields are resent.
   const toggleDone = async () => {
     setActionError(null);
     try {
@@ -146,8 +142,6 @@ export default function TaskDetailScreen() {
     }
   };
 
-  // Claim = assign an unassigned task to yourself (a Member can't touch it before, but owns it afterwards).
-  // Abandon = the reverse: clear the assignee so the task returns to the unassigned pool.
   const changeAssignee = async (assignedUserId: string | null, failureMessage: string) => {
     setActionError(null);
     try {
@@ -161,13 +155,11 @@ export default function TaskDetailScreen() {
   const claim = () => (myUserId ? changeAssignee(myUserId, 'Failed to take over the task.') : undefined);
   const abandon = () => changeAssignee(null, 'Failed to abandon the task.');
   const isMine = myUserId !== null && task.assignedUserId === myUserId;
-  // A task an Owner/Admin assigned cannot be given back by its assignee (the server refuses); they can still work on it and invite co-contractors.
   const lockedForMe = isMine && !!task.isAssignmentLocked && !isPrivileged;
   const assignerName = task.isAssignmentLocked && task.assignedByUserId
     ? (members.find((m) => m.userId === task.assignedByUserId)?.userDisplayName ?? null)
     : null;
 
-  // The guests of an event / co-contractors of a task, by name; a guest or co-contractor can step out of it (not edit it).
   const participantNames = participantIds.map((id) => members.find((m) => m.userId === id)?.userDisplayName ?? 'Former member');
   const isParticipant = myUserId !== null && participantIds.includes(myUserId);
   const leave = async () => {
@@ -191,7 +183,6 @@ export default function TaskDetailScreen() {
   };
 
   const confirmDelete = async () => {
-    // An item that repeats asks which occurrences go (this / this and following / all) instead of the plain confirmation.
     if (task.seriesId) {
       const scope = await askSeriesScope(`Delete "${task.title}"`, 'This item repeats. Which ones do you want to delete?');
       if (scope !== null) await deleteNow(scope);
@@ -310,7 +301,6 @@ export default function TaskDetailScreen() {
         {actionError ? <Text style={styles.deleteText}>{actionError}</Text> : null}
       </View>
 
-      {/* A day off, a focus block, a working place or a birthday is not ranked: no blocking chain and no score to explain. */}
       {ranked ? (
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Blocking Relationships</Text>

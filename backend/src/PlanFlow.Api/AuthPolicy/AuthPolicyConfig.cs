@@ -6,7 +6,7 @@ namespace PlanFlow.Api.AuthPolicy;
 /// <summary>
 /// Registers one ASP.NET Core authorization policy per <see cref="Permission"/>, named after the
 /// enum value (e.g. "DeleteTeam"), so endpoints can be locked down with
-/// [Authorize(Policy = nameof(Permission.DeleteTeam))] as soon as controllers are added (Phase 1.4).
+/// [Authorize(Policy = nameof(Permission.DeleteTeam))] .
 /// </summary>
 public static class AuthPolicyConfig
 {

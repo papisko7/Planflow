@@ -1,9 +1,7 @@
 import { RecurrenceFrequency, type ScheduleFields, type TaskDto } from '../types/task';
 
-// Same bound as the backend (RecurrenceRules.MaxInterval): "every 1 ... 99" days / weeks / months / years.
 export const MAX_INTERVAL = 99;
 
-// The days of a week as bits, Monday first (the backend's mask): Mon = 1, Tue = 2, ... Sun = 64.
 export const WEEKDAYS = [
   { bit: 1, short: 'Mon' },
   { bit: 2, short: 'Tue' },
@@ -14,7 +12,6 @@ export const WEEKDAYS = [
   { bit: 64, short: 'Sun' },
 ] as const;
 
-// The bit of the weekday a date falls on (JavaScript counts Sunday as 0).
 export const weekdayBit = (date: Date): number => 1 << ((date.getDay() + 6) % 7);
 
 export const FREQUENCY_LABEL: Record<RecurrenceFrequency, { chip: string; unit: string }> = {
@@ -29,7 +26,6 @@ const weekdayNames = (mask: number) =>
     .map((day) => day.short)
     .join(', ');
 
-// "every day" / "every 2 weeks on Mon, Wed" / "every month" / null when the item does not repeat by a rule of the app's own.
 export function formatRecurrence(
   item: Pick<TaskDto, 'isRecurring' | 'recurrenceFrequency' | 'recurrenceInterval' | 'recurrenceWeekdays'>,
 ): string | null {
@@ -43,7 +39,6 @@ export function formatRecurrence(
   return every;
 }
 
-// Turning "Repeats" on: daily is the simplest rule; the weekday of the first occurrence is where a weekly rule starts.
 export function defaultRecurrence(anchor: string | null): Pick<ScheduleFields, 'isRecurring' | 'recurrenceFrequency' | 'recurrenceInterval' | 'recurrenceWeekdays'> {
   return {
     isRecurring: true,
@@ -71,7 +66,6 @@ export function recurrenceChanged(
   );
 }
 
-// The message of the rule in the form, or null when it is fine (the twin of the backend validator).
 export function validateRecurrence(
   s: Pick<ScheduleFields, 'recurrenceFrequency' | 'recurrenceInterval' | 'recurrenceWeekdays'>,
 ): string | null {

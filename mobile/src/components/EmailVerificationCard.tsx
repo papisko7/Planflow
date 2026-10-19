@@ -9,8 +9,6 @@ interface Props {
   onVerified: () => void;
 }
 
-// Shown while the account's e-mail address is not confirmed yet. The code arrives by e-mail (right after sign-up, or after
-// the address was changed); until it is entered the app sends only account mails to this address, never task or team mail.
 export function EmailVerificationCard({ email, onVerified }: Props) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);

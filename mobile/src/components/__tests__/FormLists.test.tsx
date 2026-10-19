@@ -52,7 +52,7 @@ async function pickDeadlineTomorrow() {
   await fireEvent.press(screen.getByTestId('deadline-picker-set'));
 }
 
-// Step 7.5.11: the form of an item picks one of the team's own lists.
+// The form of an item picks one of the team's own lists.
 describe('CreateTaskModal - lists', () => {
   beforeEach(() => {
     jest.clearAllMocks();

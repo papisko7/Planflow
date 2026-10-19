@@ -5,7 +5,7 @@ using PlanFlow.Domain.Services;
 
 namespace PlanFlow.Tests.Domain.Services;
 
-/// <summary>Step 7.5.6: the reminders have their own switch; joining / leaving an item follows the assignment switch; and the wording of a reminder.</summary>
+/// <summary>The reminders have their own switch; joining / leaving an item follows the assignment switch; and the wording of a reminder.</summary>
 public class ItemAlertNotificationPolicyTests
 {
     private static NotificationPreference Defaults() => NotificationPreference.CreateDefault(Guid.NewGuid());

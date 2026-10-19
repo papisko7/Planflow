@@ -6,7 +6,7 @@ using Xunit;
 
 namespace PlanFlow.Tests.Infrastructure.BackgroundJobs;
 
-/// <summary>Step 7.5.9: the sync jobs have no timer. A press queues them for one user, and the status can tell that user's sync is still going.</summary>
+/// <summary>The sync jobs have no timer. A press queues them for one user, and the status can tell that user's sync is still going.</summary>
 public class GoogleSyncTriggerTests
 {
     /// <summary>Stands in for the real sync: signals that it started and stays "running" until the test lets it go.</summary>

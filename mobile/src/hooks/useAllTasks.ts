@@ -19,7 +19,6 @@ export function useAllTasks() {
   const [lists, setLists] = useState<ItemListDto[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  // When the data on screen was last fetched from the server (shown as "Updated 12:30" on the dashboard).
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchAll = useCallback(async (force = false) => {
@@ -56,7 +55,6 @@ export function useAllTasks() {
     }
   }, [fetchAll]);
 
-  // Stable identity: it is passed down to memoized task cards.
   const reload = useCallback(() => fetchAll(true), [fetchAll]);
 
   return { state, tasks, teams, lists, errorMessage, refreshing, lastUpdated, refresh, reload };

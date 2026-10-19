@@ -15,7 +15,7 @@ using Xunit;
 namespace PlanFlow.Tests.Application.Calendar;
 
 /// <summary>
-/// Step 7.5.3: an account only syncs Google Tasks once Google reports the tasks permission. Accounts connected before that permission
+/// An account only syncs Google Tasks once Google reports the tasks permission. Accounts connected before that permission
 /// existed have to reconnect, and the app learns this from the status endpoint.
 /// </summary>
 public class GoogleTasksScopeTests

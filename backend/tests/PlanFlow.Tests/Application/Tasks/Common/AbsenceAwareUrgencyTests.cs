@@ -8,7 +8,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Application.Tasks.Common;
 
 /// <summary>
-/// Step 7.5.10b: the assignee's out-of-office time is taken off a task's deadline (capped at 7 days) before the deadline curve is read, and
+/// The assignee's out-of-office time is taken off a task's deadline (capped at 7 days) before the deadline curve is read, and
 /// the explanation says so. What counts as an absence follows what the person shares.
 /// </summary>
 public class AbsenceAwareUrgencyTests

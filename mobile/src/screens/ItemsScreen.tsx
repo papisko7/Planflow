@@ -38,16 +38,12 @@ export default function ItemsScreen() {
   const [renamingList, setRenamingList] = useState<ItemListDto | null>(null);
   const [listMenu, setListMenu] = useState<ItemListDto | null>(null);
   const [clearMenu, setClearMenu] = useState(false);
-  // Tasks and Events are one list on the server (CalendarItem); the tabs are just a filter over it.
-  // All shows both, split into a Tasks and an Events section.
   const [tab, setTab] = useState<ItemTab>('all');
-  // A repeating series is one entry here (the next occurrence, "+N more"); Clear and the Agenda still deal with every occurrence.
   const shown = useMemo(() => collapseSeries(tasks), [tasks]);
   const rows = useMemo(() => buildRows(shown, tab, new Date(), lists), [shown, tab, lists]);
   const counts = useMemo(() => countByTab(shown), [shown]);
   const noun = tab === 'all' ? 'item' : tab === 'events' ? 'event' : 'task';
 
-  // Selection mode: every entry of the open tab can be ticked, also the ones inside a collapsed group.
   const visible = useMemo(() => filterByTab(shown, tab), [shown, tab]);
   const visibleIds = useMemo(() => visible.map((item) => item.id), [visible]);
   const selection = useSelectionSet(visibleIds);
@@ -169,8 +165,6 @@ export default function ItemsScreen() {
               {row.title} · {row.count}
             </Text>
           ) : row.type === 'group' ? (
-            // A list: collapsed until opened, so a long one does not push your other items off the screen. Your own lists open a
-            // rename / delete menu on a long press of the header; a Google Tasks list is a read-only mirror.
             <View style={styles.group}>
               <AccordionSection
                 testID={row.key}

@@ -1,7 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
 
-// Persists the auth session so the app survives a restart without forcing re-login;
-// SecureStore backs onto Keychain/Keystore, so tokens never sit in plain storage.
 const ACCESS_TOKEN_KEY = 'planflow.accessToken';
 const REFRESH_TOKEN_KEY = 'planflow.refreshToken';
 const USER_ID_KEY = 'planflow.userId';
@@ -58,8 +56,6 @@ export interface RefreshCredentials {
   userId: string;
 }
 
-// Used by refresh() — only the refresh token and userId are needed for a token exchange,
-// so this works even after a soft logout where the access token has been cleared.
 export async function loadRefreshCredentials(): Promise<RefreshCredentials | null> {
   const [refreshToken, userId] = await Promise.all([
     SecureStore.getItemAsync(REFRESH_TOKEN_KEY),
@@ -79,8 +75,6 @@ export async function clearRefreshTokenForUser(userId: string): Promise<void> {
   await SecureStore.deleteItemAsync(`${REFRESH_TOKEN_KEY}.${userId}`);
 }
 
-// A random id created once per installation (it survives logout on purpose). The server remembers which
-// devices an account has used so it can e-mail a "new sign-in" alert for an unfamiliar one.
 export async function getDeviceId(): Promise<string> {
   const existing = await SecureStore.getItemAsync(DEVICE_ID_KEY);
   if (existing) {

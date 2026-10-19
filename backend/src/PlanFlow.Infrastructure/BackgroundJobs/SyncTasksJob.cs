@@ -225,7 +225,6 @@ public class SyncTasksJob : IJob
 
         if (incompleteItems.Count > 0)
         {
-            // One message per run listing every newly imported task (inbox + push + e-mail by preference), saved in the same transaction.
             await _notifications.NotifyAsync(
                 NotificationEvent.CalendarItemsIncomplete,
                 new[] { integration.UserId },
@@ -242,7 +241,6 @@ public class SyncTasksJob : IJob
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        // A new or moved deadline changes the heaviest urgency component, so the team is rescored right away (not at the next hourly pass).
         var changedTaskIds = await TeamUrgencyRecalculator.RecalculateTeamAsync(
             _context, destinationTeamId.Value, nowUtc, ScoreTriggerSource.CalendarSync, null, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
@@ -324,7 +322,6 @@ public class SyncTasksJob : IJob
             item.DeadlineUtc = due;
             item.IsDeadlineDefaulted = false;
         }
-        // Whatever moved the deadline, the planned start never ends up after it.
         if (item.StartUtc is { } start && item.DeadlineUtc is { } deadline && start > deadline)
         {
             item.StartUtc = deadline;
@@ -392,7 +389,6 @@ public class SyncTasksJob : IJob
 
     private static Content ReadContent(GoogleTask googleTask)
     {
-        // The optional "[planflow] impact=8 effort=2h" line (title or notes) supplies data Google Tasks has no field for.
         var plainNotes = PlanflowTagParser.ToPlainText(googleTask.Notes);
         var tag = PlanflowTagParser.Parse(googleTask.Title, plainNotes);
         var title = string.IsNullOrWhiteSpace(googleTask.Title) ? string.Empty : PlanflowTagParser.StripFromTitle(googleTask.Title);

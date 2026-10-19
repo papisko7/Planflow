@@ -13,7 +13,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Integration.PostgresIntegration;
 
 /// <summary>
-/// The 7.5.2 migration adds the reminders table and the "last full pass" moment of a Google connection. Checked on a real
+/// The migration adds the reminders table and the "last full pass" moment of a Google connection. Checked on a real
 /// PostgreSQL database: connections that already exist must be due for a full pass (so they pick up the new fields), and the table's
 /// rule "exactly one reminder form" and its cascade must really hold.
 /// </summary>

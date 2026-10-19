@@ -28,7 +28,6 @@ const TAB_ICONS: Record<keyof RootTabParamList, { active: keyof typeof Ionicons.
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-// Lets code outside a screen (a tap on a push notification) navigate.
 const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 function Tabs() {
@@ -76,7 +75,6 @@ export default function RootNavigator() {
             headerStyle: { backgroundColor: colors.surface },
             headerTitleStyle: { color: colors.text },
             headerTintColor: colors.primary,
-            // Swipe right anywhere on the screen to go back (iOS; Android uses the system back gesture).
             gestureEnabled: true,
             fullScreenGestureEnabled: true,
           }}

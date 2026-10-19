@@ -5,7 +5,7 @@ using PlanFlow.Domain.Services;
 namespace PlanFlow.Tests.Domain.Services;
 
 /// <summary>
-/// Step 7.5.10: what a teammate may see of a personal calendar (sharing levels, privacy), how available a person is (status now and per day)
+/// What a teammate may see of a personal calendar (sharing levels, privacy), how available a person is (status now and per day)
 /// and how loaded with work they are (capacity 8 h on weekdays, effort spread over the days up to the deadline).
 /// </summary>
 public class MemberCalendarServicesTests

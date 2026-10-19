@@ -9,7 +9,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 
 namespace PlanFlow.Tests.Application.Tasks;
 
-/// <summary>Step 7.4: an imported item flagged "incomplete" stops being flagged as soon as the user edits and saves it.</summary>
+/// <summary>An imported item flagged "incomplete" stops being flagged as soon as the user edits and saves it.</summary>
 public class IncompleteDataFlagTests
 {
     [Fact]

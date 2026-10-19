@@ -3,20 +3,16 @@ import { colors, radius, spacing, typography } from '../theme/theme';
 import { buildMonthGrid, dayKey, startOfDay } from '../utils/dateUtils';
 
 type Props = {
-  // Any date inside the month to show.
   month: Date;
   onMonthChange: (month: Date) => void;
   selectedKey?: string | null;
-  // dayKey -> dot color, e.g. the urgency of the most pressing task due that day.
   markers?: Map<string, string>;
-  // Days before this one are shown greyed out and cannot be picked.
   minDate?: Date;
   onSelectDay: (day: Date) => void;
 };
 
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
-// One month as a tappable grid. Shared by the deadline picker and the Calendar's month view.
 export function MonthGrid({ month, onMonthChange, selectedKey, markers, minDate, onSelectDay }: Props) {
   const year = month.getFullYear();
   const monthIndex = month.getMonth();

@@ -16,8 +16,6 @@ const MODAL_TITLES: Record<Mode, string> = {
   'change-confirm': 'Confirm your new PIN',
 };
 
-// The PIN part of the Credentials section (the section itself provides the heading and the card):
-// turn PIN login on/off and, once it is on, change the PIN. Changing asks for the current PIN first.
 export function PinSettingsCard({ onEnabledChange }: { onEnabledChange?: (enabled: boolean) => void }) {
   const [enabled, setEnabledState] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -59,7 +57,6 @@ export function PinSettingsCard({ onEnabledChange }: { onEnabledChange?: (enable
   };
 
   const onComplete = async (pin: string) => {
-    // Both "set a PIN" and "change the PIN" pick a new one twice; they differ only in how they start.
     if (mode === 'setup-enter' || mode === 'change-enter') {
       setFirstPin(pin);
       setMode(mode === 'setup-enter' ? 'setup-confirm' : 'change-confirm');

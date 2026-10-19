@@ -8,7 +8,7 @@ using Xunit;
 namespace PlanFlow.Tests.Integration.PostgresIntegration;
 
 /// <summary>
-/// The 7.5.10 migration adds Google's privacy flag to every item. Existing items come through with "unknown" (null, read as private),
+/// The migration adds Google's privacy flag to every item. Existing items come through with "unknown" (null, read as private),
 /// and every integration forgets its last full pass so the next sync fills the flag in. Checked on a real PostgreSQL database.
 /// </summary>
 public class MemberCalendarsMigrationPostgresTests : IAsyncLifetime

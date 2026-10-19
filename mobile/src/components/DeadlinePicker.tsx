@@ -5,31 +5,20 @@ import { addDays, composeDeadline, dayKey, formatDay, formatDeadline, splitDeadl
 import { MonthGrid } from './MonthGrid';
 
 type Props = {
-  // ISO timestamp or null (no deadline).
   value: string | null;
   onChange: (deadlineUtc: string | null) => void;
-  // New tasks must be due in the future (the API rejects anything else); editing an old task may keep a past date.
   futureOnly?: boolean;
-  // What the moment is called: "Deadline" (default), "Start", "End", "Repeat until"...
   label?: string;
-  // Optional fields read "<label> (optional)" and can be cleared; required ones (an event's start) cannot.
   optional?: boolean;
-  // Offer the "All day" choice (stored as 23:59). Off for event times, which always have a clock time.
   allowAllDay?: boolean;
-  // Earliest pickable day (e.g. an event's end cannot be before its start day).
   minDate?: Date;
-  // Pick only a day (no time choices): used for all-day events, where the caller turns the day into 00:00 / 23:59.
   dateOnly?: boolean;
   testIDPrefix?: string;
 };
 
 const TIME_CHOICES = ['09:00', '12:00', '15:00', '18:00'];
-// Any other clock time can be typed; it applies as soon as it is a valid H:MM / HH:MM.
 const CLOCK_TIME = /^([01]?\d|2[0-3]):[0-5]\d$/;
 
-// Replaces "type a number of days": tap the field, pick a day on a month grid (or a quick choice) and,
-// if it matters, a time. A task has ONE deadline - that is what the urgency score and the Google Calendar
-// sync work with - so a task has no start-to-end range. An Event does: the form uses two pickers (start, end).
 export function DeadlinePicker({
   value,
   onChange,

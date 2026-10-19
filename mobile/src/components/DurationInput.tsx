@@ -5,16 +5,13 @@ import { DURATION_UNIT_LABEL, EFFORT_UNITS, fromHours, toHours, type DurationUni
 
 type Props = {
   label: string;
-  // Stored value in hours (what the API uses) or null when empty.
   hours: number | null;
   onChange: (hours: number | null) => void;
   units?: DurationUnit[];
-  // Unit shown when there is no value yet.
   defaultUnit?: DurationUnit;
   testID: string;
 };
 
-// A number plus a unit ("2" + Days). The user types in the unit that feels natural; the parent only ever sees hours.
 export function DurationInput({ label, hours, onChange, units = EFFORT_UNITS, defaultUnit = 'hour', testID }: Props) {
   const initial = hours !== null ? fromHours(hours, units) : null;
   const [text, setText] = useState(initial ? String(initial.value) : '');

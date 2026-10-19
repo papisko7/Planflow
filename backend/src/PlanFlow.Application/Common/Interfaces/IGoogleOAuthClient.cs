@@ -13,7 +13,7 @@ public record GoogleUserInfo(string Sub, string Email);
 /// <summary>
 /// Talks to Google's OAuth2/OpenID endpoints. Declared here so Application-layer command handlers
 /// depend on an abstraction (and can be unit-tested with a fake) instead of an HttpClient directly;
-/// implemented in Infrastructure (Phase 4A).
+/// implemented in Infrastructure.
 /// </summary>
 public interface IGoogleOAuthClient
 {

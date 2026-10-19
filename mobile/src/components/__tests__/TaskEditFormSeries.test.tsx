@@ -51,7 +51,7 @@ const popup = () => alertSpy.mock.calls[0] as [string, string, AlertButton[]];
 const form = (task: TaskDto) =>
   render(<TaskEditForm task={task} members={[]} canAssign={false} onSaved={jest.fn()} onCancel={jest.fn()} />);
 
-// Step 7.5.7: saving a change of an item that repeats asks which occurrences it applies to.
+// Saving a change of an item that repeats asks which occurrences it applies to.
 describe('TaskEditForm - repeating item', () => {
   beforeEach(() => {
     jest.clearAllMocks();

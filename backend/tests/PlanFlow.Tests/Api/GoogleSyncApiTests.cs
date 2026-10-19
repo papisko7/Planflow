@@ -15,7 +15,7 @@ using Quartz;
 namespace PlanFlow.Tests.Api;
 
 /// <summary>
-/// Step 7.5.9 through the real host: Google is fetched only when "Sync now" is pressed, for the caller's own account, and never twice within
+/// Through the real host: Google is fetched only when "Sync now" is pressed, for the caller's own account, and never twice within
 /// a minute. The fake tokens in these accounts make a started sync fail on the spot without reaching Google, which is all these tests need.
 /// </summary>
 [Collection(PostgresCollection.Name)]

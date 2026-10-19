@@ -13,7 +13,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Integration.PostgresIntegration;
 
 /// <summary>
-/// Step 7.8: creating and editing items with the fields added in the thesis-improvements phase (type and times, effort, place, colour,
+/// Creating and editing items with the fields added in the thesis-improvements phase (type and times, effort, place, colour,
 /// busy/free, alerts, guests, repeat rule with a scope), through the real HTTP pipeline onto a real PostgreSQL database. The same
 /// endpoints are exercised on InMemory in <c>Api/*ApiTests</c>; here the SQL, the foreign-key cascades and the column widths are real.
 /// </summary>

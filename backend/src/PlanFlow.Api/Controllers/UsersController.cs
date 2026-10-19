@@ -47,7 +47,6 @@ public class UsersController : ControllerBase
         return Ok(profile);
     }
 
-    // The phone reports its time zone here (on sign-in / when it changes), so the server can compute "end of day" per user.
     [HttpPut("time-zone")]
     public async Task<IActionResult> UpdateTimeZone(UpdateTimeZoneRequest request, CancellationToken cancellationToken)
     {
@@ -63,7 +62,6 @@ public class UsersController : ControllerBase
         return NoContent();
     }
 
-    // The caller's own Out of office time ahead, so the app can warn "this deadline falls while you are away".
     [HttpGet("absences")]
     public async Task<IActionResult> GetMyAbsences(CancellationToken cancellationToken) =>
         Ok(await _sender.Send(new GetMyAbsencesQuery(User.GetUserId()), cancellationToken));

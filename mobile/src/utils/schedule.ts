@@ -3,7 +3,6 @@ import { EventTemplate, RecurrenceFrequency, TaskType, type ScheduleFields, type
 import { validateRecurrence } from './recurrence';
 import { resolveAllDay, resolveBusy, rulesFor, WORKING_LOCATION_PRESETS, type ItemKind } from './templateRules';
 
-// Same bound as the backend's TaskScheduleValidator: one year in hours.
 const MAX_HOURS = 366 * 24;
 // An event with no end is assumed to last one hour (CalendarItemUrgencyScoreFactory.DefaultEventDurationHours).
 export const DEFAULT_EVENT_HOURS = 1;
@@ -29,8 +28,6 @@ export function emptySchedule(taskType: TaskType = TaskType.Task, eventTemplate:
   };
 }
 
-// The stored values as they are (the wire convention for all-day items). Quick actions resend these untouched; the edit
-// form starts from scheduleForEditing instead.
 export function scheduleFromTask(task: TaskDto): ScheduleFields {
   return {
     taskType: task.taskType,
@@ -65,8 +62,6 @@ export function scheduleForEditing(task: TaskDto): ScheduleFields {
   return schedule.endUtc ? schedule : { ...schedule, ...pairEventTimes(schedule.startUtc, null, 'start') };
 }
 
-// Picking another chip of the form (Task, Event, Out of office, ...): the type and template change, what the new kind does
-// not have is cleared, and the dates are re-shaped when the kind is all-day (Birthday) or never all-day (Focus time).
 export function switchKind(s: ScheduleFields, kind: ItemKind): ScheduleFields {
   const rules = rulesFor(kind.taskType, kind.template);
   const wasAllDay = s.taskType === TaskType.Event && s.isAllDay;
@@ -166,13 +161,11 @@ export function pairAllDayDates(
   };
 }
 
-// Leaving all-day mode: the first day becomes a normal 09:00-10:00 slot (the picker's default time) to adjust.
 export function allDayToTimed(startUtc: string | null): { startUtc: string | null; endUtc: string | null } {
   if (!startUtc) return { startUtc: null, endUtc: null };
   return pairEventTimes(composeDeadline(startOfDay(new Date(startUtc)), '09:00'), null, 'start');
 }
 
-// The moment a person plans around: a Task's deadline, an Event's start (mirrors CalendarItem.DueUtc).
 export function dueUtc(item: Pick<TaskDto, 'taskType' | 'deadlineUtc' | 'startUtc'>): string | null {
   return item.taskType === TaskType.Event ? item.startUtc : item.deadlineUtc;
 }
@@ -205,8 +198,6 @@ export function isPastEvent(
   return end < now.getTime();
 }
 
-// Drops what does not apply to the chosen type and template, so switching kinds in the form never sends stale values
-// (the backend does the same; this keeps the request honest).
 export function normalizeSchedule(s: ScheduleFields): ScheduleFields {
   const isEvent = s.taskType === TaskType.Event;
   const eventTemplate = isEvent ? s.eventTemplate : EventTemplate.Default;
@@ -219,7 +210,6 @@ export function normalizeSchedule(s: ScheduleFields): ScheduleFields {
     colorKey: rules.allowsColor ? s.colorKey : null,
     isBusy: resolveBusy(s.taskType, eventTemplate, s.isBusy),
     deadlineUtc: isEvent ? null : s.deadlineUtc,
-    // An Event's start is when it begins; a Task's is its optional planned start (it feeds the "Scheduled" part of the score).
     startUtc: s.startUtc,
     endUtc: isEvent ? s.endUtc : null,
     recurrenceFrequency: s.isRecurring ? s.recurrenceFrequency : null,
@@ -229,7 +219,6 @@ export function normalizeSchedule(s: ScheduleFields): ScheduleFields {
   };
 }
 
-// A calendar day as midnight UTC - the stored form of an all-day date (see utcDay for the way back).
 const utcMidnight = (d: Date) => new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).toISOString();
 
 // The fields as the API stores them. Timed values pass through; an all-day event's local days (start 00:00, end 23:59) become
@@ -243,17 +232,13 @@ export function scheduleForRequest(raw: ScheduleFields): ScheduleFields {
   return { ...s, startUtc: utcMidnight(first), endUtc: utcMidnight(addDays(last < first ? first : last, 1)) };
 }
 
-// A whole-day value (stored as midnight UTC of its date) <-> the local timestamp the date pickers work with (the end of that local day).
 export const wireDayToPicker = (iso: string | null): string | null => (iso ? composeDeadline(utcDay(iso), null) : null);
 export const pickerToWireDay = (iso: string | null): string | null => (iso ? utcMidnight(new Date(iso)) : null);
 
-// The effort rule shared by the create/edit forms (the same bound as the backend validator).
 export function validateEffort(hours: number | null): string | null {
   return hours !== null && !(hours > 0 && hours <= MAX_HOURS) ? 'Effort must be greater than 0 and at most one year.' : null;
 }
 
-// Client-side twin of the backend validator, so the user gets a message before the round trip.
-// `isNew` adds the create-only rules (a new item may not already be in the past).
 export function validateSchedule(raw: ScheduleFields, isNew: boolean): string | null {
   const s = normalizeSchedule(raw);
   const isEvent = s.taskType === TaskType.Event;
@@ -287,8 +272,6 @@ export function validateSchedule(raw: ScheduleFields, isNew: boolean): string | 
   return null;
 }
 
-// The update endpoint replaces the whole item, so quick actions (done, claim, ...) resend every field of the
-// existing one; `overrides` carries the single thing that changes.
 export function toUpdateRequest(task: TaskDto, overrides: Partial<UpdateTaskRequest> = {}): UpdateTaskRequest {
   return {
     title: task.title,

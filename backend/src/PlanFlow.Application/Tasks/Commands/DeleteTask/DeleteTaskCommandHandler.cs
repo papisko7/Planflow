@@ -39,7 +39,6 @@ public class DeleteTaskCommandHandler : IRequestHandler<DeleteTaskCommand>
 
         // TaskHistory/UrgencyScoreLog rows cascade-delete with the task (see TaskHistoryConfiguration),
         // so no separate "Deleted" audit entry is written here — it would be removed in the same transaction.
-        // An item that repeats may take other occurrences with it (the pop-up's choice); a Member only deletes the ones assigned to them.
         var nowUtc = DateTime.UtcNow;
         await SeriesEditing.DeleteAsync(
             _context, task, request.Scope, row => request.CanDeleteAny || row.AssignedUserId == request.DeletedByUserId, nowUtc, cancellationToken);

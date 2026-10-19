@@ -14,7 +14,6 @@ public class UserDeviceConfiguration : IEntityTypeConfiguration<UserDevice>
         builder.Property(d => d.DeviceId).IsRequired().HasMaxLength(128);
         builder.Property(d => d.Name).IsRequired().HasMaxLength(128);
 
-        // A device is recorded once per user.
         builder.HasIndex(d => new { d.UserId, d.DeviceId }).IsUnique();
 
         builder.HasOne(d => d.User)

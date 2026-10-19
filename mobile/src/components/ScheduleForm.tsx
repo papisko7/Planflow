@@ -13,14 +13,9 @@ import { DurationInput } from './DurationInput';
 type Props = {
   value: ScheduleFields;
   onChange: (next: ScheduleFields) => void;
-  // New items must lie in the future (the API rejects anything else); editing an old one may keep a past date.
   isNew: boolean;
 };
 
-// The scheduling part of the create/edit forms, shared by both. The chips at the top pick the kind of item as in Google
-// Calendar (Task, Event, Out of office, Focus time, Working location, Birthday); the rest of the form shows only the fields
-// that kind has (utils/templateRules.ts). A Task is work with ONE deadline and an effort estimate; an Event occupies a time
-// range, or whole days. Whatever is not relevant is hidden and not sent (see scheduleForRequest). Recurrence applies to all.
 export function ScheduleForm({ value, onChange, isNew }: Props) {
   const isEvent = value.taskType === TaskType.Event;
   const rules = rulesFor(value.taskType, value.eventTemplate);
@@ -28,7 +23,6 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
   const isActive = (kind: (typeof ITEM_KINDS)[number]) =>
     kind.taskType === value.taskType && (kind.taskType === TaskType.Task || kind.template === value.eventTemplate);
 
-  // Picking weekly starts the days at the weekday of the first occurrence, so the rule fits the date it was set up on.
   const changeFrequency = (frequency: RecurrenceFrequency) => {
     const anchor = isEvent ? value.startUtc : value.deadlineUtc;
     patch({
@@ -68,7 +62,6 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
             </View>
           ) : null}
           {rules.allDay === 'always' ? (
-            // A birthday is one day: a single date, the end follows by itself.
             <DeadlinePicker
               testIDPrefix="event-start-picker"
               label="Date"
@@ -108,7 +101,6 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
         </>
       ) : (
         <>
-          {/* The planned start is optional: the closer it gets, the more the score nudges you to begin (never later than the deadline). */}
           <DeadlinePicker
             testIDPrefix="task-start-picker"
             label="Start"
@@ -237,10 +229,8 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
   );
 }
 
-// Working location: "Home", "Office" or a label of your own, as in Google Calendar.
 function WorkingLocationField({ value, onChange }: { value: string | null; onChange: (location: string | null) => void }) {
   const isPreset = (WORKING_LOCATION_PRESETS as readonly string[]).includes(value ?? '');
-  // The custom field is open when the stored label is not one of the presets, or after tapping "Other" with nothing typed yet.
   const [custom, setCustom] = useState(() => Boolean(value) && !isPreset);
   return (
     <View>

@@ -2,26 +2,19 @@
 // so the API serializes this as a plain int; the numbers here must stay in sync. 2 (the old "Blocked")
 // is retired: "blocked" is now derived from blockedByTaskId.
 export enum TaskStatus {
-  // Task statuses
   Backlog = 0,
   InProgress = 1,
   Completed = 3,
-  // Both types
   Cancelled = 4,
-  // Event statuses
   Confirmed = 5,
   Tentative = 6,
 }
 
-// Mirrors backend PlanFlow.Domain.Enums.TaskType (plain int on the wire): a Task is work with a deadline,
-// an Event happens in a time range.
 export enum TaskType {
   Task = 0,
   Event = 1,
 }
 
-// Mirrors backend PlanFlow.Domain.Enums.EventTemplate (plain int on the wire): the Google-Calendar-style kind of an Event.
-// A Task is always Default.
 export enum EventTemplate {
   Default = 0,
   OutOfOffice = 1,
@@ -30,7 +23,6 @@ export enum EventTemplate {
   Birthday = 4,
 }
 
-// Mirrors backend PlanFlow.Domain.Enums.RecurrenceFrequency (plain int on the wire): the unit of "repeat every N ...".
 export enum RecurrenceFrequency {
   Daily = 0,
   Weekly = 1,
@@ -38,16 +30,12 @@ export enum RecurrenceFrequency {
   Yearly = 3,
 }
 
-// Mirrors backend PlanFlow.Domain.Enums.SeriesScope (plain int on the wire): which occurrences of a repeating item an edit or a
-// delete reaches. The "This / This and following / All" pop-up (utils/seriesScope.ts) asks for it.
 export enum SeriesScope {
   This = 0,
   ThisAndFollowing = 1,
   All = 2,
 }
 
-// Mirrors backend PlanFlow.Domain.Enums.ReminderAnchor (plain int on the wire): what a reminder counts back from.
-// An event's reminders always count from its start; a task may use its planned start or its deadline.
 export enum ReminderAnchor {
   Start = 0,
   Deadline = 1,
@@ -62,7 +50,6 @@ export interface ReminderDto {
   anchor?: ReminderAnchor; // absent on older servers: the start
 }
 
-// Mirrors PlanFlow.Application.Tasks.Common.ReminderInput: one alert as the form sends it (the same shape as ReminderDto, anchor always set).
 export interface ReminderInput {
   offsetMinutes: number | null;
   daysBefore: number | null;
@@ -70,7 +57,6 @@ export interface ReminderInput {
   anchor: ReminderAnchor;
 }
 
-// Mirrors PlanFlow.Application.Tasks.Common.TaskDto
 export interface TaskDto {
   id: string;
   teamId: string;
@@ -106,39 +92,29 @@ export interface TaskDto {
   colorKey: string | null; // palette name (e.g. "tomato"), null = default colour
   isBusy: boolean;
   // All-day items store their DATES as midnight UTC, read literally (see utils/schedule.ts allDayDays); the end is the
-  // midnight after the last day. Items created in the app before 7.5.5 mark all-day by shape instead and have this false.
+  // midnight after the last day. Items created in the app earlier mark all-day by shape instead and have this false.
   isAllDay: boolean;
   externalSettings: string | null; // read-only note about Google-only settings of an imported Out of office / Focus time
-  // Imported from Google Calendar: Google owns its title, time, place, description, colour and template (the server ignores
-  // edits to them), so the edit form shows those read-only.
   isExternal: boolean;
-  // A Google task with no due day in Google: its deadline is a placeholder ("tomorrow") that the user may still set.
   isDeadlineDefaulted: boolean;
-  // The Google Tasks list an imported task belongs to (the Items tab groups such tasks by it); null for everything else.
   googleTaskListId: string | null;
   googleTaskListTitle: string | null;
-  // The guests of an event / co-contractors of a task (not the assignee), as user ids. Empty for older servers' rows.
   participantUserIds: string[];
   // The occurrences of one repeating item share a series id (an own series' id, or Google's recurringEventId); null = not part of a series.
   seriesId: string | null;
-  // The team's own list the item sits in (a task list for a task, a meeting list for an event); null = in none.
   itemListId: string | null;
-  // An Owner/Admin assigned the item, so its assignee cannot give it back (the server refuses); assignedByUserId is who did. Absent on older servers.
   isAssignmentLocked?: boolean;
   assignedByUserId?: string | null;
-  // Latest "[Priority] why" sentence; only the team list endpoint fills it.
   reasonText?: string | null;
   // Client side only, set by utils/seriesGrouping when a list shows one entry for a whole series: how many other occurrences it hides.
   seriesMore?: number;
 }
 
-// Mirrors PlanFlow.Application.Tasks.Common.UrgencyScoreBreakdownDto
 export interface UrgencyScoreBreakdownDto {
   deadlineComponent: number;
   blockingComponent: number;
   impactComponent: number | null; // null = task not rated, its weight is shared by the other factors
   userOverrideComponent: number;
-  // Algorithm v2: closeness of a task's planned start; null when it did not count, absent on rows written by v1.
   scheduledComponent?: number | null;
   algorithmVersion?: number;
   finalScore: number;
@@ -147,15 +123,12 @@ export interface UrgencyScoreBreakdownDto {
   reasonText?: string | null; // null on score rows written before the explanation existed
 }
 
-// Mirrors PlanFlow.Application.Tasks.Common.TaskDetailDto
 export interface TaskDetailDto {
   task: TaskDto;
   latestScoreBreakdown: UrgencyScoreBreakdownDto | null;
   reminders?: ReminderDto[]; // the item's alerts (imported from Google for an event of Google's); absent on older servers
 }
 
-// The scheduling and template fields shared by the create and update requests (type, template, dates, effort, recurrence,
-// place, colour, busy/free). Which of them an item has depends on its type and template (utils/templateRules.ts).
 export interface ScheduleFields {
   taskType: TaskType;
   eventTemplate: EventTemplate;
@@ -174,7 +147,6 @@ export interface ScheduleFields {
   recurrenceEndsAtUtc: string | null;
 }
 
-// Mirrors PlanFlow.Api.Contracts.CreateTaskRequest
 export interface CreateTaskRequest extends ScheduleFields {
   title: string;
   description: string | null;
@@ -186,7 +158,6 @@ export interface CreateTaskRequest extends ScheduleFields {
   itemListId?: string | null;
 }
 
-// Mirrors PlanFlow.Api.Contracts.UpdateTaskRequest
 export interface UpdateTaskRequest extends ScheduleFields {
   title: string;
   description: string | null;
@@ -206,5 +177,4 @@ export interface UpdateTaskRequest extends ScheduleFields {
   scope?: SeriesScope;
 }
 
-// A task plus the name of its team (resolved client-side from the teams list) for display.
 export type TaskWithTeam = TaskDto & { teamName: string };

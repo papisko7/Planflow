@@ -96,11 +96,9 @@ public class GoogleTasksClient : IGoogleTasksClient
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
-            // Distinct from other failures so SyncTasksJob can force a token refresh and retry once.
             throw new UnauthorizedException("Google rejected the Tasks request (expired/revoked access token).");
         }
 
-        // 429 / 5xx / transport errors surface as HttpRequestException; the resilience handler retries them before they reach the job.
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadFromJsonAsync<T>(cancellationToken)

@@ -16,7 +16,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Application.ItemLists;
 
 /// <summary>
-/// Step 7.5.11: the team's own lists of tasks and of meetings. Anyone in the team makes one, its creator and Owner/Admin change or delete it,
+/// The team's own lists of tasks and of meetings. Anyone in the team makes one, its creator and Owner/Admin change or delete it,
 /// and deleting a list never deletes what is in it.
 /// </summary>
 public class ItemListsTests

@@ -82,7 +82,6 @@ public class CalendarController : ControllerBase
     {
         if (!string.IsNullOrEmpty(request.Error))
         {
-            // User denied consent on Google's screen — not a server error, just an incomplete flow.
             return ResultPage("Połączenie anulowane", "Nie udzielono zgody. Możesz wrócić do aplikacji PlanFlow.");
         }
 

@@ -17,13 +17,10 @@ export function dateKey(iso: string): string {
 function sectionTitle(key: string): string {
   const today = dateKey(new Date().toISOString());
   const [y, m, d] = key.split('-').map(Number);
-  // The year is always there, so the same weekly or yearly event under different headings can be told apart.
   const date = new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
   return key === today ? `Today · ${date}` : date;
 }
 
-// Buckets items with a due moment (a Task's deadline, an Event's start) into date-keyed sections sorted chronologically; tasks with no
-// deadline can't be placed on a calendar so they're returned separately for their own list.
 export function groupTasksByDueDate<T extends TaskDto>(tasks: T[]): { sections: AgendaSection<T>[]; undated: T[] } {
   const buckets = new Map<string, T[]>();
   const undated: T[] = [];

@@ -20,10 +20,8 @@ public class NotificationConfiguration : IEntityTypeConfiguration<Notification>
             .HasForeignKey(n => n.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // The inbox lists one user's entries newest first; the unread count filters on ReadAtUtc.
         builder.HasIndex(n => new { n.UserId, n.CreatedAtUtc });
 
-        // The push job repeatedly asks for "pending and due" rows.
         builder.HasIndex(n => new { n.PushState, n.PushNextAttemptAtUtc });
     }
 }

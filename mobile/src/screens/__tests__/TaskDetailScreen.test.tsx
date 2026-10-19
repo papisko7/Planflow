@@ -107,7 +107,7 @@ describe('TaskDetailScreen - imported Google event', () => {
   });
 });
 
-// Step 7.5.4: informational items have no score; a task shows its planned start and the Scheduled row of the breakdown.
+// Informational items have no score; a task shows its planned start and the Scheduled row of the breakdown.
 describe('TaskDetailScreen - scoring', () => {
   beforeEach(() => jest.clearAllMocks());
 
@@ -149,7 +149,7 @@ describe('TaskDetailScreen - scoring', () => {
   });
 });
 
-// Step 7.5.3: a task imported from Google Tasks is due on a DAY (stored as midnight UTC), so it is shown as a date, never as a clock time.
+// A task imported from Google Tasks is due on a DAY (stored as midnight UTC), so it is shown as a date, never as a clock time.
 describe('TaskDetailScreen - task from Google Tasks', () => {
   beforeEach(() => jest.clearAllMocks());
 

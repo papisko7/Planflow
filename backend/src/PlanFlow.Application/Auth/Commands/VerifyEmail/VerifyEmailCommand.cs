@@ -41,7 +41,6 @@ public class VerifyEmailCommandHandler : IRequestHandler<VerifyEmailCommand>
             return; // already confirmed: nothing to do, and a repeated tap must not fail
         }
 
-        // 400 (not 401): the mobile client treats 401 as an expired session and would try to refresh it.
         _ = await OneTimeCodeIssuer.TryConsumeAsync(_context, user.Id, OneTimeCodePurpose.EmailVerification, request.Code, cancellationToken)
             ?? throw new ValidationException(new[] { new ValidationFailure("Code", "The code is invalid or has expired. Request a new one.") });
 

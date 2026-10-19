@@ -10,7 +10,6 @@ export function getChatMessages(teamId: string): Promise<ChatMessageDto[]> {
   });
 }
 
-// One connection per ChatScreen mount; caller owns start/stop via useEffect cleanup.
 export function createChatConnection(): HubConnection {
   return new HubConnectionBuilder()
     .withUrl(`${API_BASE_URL}/hubs/chat`, { accessTokenFactory: getFreshAccessToken })

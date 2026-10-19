@@ -11,7 +11,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Application.Tasks.Common;
 
 /// <summary>
-/// Step 7.1: the deadline clock now depends on the item type and its effort estimate
+/// The deadline clock now depends on the item type and its effort estimate
 /// (Task: deadline minus effort, Event: its start), and the "imminent" floor window is dynamic.
 /// </summary>
 public class TaskTimingTests
@@ -199,7 +199,7 @@ public class TaskTimingTests
     }
 }
 
-/// <summary>Step 7.1: the new fields are validated and persisted by the create/update commands.</summary>
+/// <summary>The new fields are validated and persisted by the create/update commands.</summary>
 public class TaskScheduleFieldsTests
 {
     private static readonly DateTime Future = DateTime.UtcNow.AddDays(5);

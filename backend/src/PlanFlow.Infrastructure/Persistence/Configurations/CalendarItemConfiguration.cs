@@ -36,18 +36,15 @@ public class CalendarItemConfiguration : IEntityTypeConfiguration<CalendarItem>
             .IsUnique()
             .HasFilter("\"ExternalCalendarEventId\" IS NOT NULL");
 
-        // The same guarantee for SyncTasksJob, keyed on the Google Tasks id.
         builder.HasIndex(t => new { t.SourceCalendarIntegrationId, t.ExternalTaskId })
             .IsUnique()
             .HasFilter("\"ExternalTaskId\" IS NOT NULL");
 
-        // Deleting a list (it vanished in Google) keeps the tasks already imported from it; they just lose the group.
         builder.HasOne(t => t.ExternalTaskList)
             .WithMany()
             .HasForeignKey(t => t.ExternalTaskListId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        // Deleting one of the team's own lists keeps its items; they just lose the grouping.
         builder.HasOne(t => t.ItemList)
             .WithMany()
             .HasForeignKey(t => t.ItemListId)
@@ -58,28 +55,21 @@ public class CalendarItemConfiguration : IEntityTypeConfiguration<CalendarItem>
             .HasForeignKey(t => t.TeamId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // A synced task outlives the connection it was imported through: disconnecting Google
-        // Calendar shouldn't delete the tasks it already created, just sever the link.
         builder.HasOne(t => t.SourceCalendarIntegration)
             .WithMany()
             .HasForeignKey(t => t.SourceCalendarIntegrationId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        // Assignment is a reference, not ownership: deleting the assignee unassigns the task
-        // rather than deleting it.
         builder.HasOne(t => t.AssignedUser)
             .WithMany(u => u.AssignedTasks)
             .HasForeignKey(t => t.AssignedUserId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        // Who assigned the item is just a reference too: removing that user leaves the assignment, minus the "who".
         builder.HasOne(t => t.AssignedByUser)
             .WithMany()
             .HasForeignKey(t => t.AssignedByUserId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        // Self-reference for the "blocking" urgency component: deleting a blocker frees the
-        // tasks it was blocking instead of deleting them too.
         builder.HasOne(t => t.BlockedByTask)
             .WithMany(t => t.BlockedTasks)
             .HasForeignKey(t => t.BlockedByTaskId)

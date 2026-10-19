@@ -2,7 +2,6 @@ import { StyleSheet, Text } from 'react-native';
 import { colors, radius } from '../theme/theme';
 import { TaskType } from '../types/task';
 
-// Shown on EVERY item so a row reads at a glance as a Task (one deadline, an effort) or an Event (a time range).
 export function ItemTypeBadge({ type, testID }: { type: TaskType; testID?: string }) {
   const isEvent = type === TaskType.Event;
   return (

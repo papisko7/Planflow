@@ -51,7 +51,7 @@ const pressAlertButton = async (text: string) => {
   });
 };
 
-// Step 7.5.11 on the Agenda: every occurrence keeps its own day (with the year in the heading), and the cards can be ticked.
+// On the Agenda: every occurrence keeps its own day (with the year in the heading), and the cards can be ticked.
 describe('CalendarScreen - Agenda', () => {
   beforeEach(() => {
     jest.clearAllMocks();

@@ -1,82 +1,97 @@
 ---
-title: Urgency Score Algorithm — Activity Diagram
+title: Urgency Score Algorithm (version 2) - Activity Diagram
 ---
 flowchart TD
-    START([▶ BuildTeamScoreLogs\ncalled with activeTasks + nowUtc]):::terminal
-    START --> LOAD[Index tasks by ID\nbuild blockedBy lookup]
+    START(["BuildTeamScoreLogs<br/>active items of one team + now"]):::terminal
+    START --> PROFILE["Keep ranked items only<br/>scoring profile Full: Task and plain Event<br/>Informational items (Out of office, Focus time,<br/>Working location, Birthday) get no score and no log"]
+    PROFILE --> LOAD["Index items by id<br/>blockedBy lookup: a blocker counts only while it is<br/>unfinished and not an event that is over"]
 
-    LOAD --> FOREACH[For each task in activeTasks]
+    LOAD --> FOREACH[For each ranked item]
 
-    FOREACH --> CACHED{Effective score\ncached?}
+    FOREACH --> CACHED{"Effective score<br/>cached?"}
     CACHED -- Yes --> USE_CACHE[Use cached value]
-    CACHED -- No --> CYCLE{Task in\nvisiting set?}
+    CACHED -- No --> CYCLE{"Item in<br/>visiting set?"}
 
-    CYCLE -- Yes --> RETURN0[Return 0.0\ncycle guard]
-    CYCLE -- No --> MARK[Add task to visiting set]
+    CYCLE -- Yes --> RETURN0["Return 0.0<br/>cycle guard"]
+    CYCLE -- No --> MARK[Add item to visiting set]
 
-    MARK --> DOWNSTREAM[For each task this one blocks]
-    DOWNSTREAM --> RECURSE[Recursively call\nEffective on downstream]
-    RECURSE --> INHERIT["blockingComponent =\n0.9 × max(downstream scores)"]
+    MARK --> DOWNSTREAM["For each item this one blocks:<br/>compute its effective score recursively"]
+    DOWNSTREAM --> INHERIT["B = 0.9 × max(downstream effective scores)<br/>0 when it blocks nothing"]
 
-    INHERIT --> DDECAY
+    INHERIT --> OVER{"Event that is over?"}
+    OVER -- Yes --> ZERO["All factors 0, effective score 0<br/>history, not a decision"]
+    OVER -- No --> TIMING
 
-    subgraph DDECAY [Deadline Component]
+    subgraph TIMING [Timing of the item]
+        direction TB
+        KIND{Task or Event?}
+        KIND -- Task --> TT["effective deadline = deadline − effort − absence<br/>absence: the assignee's out-of-office time before the deadline,<br/>overlaps counted once, at most 7 days<br/>an all-day deadline ends at the END of its day in the assignee's time zone"]
+        KIND -- Event --> TE["effective deadline = start<br/>an event cannot be started earlier"]
+    end
+
+    TIMING --> DDECAY
+
+    subgraph DDECAY [Deadline factor D]
         direction TB
         HAS_DL{Has deadline?}
-        HAS_DL -- No --> D0[deadlineComp = 0.0]
-        HAS_DL -- Yes --> OVERDUE{daysRemaining ≤ 0?}
-        OVERDUE -- Yes --> D1[deadlineComp = 1.0]
-        OVERDUE -- No --> DEXP["deadlineComp = e^(−days/7)"]
+        HAS_DL -- No --> D0["D = 0.0"]
+        HAS_DL -- Yes --> OVERDUE{"time left to the<br/>effective deadline ≤ 0?"}
+        OVERDUE -- Yes --> D1["D = 1.0"]
+        OVERDUE -- No --> DEXP["D = e^(−days left / 7)"]
     end
 
     DDECAY --> IMPACT
 
-    subgraph IMPACT [Impact Component]
+    subgraph IMPACT [Impact factor I]
         direction TB
         HAS_IMP{ImpactScore set?}
-        HAS_IMP -- Yes --> INORM["impactComp = score / 10"]
-        HAS_IMP -- No --> INULL["impactComp = null\n(unrated)"]
+        HAS_IMP -- Yes --> INORM["I = ImpactScore / 10"]
+        HAS_IMP -- No --> INULL["I absent<br/>unrated, left out of the sum"]
     end
 
     IMPACT --> OVERRIDE
 
-    subgraph OVERRIDE [Override Component]
+    subgraph OVERRIDE [Override factor O]
         direction TB
-        HAS_OV{ManualOverride\nset?}
-        HAS_OV -- No --> OV0[overrideComp = 0.0]
-        HAS_OV -- Yes --> EXPIRED{Override\nexpired?}
-        EXPIRED -- Yes --> OV0
-        EXPIRED -- No --> OVAL["overrideComp = clamp(override, 0, 1)"]
+        HAS_OV{"Manual override<br/>set and not expired?"}
+        HAS_OV -- No --> OV0["O = 0.0"]
+        HAS_OV -- Yes --> OVAL["O = clamp(override, 0, 1)"]
     end
 
-    OVERRIDE --> WSUM["Weighted sum\n0.45×deadline + 0.20×blocking + 0.10×override"]
+    OVERRIDE --> SCHEDULED
 
-    WSUM --> NULL_IMP{impactComp\nis null?}
-    NULL_IMP -- No --> ADDIMP["sum += 0.25 × impactComp"]
-    NULL_IMP -- Yes --> RENORM["sum /= 0.75\n(renormalize missing weight)"]
+    subgraph SCHEDULED [Scheduled factor S]
+        direction TB
+        HAS_ST{"Verified Task in Backlog<br/>with a planned start?"}
+        HAS_ST -- No --> S0["S absent<br/>left out of the sum"]
+        HAS_ST -- Yes --> STARTED{"Planned start<br/>already reached?"}
+        STARTED -- Yes --> S1["S = 1.0"]
+        STARTED -- No --> SEXP["S = e^(−days to start / 7)"]
+    end
 
-    ADDIMP --> CLAMP1["score = clamp(sum, 0, 1)"]
-    RENORM --> CLAMP1
+    SCHEDULED --> WSUM["base = (0.40·D + 0.20·B + 0.10·O [+ 0.25·I] [+ 0.05·S])<br/>/ sum of the weights of the factors that apply<br/>an absent factor is left out, not counted as 0"]
+    WSUM --> CLAMP1["score = clamp(base, 0, 1)"]
 
-    CLAMP1 --> IMMINENT{daysRemaining ≤ 1\nor overdue?}
-    IMMINENT -- Yes --> FLOOR["score = max(score, 0.85)\nimminent floor"]
+    CLAMP1 --> IMMINENT{"Verified item and overdue or inside<br/>its imminent window?<br/>Task: its effort, 24 h when unknown<br/>Event: prep time, 1 h by default, at most 2 h"}
+    IMMINENT -- Yes --> FLOOR["score = max(score, 0.85)<br/>imminent floor"]
     IMMINENT -- No --> INHERIT_FLOOR
-    FLOOR --> INHERIT_FLOOR["score = max(score, blockingComp)\npriority inheritance"]
+    FLOOR --> INHERIT_FLOOR["score = max(score, B)<br/>priority inheritance"]
 
-    INHERIT_FLOOR --> CACHE[Store in effective cache\nRemove from visiting set]
+    INHERIT_FLOOR --> CACHE["Store as effective score<br/>remove item from visiting set"]
+    ZERO --> CACHE
     USE_CACHE --> BLOCKED_CHECK
     RETURN0 --> BLOCKED_CHECK
     CACHE --> BLOCKED_CHECK
 
-    BLOCKED_CHECK{Task is blocked by\nunfinished task?}
-    BLOCKED_CHECK -- Yes --> PENALTY["finalScore = effectiveScore × 0.5"]
-    BLOCKED_CHECK -- No --> NOPEN["finalScore = effectiveScore"]
+    BLOCKED_CHECK{"Item is blocked by an<br/>unfinished item?"}
+    BLOCKED_CHECK -- Yes --> PENALTY["finalScore = effective score × 0.5<br/>blocked penalty"]
+    BLOCKED_CHECK -- No --> NOPEN["finalScore = effective score"]
 
-    PENALTY --> BUILDLOG[Build UrgencyScoreLog\nwith all components + finalScore]
+    PENALTY --> BUILDLOG["Build UrgencyScoreLog<br/>all factors, finalScore, IsBlocked, ReasonText,<br/>AlgorithmVersion = 2"]
     NOPEN --> BUILDLOG
 
-    BUILDLOG --> MORE{More tasks?}
+    BUILDLOG --> MORE{More items?}
     MORE -- Yes --> FOREACH
-    MORE -- No --> END([◀ Return logs dictionary]):::terminal
+    MORE -- No --> END(["Return logs dictionary"]):::terminal
 
     classDef terminal fill:#1d4ed8,stroke:#1d4ed8,color:#fff

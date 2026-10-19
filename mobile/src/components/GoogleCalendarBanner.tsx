@@ -19,9 +19,6 @@ const SYNC_MAX_WAIT_MS = 60000;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Top-of-calendar strip: "Connect Google" when not linked, otherwise "Connected as … / Sync now / Disconnect". Google is fetched only when
-// "Sync now" is pressed (there is no timer), so "Last sync" is the time of the last press. An account linked before Google Tasks existed
-// (or one that declined that permission) is also offered a one-tap reconnect that asks for the Tasks permission.
 export function GoogleCalendarBanner({ onSynced }: Props) {
   const [status, setStatus] = useState<GoogleCalendarStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -41,7 +38,6 @@ export function GoogleCalendarBanner({ onSynced }: Props) {
     loadStatus();
   }, [loadStatus]);
 
-  // Waits for the server to finish (it may have been started by an earlier press), then lets the screen reload its items.
   const waitForSync = useCallback(async () => {
     setSyncing(true);
     try {
@@ -89,7 +85,6 @@ export function GoogleCalendarBanner({ onSynced }: Props) {
   const connect = () =>
     run(async () => {
       const url = await getGoogleConnectUrl();
-      // Resolves when the user closes the browser (after the backend callback page said "connected").
       await WebBrowser.openBrowserAsync(url);
       const next = await getGoogleCalendarStatus();
       setStatus(next);

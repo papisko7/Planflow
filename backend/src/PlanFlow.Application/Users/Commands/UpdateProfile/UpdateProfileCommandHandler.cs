@@ -35,8 +35,6 @@ public class UpdateProfileCommandHandler : IRequestHandler<UpdateProfileCommand,
 
         if (emailChanged)
         {
-            // A wrong password is reported as a 400 validation error, not a 401: the mobile client treats 401
-            // as "token expired" and would otherwise try to refresh and possibly sign the user out.
             if (string.IsNullOrEmpty(request.CurrentPassword) || !_passwordHasher.Verify(user.PasswordHash, request.CurrentPassword))
             {
                 throw new ValidationException(new[] { new ValidationFailure("CurrentPassword", "Current password is incorrect.") });

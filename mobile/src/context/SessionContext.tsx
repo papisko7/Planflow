@@ -12,8 +12,6 @@ interface SessionState {
 
 const SessionContext = createContext<SessionState | null>(null);
 
-// Single source of truth for "are we signed in" so Login/Register can flip the whole app's
-// navigation tree (Auth stack <-> main Tabs) instead of each screen guessing independently.
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<SessionState['status']>('checking');
 
@@ -23,7 +21,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => setSessionExpiredHandler(null);
   }, []);
 
-  // Tell the server the phone's time zone whenever a session is active (it needs it to compute "end of day").
   useEffect(() => {
     if (status === 'signedIn') void reportTimeZone();
     else forgetReportedTimeZone();

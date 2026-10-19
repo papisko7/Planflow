@@ -1,4 +1,3 @@
-// Local calendar day as YYYY-MM-DD (not UTC), so a task lands on the day the user actually sees.
 export function dayKey(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -12,7 +11,6 @@ export function addDays(d: Date, days: number): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
 }
 
-// The weeks of a month as rows of 7 cells, Monday first; days outside the month are null padding.
 export function buildMonthGrid(year: number, month: number): (Date | null)[][] {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const leading = (new Date(year, month, 1).getDay() + 6) % 7; // Sunday=0 -> 6, Monday=1 -> 0
@@ -36,7 +34,6 @@ export function composeDeadline(day: Date, time: string | null): string {
   return new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, m).toISOString();
 }
 
-// Inverse of composeDeadline: the local day and the time ('HH:MM', or null for all day).
 export function splitDeadline(iso: string): { day: Date; time: string | null } {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -44,7 +41,6 @@ export function splitDeadline(iso: string): { day: Date; time: string | null } {
   return { day: startOfDay(d), time: isAllDay ? ALL_DAY : `${pad(d.getHours())}:${pad(d.getMinutes())}` };
 }
 
-// The local day alone ("Mon, 19 Oct 2026"), for all-day values where a clock time means nothing.
 export function formatDay(iso: string): string {
   return startOfDay(new Date(iso)).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 }

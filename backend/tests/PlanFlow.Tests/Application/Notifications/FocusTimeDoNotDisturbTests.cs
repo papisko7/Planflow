@@ -8,7 +8,7 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Application.Notifications;
 
 /// <summary>
-/// Step 7.5.10b: Focus time is "do not disturb" for the phone. A push that is not the person's own alert waits until the Focus block
+/// Focus time is "do not disturb" for the phone. A push that is not the person's own alert waits until the Focus block
 /// ends (the push job sends what is due); the inbox entry appears at once, and urgency alerts and item reminders break through.
 /// </summary>
 public class FocusTimeDoNotDisturbTests

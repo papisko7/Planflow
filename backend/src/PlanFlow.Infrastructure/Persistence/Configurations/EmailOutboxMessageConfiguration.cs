@@ -15,7 +15,6 @@ public class EmailOutboxMessageConfiguration : IEntityTypeConfiguration<EmailOut
         builder.Property(m => m.Subject).IsRequired().HasMaxLength(512);
         builder.Property(m => m.LastError).HasMaxLength(1000);
 
-        // The outbox job repeatedly asks for "unsent and due" rows.
         builder.HasIndex(m => new { m.SentAtUtc, m.NextAttemptAtUtc });
     }
 }
