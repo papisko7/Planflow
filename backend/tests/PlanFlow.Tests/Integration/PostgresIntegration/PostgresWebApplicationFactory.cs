@@ -1,9 +1,13 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PlanFlow.Application.Common.Interfaces;
+using PlanFlow.Infrastructure.ExternalServices.Google;
 using PlanFlow.Infrastructure.Persistence;
+using Quartz;
 using Testcontainers.PostgreSql;
 using Xunit;
 
@@ -29,9 +33,34 @@ public class PostgresWebApplicationFactory : WebApplicationFactory<Program>, IAs
         .WithPassword("planflow_test_pw")
         .Build();
 
+    /// <summary>
+    /// What the Google Calendar / Google Tasks clients of this host talk to instead of Google. A test assigns a freshly scripted stub
+    /// before it presses "Sync now" (tests of this collection run one at a time); the real clients and their retry pipeline stay in place.
+    /// </summary>
+    public StubHttpMessageHandler GoogleCalendar { get; set; } = new();
+
+    public StubHttpMessageHandler GoogleTasks { get; set; } = new();
+
+    /// <summary>Hands every request to whatever stub is current at that moment, so a test can swap the script without rebuilding the host.</summary>
+    private sealed class CurrentStub(Func<StubHttpMessageHandler> current) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            new HttpMessageInvoker(current(), disposeHandler: false).SendAsync(request, cancellationToken);
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("PostgresIntegrationTesting");
+
+        builder.ConfigureTestServices(services =>
+        {
+            services.AddHttpClient<IGoogleCalendarClient, GoogleCalendarClient>().ConfigurePrimaryHttpMessageHandler(() => new CurrentStub(() => GoogleCalendar));
+            services.AddHttpClient<IGoogleTasksClient, GoogleTasksClient>().ConfigurePrimaryHttpMessageHandler(() => new CurrentStub(() => GoogleTasks));
+
+            // A scheduler name of its own: Quartz keeps schedulers in a process-wide registry by name, so the other test hosts of this
+            // run would otherwise share this host's scheduler and execute its jobs with their own services and database.
+            services.AddQuartz(quartz => quartz.SchedulerName = "postgres-integration-tests");
+        });
 
         // Feeds the container's connection string in as plain configuration instead of swapping DI
         // registrations after the fact — AddInfrastructure's "PostgresIntegrationTesting" branch calls

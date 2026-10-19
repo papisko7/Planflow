@@ -19,4 +19,13 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         Quartz.Logging.LogProvider.SetCurrentLogProvider(null);
         builder.UseEnvironment("Testing");
     }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+
+        // Also after a host: the provider Quartz cached still points at this host's disposed LoggerFactory, and the scheduler of a host
+        // that outlives this one (the PostgreSQL integration host) would fail to start its next job ("Sync now") with an ObjectDisposedException.
+        Quartz.Logging.LogProvider.SetCurrentLogProvider(null);
+    }
 }
