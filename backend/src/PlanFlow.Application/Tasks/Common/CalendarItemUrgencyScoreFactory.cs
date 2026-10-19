@@ -48,13 +48,15 @@ public static class CalendarItemUrgencyScoreFactory
     /// a task's score depends on its neighbours: a blocker inherits urgency from what it blocks, and a
     /// blocked task is lowered while its blocker is unfinished. Returns one ready-to-persist log per ranked task
     /// (informational items get none). <paramref name="zoneOf"/> gives the time zone in which an all-day item's days are read
-    /// (null = UTC).
+    /// (null = UTC). <paramref name="absencesOf"/> gives the out-of-office spans of a task's assignee (null = none known): they are taken
+    /// off the task's deadline (see <see cref="AbsenceDeadline"/>).
     /// </summary>
     public static IReadOnlyDictionary<Guid, UrgencyScoreLog> BuildTeamScoreLogs(
         IReadOnlyCollection<CalendarItem> activeTasks, DateTime nowUtc, ScoreTriggerSource triggerSource,
-        Func<CalendarItem, TimeZoneInfo>? zoneOf = null)
+        Func<CalendarItem, TimeZoneInfo>? zoneOf = null, Func<CalendarItem, IReadOnlyList<AbsenceSpan>?>? absencesOf = null)
     {
         zoneOf ??= _ => TimeZoneInfo.Utc;
+        absencesOf ??= _ => null;
         var ranked = activeTasks.Where(IsRanked).ToList();
         var byId = ranked.ToDictionary(t => t.Id);
 
@@ -93,7 +95,7 @@ public static class CalendarItemUrgencyScoreFactory
 
             visiting.Remove(task.Id);
             blocking[task.Id] = inherited;
-            return effective[task.Id] = Breakdown(task, inherited, nowUtc, zoneOf(task)).EffectiveScore;
+            return effective[task.Id] = Breakdown(task, inherited, nowUtc, zoneOf(task), absencesOf(task)).EffectiveScore;
         }
 
         var logs = new Dictionary<Guid, UrgencyScoreLog>(ranked.Count);
@@ -101,7 +103,8 @@ public static class CalendarItemUrgencyScoreFactory
         {
             Effective(task);
             var isBlocked = task.BlockedByTaskId is { } blockerId && StillBlocks(blockerId);
-            logs[task.Id] = BuildScoreLog(task, blocking.GetValueOrDefault(task.Id), isBlocked, nowUtc, triggerSource, zoneOf(task));
+            logs[task.Id] = BuildScoreLog(
+                task, blocking.GetValueOrDefault(task.Id), isBlocked, nowUtc, triggerSource, zoneOf(task), absencesOf(task));
         }
 
         return logs;
@@ -113,10 +116,11 @@ public static class CalendarItemUrgencyScoreFactory
     /// </summary>
     public static UrgencyScoreLog BuildScoreLog(
         CalendarItem task, double blockingComponent, bool isBlocked, DateTime nowUtc,
-        ScoreTriggerSource triggerSource = ScoreTriggerSource.ManualUpdate, TimeZoneInfo? zone = null)
+        ScoreTriggerSource triggerSource = ScoreTriggerSource.ManualUpdate, TimeZoneInfo? zone = null,
+        IReadOnlyList<AbsenceSpan>? absences = null)
     {
         zone ??= TimeZoneInfo.Utc;
-        var breakdown = Breakdown(task, blockingComponent, nowUtc, zone);
+        var breakdown = Breakdown(task, blockingComponent, nowUtc, zone, absences);
         var finalScore = UrgencyScoreCalculator.ApplyBlockedPenalty(breakdown.EffectiveScore, isBlocked);
 
         return new UrgencyScoreLog
@@ -131,7 +135,7 @@ public static class CalendarItemUrgencyScoreFactory
             IsBlocked = isBlocked,
             FinalScore = finalScore,
             TriggerSource = triggerSource,
-            ReasonText = BuildReasonText(task, breakdown, isBlocked, finalScore, nowUtc, zone)
+            ReasonText = BuildReasonText(task, breakdown, isBlocked, finalScore, nowUtc, zone, absences)
         };
     }
 
@@ -147,7 +151,8 @@ public static class CalendarItemUrgencyScoreFactory
     // One-line, fully deterministic explanation: "[Priority] timing, then the other factors that shaped the score".
     // No randomness and no clock reads (only the nowUtc passed in), so the same input always gives the same text.
     private static string BuildReasonText(
-        CalendarItem task, ScoreBreakdown breakdown, bool isBlocked, double finalScore, DateTime nowUtc, TimeZoneInfo zone)
+        CalendarItem task, ScoreBreakdown breakdown, bool isBlocked, double finalScore, DateTime nowUtc, TimeZoneInfo zone,
+        IReadOnlyList<AbsenceSpan>? absences)
     {
         if (!IsRanked(task))
         {
@@ -162,7 +167,7 @@ public static class CalendarItemUrgencyScoreFactory
             return $"{label} Event ended {FormatSpan(nowUtc - end)} ago - history, no priority";
         }
 
-        var parts = new List<string> { DescribeTiming(task, nowUtc, ResolveTiming(task, zone)) };
+        var parts = new List<string> { DescribeTiming(task, nowUtc, ResolveTiming(task, zone, nowUtc, absences)) };
 
         if (DescribePlannedStart(task, breakdown, nowUtc, zone) is { } plannedStart)
         {
@@ -212,10 +217,20 @@ public static class CalendarItemUrgencyScoreFactory
         }
 
         var effort = task.EstimatedEffortHours ?? 0.0;
-        return effort > 0.0 && deadline.AddHours(-effort) <= nowUtc
-            ? $"not enough time: needs {FormatSpan(TimeSpan.FromHours(effort))}, only {FormatSpan(deadline - nowUtc)} left"
-            : $"due in {FormatSpan(deadline - nowUtc)}";
+        var absenceNote = timing.Absence > TimeSpan.Zero ? $" ({FormatDays(timing.Absence)} out of office)" : string.Empty;
+        if ((effort > 0.0 || timing.Absence > TimeSpan.Zero) && timing.EffectiveDeadlineUtc <= nowUtc)
+        {
+            return effort > 0.0
+                ? $"not enough time: needs {FormatSpan(TimeSpan.FromHours(effort))}, only {FormatSpan(deadline - nowUtc)} left{absenceNote}"
+                : $"not enough time: only {FormatSpan(deadline - nowUtc)} left{absenceNote}";
+        }
+
+        return $"due in {FormatSpan(deadline - nowUtc)}{absenceNote}";
     }
+
+    // "2 d", "1.5 d" or, below a day, "6h": how much out-of-office time was taken off the deadline.
+    private static string FormatDays(TimeSpan span) =>
+        span.TotalDays >= 1.0 ? $"{Math.Round(span.TotalDays, 1):0.#} d" : $"{Math.Max(1, (int)Math.Round(span.TotalHours))}h";
 
     // Only said when the planned start actually counted toward the score (a task still in Backlog with a confirmed start).
     private static string? DescribePlannedStart(CalendarItem task, ScoreBreakdown breakdown, DateTime nowUtc, TimeZoneInfo zone)
@@ -248,7 +263,8 @@ public static class CalendarItemUrgencyScoreFactory
     private readonly record struct ScoreBreakdown(
         double Deadline, double Blocking, double? Impact, double UserOverride, double? Scheduled, double EffectiveScore);
 
-    private static ScoreBreakdown Breakdown(CalendarItem task, double blockingComponent, DateTime nowUtc, TimeZoneInfo zone)
+    private static ScoreBreakdown Breakdown(
+        CalendarItem task, double blockingComponent, DateTime nowUtc, TimeZoneInfo zone, IReadOnlyList<AbsenceSpan>? absences)
     {
         // An informational item has no score at all, and a finished event is history, not a decision: it stops generating
         // priority altogether (no alert fatigue from meetings that already happened) and stays in the calendar only as a record.
@@ -257,7 +273,7 @@ public static class CalendarItemUrgencyScoreFactory
             return new ScoreBreakdown(0.0, 0.0, null, 0.0, null, 0.0);
         }
 
-        var timing = ResolveTiming(task, zone);
+        var timing = ResolveTiming(task, zone, nowUtc, absences);
         var deadline = ComputeDeadlineComponent(timing.EffectiveDeadlineUtc, nowUtc);
         var blocking = Math.Clamp(blockingComponent, 0.0, 1.0);
         double? impact = task.ImpactScore is { } rating ? Math.Clamp(rating / MaxImpactScore, 0.0, 1.0) : null;
@@ -275,15 +291,17 @@ public static class CalendarItemUrgencyScoreFactory
     /// <param name="TargetUtc">The moment that matters: a Task's deadline, an Event's start.</param>
     /// <param name="EffectiveDeadlineUtc">When the clock really runs out: a Task must START by deadline minus its effort; an Event by its start.</param>
     /// <param name="FloorWindowHours">How long before <paramref name="TargetUtc"/> the item counts as "imminent" and gets the score floor.</param>
-    private readonly record struct Timing(DateTime? TargetUtc, DateTime? EffectiveDeadlineUtc, double FloorWindowHours);
+    /// <param name="Absence">Out-of-office time of the assignee between now and the deadline that was taken off <paramref name="EffectiveDeadlineUtc"/>.</param>
+    private readonly record struct Timing(DateTime? TargetUtc, DateTime? EffectiveDeadlineUtc, double FloorWindowHours, TimeSpan Absence = default);
 
-    // Task:  effectiveDeadline = deadline - effort, so a 6h job due in 5h is already "overdue" (it cannot be finished anymore).
+    // Task:  effectiveDeadline = deadline - effort - the assignee's absence before it, so a 6h job due in 5h is already "overdue" (it cannot
+    //        be finished anymore) and so is a job due Friday by someone who is away from Wednesday.
     //        The floor window is the effort itself (24h when no estimate, which equals the original fixed rule).
     //        A day-long deadline (a Google task is due on a day, not at a time) runs out at the END of that day in the person's zone.
     // Event: happens at its start (the beginning of the first day when all-day); effort is not subtracted because an event cannot be
     //        started earlier. The floor window is the effort/prep time, 1h by default, capped at 2h. Once its end has passed the
     //        score is 0 (see Breakdown).
-    private static Timing ResolveTiming(CalendarItem task, TimeZoneInfo zone)
+    private static Timing ResolveTiming(CalendarItem task, TimeZoneInfo zone, DateTime nowUtc, IReadOnlyList<AbsenceSpan>? absences)
     {
         if (task.TaskType == TaskType.Event)
         {
@@ -294,10 +312,12 @@ public static class CalendarItemUrgencyScoreFactory
 
         var effort = Math.Max(task.EstimatedEffortHours ?? 0.0, 0.0);
         var deadline = task.IsAllDay && task.DeadlineUtc is { } day ? Moment(day.AddDays(1), true, zone) : task.DeadlineUtc;
+        var absence = deadline is { } due ? AbsenceDeadline.Deduction(absences, nowUtc, due) : TimeSpan.Zero;
         return new Timing(
             deadline,
-            deadline?.AddHours(-effort),
-            task.EstimatedEffortHours ?? DefaultTaskFloorWindowHours);
+            deadline?.AddHours(-effort) - absence,
+            task.EstimatedEffortHours ?? DefaultTaskFloorWindowHours,
+            absence);
     }
 
     // An all-day item keeps its day as a literal date (midnight UTC); the real moment that day begins depends on the person's zone.

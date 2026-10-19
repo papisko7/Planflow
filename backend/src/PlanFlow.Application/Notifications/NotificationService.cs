@@ -51,6 +51,11 @@ public class NotificationService : INotificationService
                 .ToDictionaryAsync(m => m.UserId, m => (m.MuteNotifications, m.MuteChat), cancellationToken);
         }
 
+        // Focus time is "do not disturb" for the phone: a push that is not the person's own alert waits until the block ends.
+        var focusEnds = NotificationPolicy.IsDeferredByFocusTime(evt)
+            ? await FocusTimeEndsAsync(recipientIds, DateTime.UtcNow, cancellationToken)
+            : new Dictionary<Guid, DateTime>();
+
         foreach (var user in users)
         {
             var prefs = preferences.GetValueOrDefault(user.Id) ?? NotificationPreference.CreateDefault(user.Id);
@@ -79,10 +84,34 @@ public class NotificationService : INotificationService
                     Body = content.Preview,
                     TeamId = teamId,
                     TaskId = taskId,
-                    PushState = NotificationPolicy.IsPushAllowed(prefs, evt) ? PushDeliveryState.Pending : PushDeliveryState.NotWanted
+                    PushState = NotificationPolicy.IsPushAllowed(prefs, evt) ? PushDeliveryState.Pending : PushDeliveryState.NotWanted,
+                    PushNextAttemptAtUtc = focusEnds.TryGetValue(user.Id, out var focusEnd) ? focusEnd : DateTime.UtcNow
                 });
             }
         }
+    }
+
+    // For every recipient who is in a timed Focus time block right now: when the latest such block ends. The person's own events are used
+    // whatever they share with the team - it is their own do-not-disturb, nobody else sees it.
+    private async Task<Dictionary<Guid, DateTime>> FocusTimeEndsAsync(
+        IReadOnlyCollection<Guid> userIds, DateTime nowUtc, CancellationToken cancellationToken)
+    {
+        var defaultEnd = nowUtc.AddHours(-1); // an event with no end is assumed to last one hour
+        var blocks = await _context.CalendarItems
+            .AsNoTracking()
+            .Where(i => i.TaskType == TaskType.Event
+                && i.EventTemplate == EventTemplate.FocusTime
+                && !i.IsAllDay
+                && i.Status != Domain.Enums.TaskStatus.Cancelled
+                && i.AssignedUserId != null && userIds.Contains(i.AssignedUserId.Value)
+                && i.StartUtc != null && i.StartUtc <= nowUtc
+                && ((i.EndUtc != null && i.EndUtc > nowUtc) || (i.EndUtc == null && i.StartUtc > defaultEnd)))
+            .Select(i => new { UserId = i.AssignedUserId!.Value, i.StartUtc, i.EndUtc })
+            .ToListAsync(cancellationToken);
+
+        return blocks
+            .GroupBy(b => b.UserId)
+            .ToDictionary(g => g.Key, g => g.Max(b => b.EndUtc ?? b.StartUtc!.Value.AddHours(1)));
     }
 
     public void QueueDirect(NotificationEvent evt, string toEmail, string recipientName, Func<string, EmailContent> build) =>

@@ -37,6 +37,9 @@ public class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, TaskD
             BlockedByTaskId = request.BlockedByTaskId,
             UseAiEnhancement = request.UseAiEnhancement
         };
+        var outcome = TaskAssignmentPolicy.ForNewItem(request.CreatedByUserId, request.CreatorIsManager, request.AssignedUserId);
+        task.AssignedByUserId = outcome.AssignedByUserId;
+        task.IsAssignmentLocked = outcome.IsLocked;
         TaskScheduleMapper.Apply(task, request);
         task.Status = TaskStatusRules.DefaultFor(task.TaskType); // a Task starts in Backlog, an Event is Confirmed
         task.ItemListId = await TaskItemLists.ResolveAsync(_context, request.TeamId, task.TaskType, request.ItemListId, cancellationToken);

@@ -64,6 +64,8 @@ public class RemoveTeamMemberCommandHandler : IRequestHandler<RemoveTeamMemberCo
         foreach (var task in assignedTasks)
         {
             task.AssignedUserId = null;
+            task.AssignedByUserId = null;
+            task.IsAssignmentLocked = false;
             task.UpdatedAtUtc = nowUtc;
         }
 

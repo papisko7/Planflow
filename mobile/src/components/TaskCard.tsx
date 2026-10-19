@@ -11,6 +11,7 @@ import { formatSeriesMore } from '../utils/seriesGrouping';
 import { isInformational } from '../utils/templateRules';
 import { getUrgencyTier, URGENCY_TIER_META } from '../utils/urgencyGrouping';
 import { TaskStatus, TaskType, type TaskDto } from '../types/task';
+import { AbsenceDeadlineNote } from './AbsenceDeadlineNote';
 import { ItemTypeBadge } from './ItemTypeBadge';
 import { SwipeableRow } from './SwipeableRow';
 import { TaskActionMenu } from './TaskActionMenu';
@@ -63,8 +64,9 @@ function TaskCardComponent({ task, onPress, actions, onToggleSelect, selectionMo
   // without selection open instantly.
   const isDone = task.status === TaskStatus.Completed;
   const isUnassigned = !task.assignedUserId;
-  // Only the current assignee can abandon a task (the API enforces the same).
+  // Only the current assignee can abandon a task, and not one an Owner/Admin assigned to them (the API enforces the same).
   const isMine = !!task.assignedUserId && task.assignedUserId === getCurrentUserId();
+  const canAbandon = isMine && !task.isAssignmentLocked;
   // Guests of an event / co-contractors of a task: shown as a head count, or as "You" when the viewer is one of them.
   const participantIds = task.participantUserIds ?? [];
   const me = getCurrentUserId();
@@ -150,6 +152,7 @@ function TaskCardComponent({ task, onPress, actions, onToggleSelect, selectionMo
           </Text>
         ) : null}
         {when ? <Text style={styles.metaText}>{isEvent ? '🗓' : '📅'} {when}</Text> : null}
+        {isMine && !isEvent && !isDone && task.deadlineUtc ? <AbsenceDeadlineNote task={task} testID={`absence-note-${task.id}`} /> : null}
         {task.location ? <Text style={styles.metaText}>📍 {task.location}</Text> : null}
         {!isEvent && task.estimatedEffortHours !== null ? (
           <Text style={styles.metaText}>⏱ {formatDuration(task.estimatedEffortHours)}</Text>
@@ -197,7 +200,7 @@ function TaskCardComponent({ task, onPress, actions, onToggleSelect, selectionMo
         onOpen={() => onPress?.(task)}
         onSelect={onToggleSelect ? () => onToggleSelect(task) : undefined}
         onClaim={isUnassigned ? () => actions.claim(task) : undefined}
-        onAbandon={isMine ? () => actions.abandon(task) : undefined}
+        onAbandon={canAbandon ? () => actions.abandon(task) : undefined}
         onEdit={() => actions.edit(task)}
         onComplete={isEvent || isDone ? undefined : () => actions.complete(task)}
         onReopen={!isEvent && isDone ? () => actions.reopen(task) : undefined}

@@ -31,4 +31,5 @@ public record UpdateTaskCommand(
     bool IsBusy = true,
     IReadOnlyList<ReminderInput>? Reminders = null,
     IReadOnlyList<Guid>? ParticipantUserIds = null,
-    Guid? ItemListId = null) : IRequest<TaskDto>, ITaskScheduleFields;
+    Guid? ItemListId = null,
+    bool CallerIsManager = true) : IRequest<TaskDto>, ITaskScheduleFields;

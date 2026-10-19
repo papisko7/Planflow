@@ -1,7 +1,7 @@
 import { http } from './httpClient';
 import { loadSession } from './tokenStorage';
 import type { CalendarSharingLevel } from '../types/availability';
-import type { UpdateProfileRequest, UserProfileDto } from '../types/user';
+import type { MyAbsence, UpdateProfileRequest, UserProfileDto } from '../types/user';
 
 export async function getProfile(): Promise<UserProfileDto> {
   const { data } = await http.get<UserProfileDto>('/api/users/me');
@@ -10,6 +10,12 @@ export async function getProfile(): Promise<UserProfileDto> {
 
 export async function updateProfile(request: UpdateProfileRequest): Promise<UserProfileDto> {
   const { data } = await http.put<UserProfileDto>('/api/users/me', request);
+  return data;
+}
+
+// The caller's own Out of office time ahead (real instants), used to warn that a deadline falls while they are away.
+export async function getMyAbsences(): Promise<MyAbsence[]> {
+  const { data } = await http.get<MyAbsence[]>('/api/users/me/absences');
   return data;
 }
 

@@ -41,6 +41,7 @@ export enum NotificationEvent {
   ItemReminder = 16,
   ParticipantAdded = 17,
   ParticipantRemoved = 18,
+  TaskReturnedToPool = 19,
   AddedToTeam = 20,
   TeamRoleChanged = 21,
   RemovedFromTeam = 22,

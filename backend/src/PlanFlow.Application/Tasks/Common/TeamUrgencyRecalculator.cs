@@ -3,6 +3,7 @@ using PlanFlow.Application.Common.Caching;
 using PlanFlow.Application.Common.Interfaces;
 using PlanFlow.Domain.Entities;
 using PlanFlow.Domain.Enums;
+using PlanFlow.Domain.Services;
 using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 
 namespace PlanFlow.Application.Tasks.Common;
@@ -36,19 +37,23 @@ public static class TeamUrgencyRecalculator
         }
 
         var zones = await UserTimeZones.LoadAsync(context, teamTasks, cancellationToken);
-        return Apply(context, teamTasks, nowUtc, triggerSource, subject, zones);
+        var absences = await UserAbsences.LoadAsync(context, teamTasks, nowUtc, cancellationToken);
+        return Apply(context, teamTasks, nowUtc, triggerSource, subject, zones, absences);
     }
 
     /// <summary>
     /// Same as <see cref="RecalculateTeamAsync"/> for tasks the caller has already loaded (any teams).
     /// <paramref name="zones"/> are the time zones of the assignees (see <see cref="UserTimeZones"/>); without them all-day items are read in UTC.
+    /// <paramref name="absences"/> are their out-of-office spans (see <see cref="UserAbsences"/>); without them no deadline is shortened.
     /// </summary>
     public static IReadOnlyCollection<Guid> Apply(
         IApplicationDbContext context, IEnumerable<CalendarItem> tasks, DateTime nowUtc, ScoreTriggerSource triggerSource,
-        CalendarItem? subject = null, IReadOnlyDictionary<Guid, TimeZoneInfo>? zones = null)
+        CalendarItem? subject = null, IReadOnlyDictionary<Guid, TimeZoneInfo>? zones = null,
+        IReadOnlyDictionary<Guid, IReadOnlyList<AbsenceSpan>>? absences = null)
     {
         var changed = new List<Guid>();
         var zoneOf = UserTimeZones.ResolverFor(zones);
+        var absencesOf = UserAbsences.ResolverFor(absences);
 
         foreach (var teamTasks in tasks.GroupBy(t => t.TeamId))
         {
@@ -61,7 +66,7 @@ public static class TeamUrgencyRecalculator
             }
 
             var active = teamTasks.Where(IsActive).ToList();
-            var logs = CalendarItemUrgencyScoreFactory.BuildTeamScoreLogs(active, nowUtc, triggerSource, zoneOf);
+            var logs = CalendarItemUrgencyScoreFactory.BuildTeamScoreLogs(active, nowUtc, triggerSource, zoneOf, absencesOf);
 
             foreach (var task in active.Where(CalendarItemUrgencyScoreFactory.IsRanked))
             {
@@ -76,7 +81,7 @@ public static class TeamUrgencyRecalculator
             // A finished subject isn't part of the active graph (it blocks nobody), but an edit still records its score.
             if (subject is not null && subject.TeamId == teamTasks.Key && !IsActive(subject) && CalendarItemUrgencyScoreFactory.IsRanked(subject))
             {
-                var log = CalendarItemUrgencyScoreFactory.BuildScoreLog(subject, 0.0, false, nowUtc, triggerSource, zoneOf(subject));
+                var log = CalendarItemUrgencyScoreFactory.BuildScoreLog(subject, 0.0, false, nowUtc, triggerSource, zoneOf(subject), absencesOf(subject));
                 Stage(context, subject, log, nowUtc, changed);
             }
         }

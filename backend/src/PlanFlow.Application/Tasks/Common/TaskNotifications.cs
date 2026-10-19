@@ -97,6 +97,7 @@ internal static class TaskNotifications
                     task.TeamId, actorUserId, cancellationToken);
             }
 
+            await NotifyManagersOfReturnToPoolAsync(context, notifications, task, before, actorUserId, teamName, actorName, cancellationToken);
             return;
         }
 
@@ -117,6 +118,32 @@ internal static class TaskNotifications
         await notifications.NotifyAsync(
             NotificationEvent.TaskChanged, recipients,
             EmailTemplates.TaskChanged(task.Title, teamName, actorName, changes, task.TaskType),
+            task.TeamId, actorUserId, cancellationToken, task.Id);
+    }
+
+    // A Member who gives back a task they had taken leaves it with nobody: the team's Owners and Admins are told, so it does not rot unnoticed.
+    // (Anything an Owner/Admin did themselves is not announced to Owners/Admins - they know.)
+    private static async Task NotifyManagersOfReturnToPoolAsync(
+        IApplicationDbContext context, INotificationService notifications, CalendarItem task, TaskSnapshot before, Guid? actorUserId,
+        string teamName, string actorName, CancellationToken cancellationToken)
+    {
+        if (task.AssignedUserId is not null || before.AssignedUserId is null || before.AssignedUserId != actorUserId)
+        {
+            return;
+        }
+
+        var managers = await context.TeamMembers.AsNoTracking()
+            .Where(m => m.TeamId == task.TeamId && (m.Role == TeamRole.Owner || m.Role == TeamRole.Admin))
+            .Select(m => m.UserId)
+            .ToListAsync(cancellationToken);
+        if (managers.Contains(before.AssignedUserId.Value))
+        {
+            return;
+        }
+
+        await notifications.NotifyAsync(
+            NotificationEvent.TaskReturnedToPool, managers,
+            EmailTemplates.TaskReturnedToPool(task.Title, teamName, actorName, task.TaskType),
             task.TeamId, actorUserId, cancellationToken, task.Id);
     }
 

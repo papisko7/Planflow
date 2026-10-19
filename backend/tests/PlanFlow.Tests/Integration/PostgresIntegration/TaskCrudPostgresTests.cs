@@ -334,7 +334,8 @@ public class TaskCrudPostgresTests
         var owner = await AuthenticatedClientAsync(ownerId, teamId, TeamRole.Owner);
         var member = await AuthenticatedClientAsync(memberId, teamId, TeamRole.Member);
 
-        var mine = await (await owner.PostAsJsonAsync($"api/teams/{teamId}/tasks", new CreateTaskRequest(
+        // A Member's own task (one an Owner assigned to them would be locked - see TaskAssignmentLockTests).
+        var mine = await (await member.PostAsJsonAsync($"api/teams/{teamId}/tasks", new CreateTaskRequest(
             "Mine for now", null, memberId, null, 3, null))).Content.ReadFromJsonAsync<TaskDto>();
         var ownersTask = await (await owner.PostAsJsonAsync($"api/teams/{teamId}/tasks", new CreateTaskRequest(
             "Owner's task", null, ownerId, null, 3, null))).Content.ReadFromJsonAsync<TaskDto>();

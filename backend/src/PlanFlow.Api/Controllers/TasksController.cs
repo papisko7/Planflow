@@ -81,7 +81,8 @@ public class TasksController : ControllerBase
                 request.IsBusy,
                 request.Reminders,
                 request.ParticipantUserIds,
-                request.ItemListId),
+                request.ItemListId,
+                canAssignOthers),
             cancellationToken);
 
         return CreatedAtAction(nameof(GetTask), new { taskId = task.Id }, task);
@@ -178,21 +179,8 @@ public class TasksController : ControllerBase
             return Forbid();
         }
 
-        // A Member may edit a task that is already theirs (and not hand it to someone else), CLAIM an
-        // unassigned one by assigning it to themselves, or ABANDON their own task by clearing the assignee
-        // (it goes back to the unassigned pool). A task owned by somebody else is off limits:
-        // only Owner/Admin can reassign it.
-        if (!User.HasPermission(Permission.EditAnyTask))
-        {
-            var callerId = User.GetUserId();
-            var isOwnTask = existing.Task.AssignedUserId == callerId && request.AssignedUserId == callerId;
-            var isClaim = existing.Task.AssignedUserId is null && request.AssignedUserId == callerId;
-            var isAbandon = existing.Task.AssignedUserId == callerId && request.AssignedUserId is null;
-            if (!isOwnTask && !isClaim && !isAbandon)
-            {
-                return Forbid();
-            }
-        }
+        // Who may change the assignee (a Member: keep their own task, claim an unassigned one, give back one they took themselves;
+        // never one an Owner/Admin assigned) is decided by TaskAssignmentPolicy inside the command, which gets the caller's role.
 
         // A client that predates the scheduling fields sends no TaskType: keep what is stored, otherwise an edit
         // of the title would silently turn an Event into a plain Task and wipe its effort and recurrence.
@@ -228,7 +216,8 @@ public class TasksController : ControllerBase
                 keepTemplate ? stored.IsBusy : request.IsBusy,
                 request.Reminders,
                 request.ParticipantUserIds,
-                keepStored ? stored.ItemListId : request.ItemListId),
+                keepStored ? stored.ItemListId : request.ItemListId,
+                User.HasPermission(Permission.EditAnyTask)),
             cancellationToken);
 
         return Ok(task);

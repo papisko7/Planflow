@@ -13,6 +13,7 @@ export function notificationIcon(event: NotificationEvent): NotificationIcon {
     case NotificationEvent.TaskAssignedToYou:
       return { name: 'person-add-outline', color: colors.primary };
     case NotificationEvent.TaskUnassigned:
+    case NotificationEvent.TaskReturnedToPool:
       return { name: 'person-remove-outline', color: colors.textMuted };
     case NotificationEvent.TaskChanged:
       return { name: 'create-outline', color: colors.primary };

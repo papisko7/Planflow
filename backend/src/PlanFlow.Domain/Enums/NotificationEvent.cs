@@ -27,6 +27,9 @@ public enum NotificationEvent
     /// <summary>You were taken off an event / task you took part in as a guest / co-contractor.</summary>
     ParticipantRemoved = 18,
 
+    /// <summary>A Member gave a task they had taken back to the unassigned pool; sent to the team's Owners and Admins.</summary>
+    TaskReturnedToPool = 19,
+
     // Team membership
     AddedToTeam = 20,
     TeamRoleChanged = 21,

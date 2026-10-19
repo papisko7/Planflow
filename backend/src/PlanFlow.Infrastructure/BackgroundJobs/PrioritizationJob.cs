@@ -44,7 +44,9 @@ public class PrioritizationJob : IJob
         }
 
         var zones = await UserTimeZones.LoadAsync(_context, activeTasks, cancellationToken);
-        var changedTaskIds = TeamUrgencyRecalculator.Apply(_context, activeTasks, nowUtc, ScoreTriggerSource.ScheduledRecalculation, zones: zones);
+        var absences = await UserAbsences.LoadAsync(_context, activeTasks, nowUtc, cancellationToken);
+        var changedTaskIds = TeamUrgencyRecalculator.Apply(
+            _context, activeTasks, nowUtc, ScoreTriggerSource.ScheduledRecalculation, zones: zones, absences: absences);
         await _context.SaveChangesAsync(cancellationToken);
 
         var affectedTeamIds = activeTasks.Select(t => t.TeamId).Distinct().ToList();

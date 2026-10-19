@@ -46,6 +46,8 @@ public static class RecurrenceScheduler
         {
             TeamId = finished.TeamId,
             AssignedUserId = finished.AssignedUserId,
+            AssignedByUserId = finished.AssignedByUserId, // the next occurrence stays with the same person, on the same terms
+            IsAssignmentLocked = finished.IsAssignmentLocked,
             Title = finished.Title,
             Description = finished.Description,
             Status = TaskStatusRules.DefaultFor(finished.TaskType),

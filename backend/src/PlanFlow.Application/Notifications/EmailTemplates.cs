@@ -82,6 +82,11 @@ public static class EmailTemplates
         name,
         Lines($"{byName} unassigned you from the {Noun(type)} \"{taskTitle}\" in the team \"{teamName}\"."));
 
+    public static Func<string, EmailContent> TaskReturnedToPool(string taskTitle, string teamName, string byName, TaskType type = TaskType.Task) => name => EmailLayout.Build(
+        $"{Capitalized(type)} back in the pool: {Clean(taskTitle)}",
+        name,
+        Lines($"{byName} gave the {Noun(type)} \"{taskTitle}\" in the team \"{teamName}\" back - it has no assignee now."));
+
     public static Func<string, EmailContent> TaskChanged(string taskTitle, string teamName, string byName, IReadOnlyList<string> changes, TaskType type = TaskType.Task) => name => EmailLayout.Build(
         $"Your {Noun(type)} was changed: {Clean(taskTitle)}",
         name,

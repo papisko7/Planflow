@@ -184,7 +184,7 @@ public static class MemberCalendars
         return nowUtc >= start && nowUtc < end;
     }
 
-    private static TimeBlock? TeamBlockOf(CalendarItem item)
+    public static TimeBlock? TeamBlockOf(CalendarItem item)
     {
         if (item.StartUtc is null)
         {

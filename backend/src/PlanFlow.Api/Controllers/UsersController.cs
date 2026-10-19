@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using PlanFlow.Api.Common;
 using PlanFlow.Api.Contracts;
 using PlanFlow.Application.Auth.Commands.ChangePassword;
+using PlanFlow.Application.Availability.Queries.GetMyAbsences;
 using PlanFlow.Application.Auth.Commands.ResendEmailVerification;
 using PlanFlow.Application.Auth.Commands.VerifyEmail;
 using PlanFlow.Application.Users.Commands.UpdateCalendarSharing;
@@ -61,6 +62,11 @@ public class UsersController : ControllerBase
         await _sender.Send(new UpdateCalendarSharingCommand(User.GetUserId(), request.Level), cancellationToken);
         return NoContent();
     }
+
+    // The caller's own Out of office time ahead, so the app can warn "this deadline falls while you are away".
+    [HttpGet("absences")]
+    public async Task<IActionResult> GetMyAbsences(CancellationToken cancellationToken) =>
+        Ok(await _sender.Send(new GetMyAbsencesQuery(User.GetUserId()), cancellationToken));
 
     [HttpGet("notification-preferences")]
     public async Task<IActionResult> GetNotificationPreferences(CancellationToken cancellationToken)

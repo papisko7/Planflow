@@ -103,6 +103,9 @@ export interface TaskDto {
   seriesId: string | null;
   // The team's own list the item sits in (a task list for a task, a meeting list for an event); null = in none.
   itemListId: string | null;
+  // An Owner/Admin assigned the item, so its assignee cannot give it back (the server refuses); assignedByUserId is who did. Absent on older servers.
+  isAssignmentLocked?: boolean;
+  assignedByUserId?: string | null;
   // Latest "[Priority] why" sentence; only the team list endpoint fills it.
   reasonText?: string | null;
   // Client side only, set by utils/seriesGrouping when a list shows one entry for a whole series: how many other occurrences it hides.

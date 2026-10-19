@@ -33,6 +33,12 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
             .FirstOrDefaultAsync(t => t.Id == request.TaskId, cancellationToken)
             ?? throw new NotFoundException(nameof(CalendarItem), request.TaskId);
 
+        // Who may change the assignee is decided here (not in the controller), so every caller plays by the same rules. It comes first:
+        // being refused is answered before the request is checked for mistakes.
+        var outcome = TaskAssignmentPolicy.Decide(
+            request.UpdatedByUserId, request.CallerIsManager, task.AssignedUserId, task.AssignedByUserId, task.IsAssignmentLocked,
+            request.AssignedUserId);
+
         await TaskAssignment.EnsureAssigneeInTeamAsync(_context, task.TeamId, request.AssignedUserId, cancellationToken);
         await TaskDependencies.EnsureValidBlockerAsync(_context, task.TeamId, task.Id, request.BlockedByTaskId, cancellationToken);
 
@@ -41,6 +47,8 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
         var before = TaskSnapshot.Of(task); // for the "your task was changed" e-mail
 
         task.AssignedUserId = request.AssignedUserId;
+        task.AssignedByUserId = outcome.AssignedByUserId;
+        task.IsAssignmentLocked = outcome.IsLocked;
         if (task.IsExternal)
         {
             // Google owns the title, time, place, description, colour and template of an imported item (the next sync would overwrite

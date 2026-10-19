@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import { AbsenceDeadlineNote } from '../components/AbsenceDeadlineNote';
 import { TaskEditForm } from '../components/TaskEditForm';
 import { UrgencyBreakdown } from '../components/UrgencyBreakdown';
 import { getCurrentUserId } from '../services/authService';
@@ -158,6 +159,11 @@ export default function TaskDetailScreen() {
   const claim = () => (myUserId ? changeAssignee(myUserId, 'Failed to take over the task.') : undefined);
   const abandon = () => changeAssignee(null, 'Failed to abandon the task.');
   const isMine = myUserId !== null && task.assignedUserId === myUserId;
+  // A task an Owner/Admin assigned cannot be given back by its assignee (the server refuses); they can still work on it and invite co-contractors.
+  const lockedForMe = isMine && !!task.isAssignmentLocked && !isPrivileged;
+  const assignerName = task.isAssignmentLocked && task.assignedByUserId
+    ? (members.find((m) => m.userId === task.assignedByUserId)?.userDisplayName ?? null)
+    : null;
 
   // The guests of an event / co-contractors of a task, by name; a guest or co-contractor can step out of it (not edit it).
   const participantNames = participantIds.map((id) => members.find((m) => m.userId === id)?.userDisplayName ?? 'Former member');
@@ -223,6 +229,9 @@ export default function TaskDetailScreen() {
         </View>
         {task.description ? <Text style={styles.description}>{task.description}</Text> : null}
 
+        {isMine && !isEvent && task.deadlineUtc && task.status !== TaskStatus.Completed ? (
+          <AbsenceDeadlineNote task={task} testID="absence-deadline-note" />
+        ) : null}
         <View style={styles.metaGrid}>
           {createdDate ? <MetaItem label="Created" value={createdDate} /> : null}
           {isEvent ? (
@@ -252,7 +261,7 @@ export default function TaskDetailScreen() {
             <MetaItem label="Repeats" value={recurrenceEnd ? `${recurrence}, until ${recurrenceEnd}` : recurrence} />
           ) : null}
           {ranked ? <MetaItem label="Impact score" value={task.impactScore === null ? "Not rated" : String(task.impactScore)} /> : null}
-          <MetaItem label="Assigned to" value={assigneeName} />
+          <MetaItem label="Assigned to" value={assignerName ? `${assigneeName} (assigned by ${assignerName})` : assigneeName} />
           {participantNames.length > 0 ? <MetaItem label={isEvent ? 'Guests' : 'Co-contractors'} value={participantNames.join(', ')} /> : null}
         </View>
 
@@ -266,7 +275,12 @@ export default function TaskDetailScreen() {
             <Text style={styles.editButtonText}>{isEvent ? 'Leave this event' : 'Leave this task'}</Text>
           </Pressable>
         ) : null}
-        {isMine && !editing ? (
+        {lockedForMe && !editing ? (
+          <Text testID="task-locked-note" style={styles.lockedNote}>
+            🔒 An Owner or Admin assigned this task to you, so only they can take you off it.
+          </Text>
+        ) : null}
+        {isMine && !editing && !lockedForMe ? (
           <Pressable testID="task-abandon-button" style={styles.editButton} onPress={abandon}>
             <Text style={styles.editButtonText}>Abandon this task</Text>
           </Pressable>
@@ -397,5 +411,6 @@ const styles = StyleSheet.create({
   },
   editButtonText: { color: colors.surface, fontWeight: '700', fontSize: 12 },
   toggleText: { ...typography.body, color: colors.primary, fontWeight: '600' },
+  lockedNote: { ...typography.body, fontSize: 13, color: colors.textMuted },
   deleteText: { ...typography.body, color: colors.danger, fontWeight: '600' },
 });

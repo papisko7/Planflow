@@ -198,16 +198,33 @@ public class TaskNotificationTests
     }
 
     [Fact]
-    public async Task Update_AssigneeTakesTheirOwnTaskOff_NobodyIsMailedAboutOwnAction()
+    public async Task Update_AssigneeTakesTheirOwnTaskOff_OnlyOwnerAndAdminAreToldItIsBackInThePool()
     {
-        var (db, owner, _, member, team) = await TeamOfThree();
-        await Create(db, team.Id, owner.Id, member.Id);
+        var (db, owner, admin, member, team) = await TeamOfThree();
+        await Create(db, team.Id, member.Id, member.Id);
         ClearOutbox(db);
         await db.SaveChangesAsync();
 
         await Update(db, db.CalendarItems.Single(), member.Id, assignee: null, keepAssignee: false);
 
-        Assert.Empty(db.EmailOutbox); // Mia unassigned herself; no new assignee
+        // Mia gave it back: she hears nothing about her own action, the ones who hand out work are told.
+        Assert.DoesNotContain(db.EmailOutbox, m => m.ToEmail == member.Email);
+        Assert.Single(db.EmailOutbox, m => m.Event == NotificationEvent.TaskReturnedToPool && m.ToEmail == owner.Email);
+        Assert.Single(db.EmailOutbox, m => m.Event == NotificationEvent.TaskReturnedToPool && m.ToEmail == admin.Email);
+    }
+
+    [Fact]
+    public async Task Update_OwnerTakesSomeonesTaskOff_NobodyElseIsToldItIsBackInThePool()
+    {
+        var (db, owner, admin, member, team) = await TeamOfThree();
+        await Create(db, team.Id, owner.Id, member.Id);
+        ClearOutbox(db);
+        await db.SaveChangesAsync();
+
+        await Update(db, db.CalendarItems.Single(), owner.Id, assignee: null, keepAssignee: false);
+
+        Assert.DoesNotContain(db.EmailOutbox, m => m.Event == NotificationEvent.TaskReturnedToPool);
+        Assert.Single(db.EmailOutbox, m => m.Event == NotificationEvent.TaskUnassigned && m.ToEmail == member.Email);
     }
 
     [Fact]

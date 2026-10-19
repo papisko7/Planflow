@@ -19,3 +19,10 @@ export interface UpdateProfileRequest {
   email: string;
   currentPassword: string | null;
 }
+
+// Mirrors PlanFlow.Application.Availability.Queries.GetMyAbsences.MyAbsenceDto: one stretch of the caller's own Out of office time.
+export interface MyAbsence {
+  itemId: string;
+  startUtc: string;
+  endUtc: string;
+}

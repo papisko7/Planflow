@@ -42,13 +42,22 @@ public static class NotificationPolicy
     public static bool IsPushAllowed(NotificationPreference prefs, NotificationEvent evt) =>
         prefs.PushEnabled && IsInboxAllowed(prefs, evt);
 
+    /// <summary>
+    /// Whether a push waits while its recipient is in a Focus time block ("do not disturb" inside PlanFlow). Only the person's own alerts
+    /// (item reminders, urgency) break through; everything else - assignments, edits, team news - is held until the block ends. The
+    /// inbox entry is made at once either way, so nothing is lost; only the phone stays quiet.
+    /// </summary>
+    public static bool IsDeferredByFocusTime(NotificationEvent evt) =>
+        HasInAppForm(evt) && evt is not (NotificationEvent.TaskUrgent or NotificationEvent.ItemReminder);
+
     private static bool IsCategoryEnabled(NotificationPreference prefs, NotificationEvent evt)
     {
         return evt switch
         {
             NotificationEvent.NewDeviceLogin => prefs.LoginAlerts != LoginNotificationMode.Off,
             NotificationEvent.TaskAssignedToYou or NotificationEvent.TaskUnassigned
-                or NotificationEvent.ParticipantAdded or NotificationEvent.ParticipantRemoved => prefs.TaskAssignments,
+                or NotificationEvent.ParticipantAdded or NotificationEvent.ParticipantRemoved
+                or NotificationEvent.TaskReturnedToPool => prefs.TaskAssignments,
             NotificationEvent.ItemReminder => prefs.ItemReminders,
             NotificationEvent.TaskChanged or NotificationEvent.TaskDeleted => prefs.TaskChanges,
             NotificationEvent.TeamTaskAdded => prefs.TeamTasks,
@@ -80,7 +89,7 @@ public static class NotificationPolicy
         NotificationEvent.TaskAssignedToYou or NotificationEvent.TaskUnassigned or NotificationEvent.TaskChanged
             or NotificationEvent.TaskDeleted or NotificationEvent.TeamTaskAdded or NotificationEvent.TaskUrgent
             or NotificationEvent.ItemReminder or NotificationEvent.ParticipantAdded or NotificationEvent.ParticipantRemoved
-            or NotificationEvent.IncompleteItemsReminder => muteNotifications,
+            or NotificationEvent.TaskReturnedToPool or NotificationEvent.IncompleteItemsReminder => muteNotifications,
         NotificationEvent.ChatDigest => muteChat,
         _ => false
     };
