@@ -34,8 +34,7 @@ public class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, TaskD
             AssignedUserId = request.AssignedUserId,
             Title = request.Title,
             ImpactScore = request.ImpactScore,
-            BlockedByTaskId = request.BlockedByTaskId,
-            UseAiEnhancement = request.UseAiEnhancement
+            BlockedByTaskId = request.BlockedByTaskId
         };
         var outcome = TaskAssignmentPolicy.ForNewItem(request.CreatedByUserId, request.CreatorIsManager, request.AssignedUserId);
         task.AssignedByUserId = outcome.AssignedByUserId;

@@ -13,7 +13,6 @@ public class CalendarItemConfiguration : IEntityTypeConfiguration<CalendarItem>
 
         builder.Property(t => t.Title).IsRequired().HasMaxLength(256);
         builder.Property(t => t.ExternalCalendarEventId).HasMaxLength(512);
-        builder.Property(t => t.AiImpactReasoning).HasMaxLength(2000);
         builder.Property(t => t.Location).HasMaxLength(512);
         builder.Property(t => t.ColorKey).HasMaxLength(32);
         builder.Property(t => t.SeriesId).HasMaxLength(512);

@@ -17,7 +17,6 @@ public record CreateTaskRequest(
     int? RecurrenceInterval = null,
     int? RecurrenceWeekdays = null,
     DateTime? RecurrenceEndsAtUtc = null,
-    bool UseAiEnhancement = false,
     DateTime? EndUtc = null,
     Domain.Enums.EventTemplate EventTemplate = Domain.Enums.EventTemplate.Default,
     bool IsAllDay = false,
@@ -28,7 +27,7 @@ public record CreateTaskRequest(
     IReadOnlyList<Guid>? ParticipantUserIds = null,
     Guid? ItemListId = null);
 
-// TaskType doubles as the marker for "this client knows the scheduling block": when it is null the stored type/start/effort/recurrence/AI values are kept instead of being reset to defaults.
+// TaskType doubles as the marker for "this client knows the scheduling block": when it is null the stored type/start/effort/recurrence values are kept instead of being reset to defaults.
 // EventTemplate is the same kind of marker for the template block (template, all-day, place, colour, busy/free):
 // when it is null the stored values are kept. Reminders and ParticipantUserIds work the same way: null keeps what is
 // stored (quick actions such as "done" send neither), a list - even an empty one - replaces it. ItemListId is the
@@ -54,7 +53,6 @@ public record UpdateTaskRequest(
     int? RecurrenceInterval = null,
     int? RecurrenceWeekdays = null,
     DateTime? RecurrenceEndsAtUtc = null,
-    bool UseAiEnhancement = false,
     DateTime? EndUtc = null,
     Domain.Enums.EventTemplate? EventTemplate = null,
     bool IsAllDay = false,

@@ -172,7 +172,6 @@ public static class SeriesEditing
         {
             row.EstimatedEffortHours = edit.Request.EstimatedEffortHours;
             row.ImpactScore = edit.Request.ImpactScore;
-            row.UseAiEnhancement = edit.Request.UseAiEnhancement;
             row.ItemListId = task.ItemListId;
             row.IsDataIncomplete = false;
             row.UpdatedAtUtc = nowUtc;
@@ -267,7 +266,6 @@ public static class SeriesEditing
         row.Title = request.Title;
         row.Status = TaskStatusRules.Normalize(row.TaskType, row.Status);
         row.ItemListId = task.ItemListId;
-        row.UseAiEnhancement = request.UseAiEnhancement;
         row.ImpactScore = request.ImpactScore;
         row.IsSeriesException = false;
         row.UpdatedAtUtc = nowUtc;

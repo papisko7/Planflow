@@ -274,7 +274,7 @@ public class TaskScheduleFieldsTests
 
         var created = await new CreateTaskCommandHandler(db, cache, notifications).Handle(
             new CreateTaskCommand(team.Id, "Standup", null, null, null, 5, null, owner.Id,
-                TaskType.Event, Future, 0.5, true, RecurrenceFrequency.Daily, 1, null, Future.AddDays(30), UseAiEnhancement: true, EndUtc: Future.AddHours(1)),
+                TaskType.Event, Future, 0.5, true, RecurrenceFrequency.Daily, 1, null, Future.AddDays(30), EndUtc: Future.AddHours(1)),
             CancellationToken.None);
 
         Assert.Equal(TaskType.Event, created.TaskType);
@@ -285,7 +285,6 @@ public class TaskScheduleFieldsTests
         Assert.True(created.IsRecurring);
         Assert.Equal(RecurrenceFrequency.Daily, created.RecurrenceFrequency);
         Assert.Equal(1, created.RecurrenceInterval);
-        Assert.True(created.UseAiEnhancement);
 
         // Switching recurrence off for the whole series clears the rule so stale values never linger.
         var updated = await new UpdateTaskCommandHandler(db, cache, notifications).Handle(
@@ -299,7 +298,6 @@ public class TaskScheduleFieldsTests
         Assert.Null(updated.RecurrenceFrequency);
         Assert.Null(updated.RecurrenceInterval);
         Assert.Null(updated.RecurrenceEndsAtUtc);
-        Assert.False(updated.UseAiEnhancement);
     }
 
     [Fact]
@@ -374,7 +372,6 @@ public class TaskScheduleFieldsTests
         Assert.Equal(TaskType.Task, created.TaskType);
         Assert.Null(created.EstimatedEffortHours);
         Assert.False(created.IsRecurring);
-        Assert.False(created.UseAiEnhancement);
         Assert.False(created.IsDataIncomplete);
     }
 }

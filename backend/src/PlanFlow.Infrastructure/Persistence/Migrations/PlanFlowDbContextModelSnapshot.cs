@@ -134,13 +134,6 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("AiImpactReasoning")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<double?>("AiImpactScore")
-                        .HasColumnType("double precision");
-
                     b.Property<Guid?>("AssignedByUserId")
                         .HasColumnType("uuid");
 
@@ -264,9 +257,6 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("UseAiEnhancement")
-                        .HasColumnType("boolean");
 
                     b.HasKey("Id");
 

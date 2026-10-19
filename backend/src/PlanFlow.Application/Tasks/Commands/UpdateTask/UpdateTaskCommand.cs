@@ -27,7 +27,6 @@ public record UpdateTaskCommand(
     int? RecurrenceInterval = null,
     int? RecurrenceWeekdays = null,
     DateTime? RecurrenceEndsAtUtc = null,
-    bool UseAiEnhancement = false,
     DateTime? EndUtc = null,
     Domain.Enums.EventTemplate EventTemplate = Domain.Enums.EventTemplate.Default,
     bool IsAllDay = false,

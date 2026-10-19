@@ -16,7 +16,7 @@ public class UrgencyReasonTextTests
 
     private static CalendarItem Item(
         TaskType type = TaskType.Task, DateTime? start = null, DateTime? end = null, DateTime? deadline = null,
-        double? effort = null, int? impact = 0, double? aiImpact = null) => new()
+        double? effort = null, int? impact = 0) => new()
     {
         Id = Guid.NewGuid(),
         TeamId = Guid.NewGuid(),
@@ -26,8 +26,7 @@ public class UrgencyReasonTextTests
         EndUtc = end,
         DeadlineUtc = deadline,
         EstimatedEffortHours = effort,
-        ImpactScore = impact,
-        AiImpactScore = aiImpact
+        ImpactScore = impact
     };
 
     private static UrgencyScoreLog Score(CalendarItem item, double blocking = 0.0, bool isBlocked = false) =>
@@ -163,7 +162,7 @@ public class UrgencyReasonTextTests
         Assert.StartsWith(CalendarItemUrgencyScoreFactory.PriorityLabel(log.FinalScore), log.ReasonText);
     }
 
-    // ---- Case 4: null impact / AI never silently fills it ----
+    // ---- Case 4: null impact ----
 
     [Fact]
     public void NullImpact_IsReportedAsNotRated_AndNotPunished()
@@ -177,24 +176,12 @@ public class UrgencyReasonTextTests
     }
 
     [Fact]
-    public void NullImpact_AnAiSuggestionDoesNotChangeTheScore()
+    public void NullImpact_RatingItLaterCountsTheImpact()
     {
-        // The AI value is only a suggestion until the user accepts it into ImpactScore.
-        var plain = Score(Item(deadline: Now.AddDays(5), impact: null));
-        var withSuggestion = Score(Item(deadline: Now.AddDays(5), impact: null, aiImpact: 9));
+        var item = Item(deadline: Now.AddDays(5), impact: null);
+        item.ImpactScore = 9;
 
-        Assert.Equal(plain.FinalScore, withSuggestion.FinalScore, precision: 12);
-        Assert.Null(withSuggestion.ImpactComponent);
-        Assert.Equal(plain.ReasonText, withSuggestion.ReasonText);
-    }
-
-    [Fact]
-    public void NullImpact_AcceptedSuggestionBecomesARealRating()
-    {
-        var accepted = Item(deadline: Now.AddDays(5), impact: null, aiImpact: 9);
-        accepted.ImpactScore = 9;
-
-        var log = Score(accepted);
+        var log = Score(item);
 
         Assert.Equal(0.9, log.ImpactComponent);
         Assert.Contains("impact 9/10", log.ReasonText);

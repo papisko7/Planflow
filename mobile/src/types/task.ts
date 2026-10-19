@@ -83,9 +83,6 @@ export interface TaskDto {
   recurrenceInterval: number | null;
   recurrenceWeekdays: number | null;
   recurrenceEndsAtUtc: string | null;
-  useAiEnhancement: boolean;
-  aiImpactScore: number | null;
-  aiImpactReasoning: string | null;
   isDataIncomplete: boolean;
   eventTemplate: EventTemplate;
   location: string | null;
@@ -167,7 +164,6 @@ export interface UpdateTaskRequest extends ScheduleFields {
   blockedByTaskId: string | null;
   manualUrgencyOverride: number | null;
   manualUrgencyOverrideExpiresAtUtc: string | null;
-  useAiEnhancement: boolean;
   // Both lists: left out = the server keeps what it has (quick actions send neither); a list - even an empty one - replaces it.
   reminders?: ReminderInput[];
   participantUserIds?: string[];

@@ -96,13 +96,6 @@ public class CalendarItem : BaseEntity
     /// <summary>True for an occurrence of a repeating item created in the app. Derived, not stored.</summary>
     public bool IsRecurring => RecurrenceSeriesId is not null;
 
-    /// <summary>Reserved for an optional AI impact suggestion; neither the app nor the algorithm uses it.</summary>
-    public bool UseAiEnhancement { get; set; }
-
-    /// <summary>Reserved with <see cref="UseAiEnhancement"/>; would only ever be a suggestion, never a replacement for <see cref="ImpactScore"/>.</summary>
-    public double? AiImpactScore { get; set; }
-    public string? AiImpactReasoning { get; set; }
-
     /// <summary>True when the task was imported without enough data (e.g. no impact/effort in a calendar description) and the user should complete it.</summary>
     public bool IsDataIncomplete { get; set; }
 

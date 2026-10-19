@@ -177,7 +177,6 @@ public static class TaskSeries
             DeadlineUtc = isEvent ? null : template.DeadlineUtc + shift,
             EstimatedEffortHours = template.EstimatedEffortHours,
             ImpactScore = template.ImpactScore,
-            UseAiEnhancement = template.UseAiEnhancement,
             ItemListId = template.ItemListId,
             RecurrenceSeriesId = series.Id
         };
