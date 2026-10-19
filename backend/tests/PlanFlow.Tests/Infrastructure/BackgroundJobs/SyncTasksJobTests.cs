@@ -70,10 +70,17 @@ public class SyncTasksJobTests
         return encryption;
     }
 
-    private static Mock<IJobExecutionContext> CreateJobContext()
+    /// <summary>A run context; with a user id it is a "Sync now" press for that account, without one it covers every account.</summary>
+    private static Mock<IJobExecutionContext> CreateJobContext(Guid? userId = null)
     {
         var jobContext = new Mock<IJobExecutionContext>();
         jobContext.SetupGet(c => c.CancellationToken).Returns(CancellationToken.None);
+        var data = new JobDataMap();
+        if (userId is { } id)
+        {
+            data["UserId"] = id.ToString();
+        }
+        jobContext.SetupGet(c => c.MergedJobDataMap).Returns(data);
         return jobContext;
     }
 
@@ -521,6 +528,24 @@ public class SyncTasksJobTests
         Assert.Equal("Visible", (await context.CalendarItems.SingleAsync()).Title);
         Assert.Equal("Fine", (await context.ExternalTaskLists.SingleAsync()).Title); // the failed one has no row, so it is read in full next time
         Assert.Null((await context.CalendarIntegrations.SingleAsync()).LastTasksSyncedAtUtc);
+    }
+
+    [Fact]
+    public async Task Execute_SyncNowPressed_SyncsOnlyThePressingUsersAccount()
+    {
+        var context = CreateInMemoryContext();
+        var (pressing, _) = SeedUserWithTeam(context, email: "pressing@example.com");
+        var (bystander, _) = SeedUserWithTeam(context, email: "bystander@example.com");
+        SeedIntegration(context, pressing.Id, suffix: "-p");
+        SeedIntegration(context, bystander.Id, suffix: "-b");
+        var client = new FakeTasksClient().WithList("l1", "Tasks", Open("t1", "Write chapter", Day(3)));
+
+        await CreateJob(context, client).Execute(CreateJobContext(pressing.Id).Object);
+
+        Assert.Equal(pressing.Id, (await context.CalendarItems.SingleAsync()).AssignedUserId);
+        Assert.Equal(1, client.ListsCalls);
+        var bystanderIntegration = await context.CalendarIntegrations.SingleAsync(i => i.UserId == bystander.Id);
+        Assert.Null(bystanderIntegration.LastTasksSyncedAtUtc);
     }
 
     [Fact]

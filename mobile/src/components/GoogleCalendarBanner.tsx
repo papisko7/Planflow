@@ -13,14 +13,20 @@ import type { ApiError } from '../types/api';
 
 type Props = { onSynced: () => void };
 
-// The sync job runs in the background after the POST returns, so give it a moment before reloading tasks.
-const SYNC_SETTLE_MS = 3000;
+// The server syncs in the background after the POST returns, so the banner asks the status once a second until it says "not syncing".
+const SYNC_POLL_MS = 1000;
+const SYNC_MAX_WAIT_MS = 60000;
 
-// Top-of-calendar strip: "Connect Google" when not linked, otherwise "Connected as … / Sync now / Disconnect". An account linked before
-// Google Tasks existed (or one that declined that permission) is also offered a one-tap reconnect that asks for the Tasks permission.
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Top-of-calendar strip: "Connect Google" when not linked, otherwise "Connected as … / Sync now / Disconnect". Google is fetched only when
+// "Sync now" is pressed (there is no timer), so "Last sync" is the time of the last press. An account linked before Google Tasks existed
+// (or one that declined that permission) is also offered a one-tap reconnect that asks for the Tasks permission.
 export function GoogleCalendarBanner({ onSynced }: Props) {
   const [status, setStatus] = useState<GoogleCalendarStatus | null>(null);
   const [busy, setBusy] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadStatus = useCallback(async () => {
@@ -35,12 +41,32 @@ export function GoogleCalendarBanner({ onSynced }: Props) {
     loadStatus();
   }, [loadStatus]);
 
+  // Waits for the server to finish (it may have been started by an earlier press), then lets the screen reload its items.
+  const waitForSync = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const deadline = Date.now() + SYNC_MAX_WAIT_MS;
+      let next: GoogleCalendarStatus;
+      do {
+        await sleep(SYNC_POLL_MS);
+        next = await getGoogleCalendarStatus();
+        setStatus(next);
+      } while (next.syncing && Date.now() < deadline);
+      onSynced();
+    } finally {
+      setSyncing(false);
+    }
+  }, [onSynced]);
+
   const syncNow = useCallback(async () => {
-    await syncGoogleCalendarNow();
-    await new Promise((resolve) => setTimeout(resolve, SYNC_SETTLE_MS));
-    await loadStatus();
-    onSynced();
-  }, [loadStatus, onSynced]);
+    setNotice(null);
+    const { started } = await syncGoogleCalendarNow();
+    if (!started) {
+      setNotice('Synced a moment ago - try again in a minute.');
+      return;
+    }
+    await waitForSync();
+  }, [waitForSync]);
 
   const run = useCallback(async (action: () => Promise<void>) => {
     setBusy(true);
@@ -53,6 +79,12 @@ export function GoogleCalendarBanner({ onSynced }: Props) {
       setBusy(false);
     }
   }, []);
+
+  // Opened while a sync is still going (pressed, left the tab, came back): pick the wait up again instead of showing a dead button.
+  const serverSyncing = status?.syncing === true;
+  useEffect(() => {
+    if (serverSyncing && !syncing) run(waitForSync);
+  }, [serverSyncing, syncing, run, waitForSync]);
 
   const connect = () =>
     run(async () => {
@@ -95,7 +127,7 @@ export function GoogleCalendarBanner({ onSynced }: Props) {
           )}
           <View style={styles.row}>
             <Pressable style={styles.button} onPress={() => run(syncNow)} disabled={busy}>
-              <Text style={styles.buttonText}>Sync now</Text>
+              <Text style={styles.buttonText}>{syncing ? 'Syncing…' : 'Sync now'}</Text>
             </Pressable>
             <Pressable style={styles.buttonGhost} onPress={disconnect} disabled={busy}>
               <Text style={styles.buttonGhostText}>Disconnect</Text>
@@ -111,6 +143,7 @@ export function GoogleCalendarBanner({ onSynced }: Props) {
         </>
       )}
       {busy && <ActivityIndicator testID="google-banner-busy" color={colors.primary} />}
+      {notice && <Text style={styles.hint}>{notice}</Text>}
       {error && <Text style={styles.error}>{error}</Text>}
     </View>
   );

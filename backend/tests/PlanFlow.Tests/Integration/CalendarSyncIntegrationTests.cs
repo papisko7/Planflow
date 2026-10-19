@@ -115,6 +115,7 @@ public class CalendarSyncIntegrationTests
     {
         var jobContext = new Mock<IJobExecutionContext>();
         jobContext.SetupGet(c => c.CancellationToken).Returns(CancellationToken.None);
+        jobContext.SetupGet(c => c.MergedJobDataMap).Returns(new JobDataMap());
         return jobContext;
     }
 

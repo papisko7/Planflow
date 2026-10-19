@@ -16,6 +16,7 @@ const status = (over: Partial<GoogleCalendarStatus> = {}): GoogleCalendarStatus 
   lastSyncedAtUtc: '2026-10-18T10:00:00.000Z',
   tasksConnected: true,
   lastTasksSyncedAtUtc: null,
+  syncing: false,
   ...over,
 });
 
@@ -23,7 +24,7 @@ const status = (over: Partial<GoogleCalendarStatus> = {}): GoogleCalendarStatus 
 describe('GoogleCalendarBanner - Google Tasks', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedSync.mockResolvedValue(undefined);
+    mockedSync.mockResolvedValue({ started: true });
   });
 
   it('with the tasks permission it says Tasks are connected and offers no reconnect', async () => {
@@ -56,8 +57,63 @@ describe('GoogleCalendarBanner - Google Tasks', () => {
     expect(screen.getByText(/Google Calendar:/)).toBeTruthy(); // the calendar itself is still shown as connected
   });
 
+  // Step 7.5.9: Google is fetched only on the button; the banner follows the server's `syncing` flag until the sync is over.
+  describe('Sync now', () => {
+    const SYNC_NOW = 'Sync now';
+
+    it('shows "Syncing…" while the server is syncing, then reloads the items once it is done', async () => {
+      mockedStatus
+        .mockResolvedValueOnce(status()) // when the banner opens
+        .mockResolvedValueOnce(status({ syncing: true })) // first look after the press: still going
+        .mockResolvedValue(status({ lastSyncedAtUtc: '2026-10-19T09:00:00.000Z' })); // finished
+      const onSynced = jest.fn();
+      await render(<GoogleCalendarBanner onSynced={onSynced} />);
+      await waitFor(() => expect(screen.getByText(SYNC_NOW)).toBeTruthy());
+
+      const pressed = fireEvent.press(screen.getByText(SYNC_NOW)); // resolves only when the whole sync has been followed to its end
+
+      await waitFor(() => expect(screen.getByText('Syncing…')).toBeTruthy());
+      expect(onSynced).not.toHaveBeenCalled();
+      await pressed;
+      expect(onSynced).toHaveBeenCalledTimes(1);
+      expect(mockedSync).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(screen.getByText(SYNC_NOW)).toBeTruthy());
+      await waitFor(() => expect(screen.queryByTestId('google-banner-busy')).toBeNull());
+    }, 20000);
+
+    it('says so and does not wait when the last sync was moments ago', async () => {
+      mockedStatus.mockResolvedValue(status());
+      mockedSync.mockResolvedValue({ started: false });
+      const onSynced = jest.fn();
+      await render(<GoogleCalendarBanner onSynced={onSynced} />);
+      await waitFor(() => expect(screen.getByText(SYNC_NOW)).toBeTruthy());
+
+      await fireEvent.press(screen.getByText(SYNC_NOW));
+
+      await waitFor(() => expect(screen.getByText(/Synced a moment ago/)).toBeTruthy());
+      expect(onSynced).not.toHaveBeenCalled();
+      expect(mockedStatus).toHaveBeenCalledTimes(1); // only the one when the banner opened
+      await waitFor(() => expect(screen.queryByTestId('google-banner-busy')).toBeNull());
+    });
+
+    it('picks the wait up again when opened while a sync is still running', async () => {
+      mockedStatus
+        .mockResolvedValueOnce(status({ syncing: true })) // when the banner opens
+        .mockResolvedValue(status()); // by the next look it is done
+      const onSynced = jest.fn();
+
+      await render(<GoogleCalendarBanner onSynced={onSynced} />);
+
+      await waitFor(() => expect(screen.getByText('Syncing…')).toBeTruthy());
+      expect(mockedSync).not.toHaveBeenCalled(); // nothing is started by merely opening the screen
+      await waitFor(() => expect(onSynced).toHaveBeenCalledTimes(1), { timeout: 8000 });
+      await waitFor(() => expect(screen.getByText(SYNC_NOW)).toBeTruthy());
+      await waitFor(() => expect(screen.queryByTestId('google-banner-busy')).toBeNull());
+    }, 20000);
+  });
+
   describe('reconnecting', () => {
-    // The banner waits 3 s for the background job to settle before reloading, so this test really waits for it.
+    // After reconnecting the banner syncs once, then follows it to the end, so this test really waits for the first poll.
     it('opens the Google consent page, then syncs right away so the tasks appear without a manual refresh', async () => {
       mockedStatus
         .mockResolvedValueOnce(status({ tasksConnected: false })) // when the banner opens

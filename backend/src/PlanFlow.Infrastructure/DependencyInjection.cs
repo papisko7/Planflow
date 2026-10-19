@@ -121,8 +121,10 @@ public static class DependencyInjection
         {
             // Each job gets its own JobKey/trigger pair; Quartz's DI integration opens a fresh
             // DI scope per execution, so jobs can safely take scoped services like IApplicationDbContext.
-            AddIntervalJob<SyncCalendarJob>(quartz, "SyncCalendarJob", TimeSpan.FromMinutes(5));
-            AddIntervalJob<SyncTasksJob>(quartz, "SyncTasksJob", TimeSpan.FromMinutes(5));
+            // Google is fetched only when a user presses "Sync now": these two jobs are stored without a trigger and started by
+            // GoogleSyncTrigger. That keeps the number of requests to Google under the user's control and "Last sync" truthful.
+            quartz.AddJob<SyncCalendarJob>(opts => opts.WithIdentity(GoogleSyncTrigger.CalendarJob).StoreDurably());
+            quartz.AddJob<SyncTasksJob>(opts => opts.WithIdentity(GoogleSyncTrigger.TasksJob).StoreDurably());
             AddIntervalJob<PrioritizationJob>(quartz, "PrioritizationJob", TimeSpan.FromHours(1));
             AddIntervalJob<AlertingJob>(quartz, "AlertingJob", TimeSpan.FromMinutes(1));
             AddIntervalJob<ItemReminderJob>(quartz, "ItemReminderJob", TimeSpan.FromMinutes(1));

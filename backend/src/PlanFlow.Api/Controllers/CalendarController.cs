@@ -7,8 +7,10 @@ using PlanFlow.Api.Contracts;
 using PlanFlow.Application.Calendar.Commands.DisconnectGoogleCalendar;
 using PlanFlow.Application.Calendar.Commands.GoogleOAuthCallback;
 using PlanFlow.Application.Calendar.Commands.InitiateGoogleConnect;
+using PlanFlow.Application.Calendar.Commands.RequestGoogleSync;
 using PlanFlow.Application.Calendar.Queries.GetGoogleCalendarStatus;
 using PlanFlow.Application.Common.Exceptions;
+using PlanFlow.Infrastructure.BackgroundJobs;
 using Quartz;
 
 namespace PlanFlow.Api.Controllers;
@@ -30,17 +32,34 @@ public class CalendarController : ControllerBase
     [HttpGet("status")]
     [Authorize]
     public async Task<ActionResult<GoogleCalendarStatusDto>> Status(CancellationToken cancellationToken)
-        => Ok(await _sender.Send(new GetGoogleCalendarStatusQuery(User.GetUserId()), cancellationToken));
+    {
+        var userId = User.GetUserId();
+        var status = await _sender.Send(new GetGoogleCalendarStatusQuery(userId), cancellationToken);
+        var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+        return Ok(status with { Syncing = await GoogleSyncTrigger.IsRunningAsync(scheduler, userId, cancellationToken) });
+    }
 
-    /// <summary>Runs the calendar and the tasks sync jobs right now instead of waiting for the 5-minute poll (each job syncs all connected accounts).</summary>
+    /// <summary>
+    /// The only way Google is fetched (no timer): starts the calendar and tasks syncs for the caller's own account. The app then watches
+    /// <c>syncing</c> in the status. A press within a minute of the last sync starts nothing; a press while a sync is running joins it.
+    /// </summary>
     [HttpPost("sync")]
     [Authorize]
-    public async Task<IActionResult> SyncNow(CancellationToken cancellationToken)
+    public async Task<ActionResult<GoogleSyncResponse>> SyncNow(CancellationToken cancellationToken)
     {
+        var userId = User.GetUserId();
+        if (!await _sender.Send(new RequestGoogleSyncCommand(userId), cancellationToken))
+        {
+            return Accepted(new GoogleSyncResponse(false));
+        }
+
         var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
-        await scheduler.TriggerJob(new JobKey("SyncCalendarJob"), cancellationToken);
-        await scheduler.TriggerJob(new JobKey("SyncTasksJob"), cancellationToken);
-        return Accepted();
+        if (!await GoogleSyncTrigger.IsRunningAsync(scheduler, userId, cancellationToken))
+        {
+            await GoogleSyncTrigger.StartAsync(scheduler, userId, cancellationToken);
+        }
+
+        return Accepted(new GoogleSyncResponse(true));
     }
 
     /// <summary>Authenticated leg: mints PKCE + state and returns the Google consent URL for the mobile client to open.</summary>

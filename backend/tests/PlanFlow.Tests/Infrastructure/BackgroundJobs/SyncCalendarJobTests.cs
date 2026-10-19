@@ -31,10 +31,17 @@ public class SyncCalendarJobTests
         return encryption;
     }
 
-    private static Mock<IJobExecutionContext> CreateJobContext()
+    /// <summary>A run context; with a user id it is a "Sync now" press for that account, without one it covers every account.</summary>
+    private static Mock<IJobExecutionContext> CreateJobContext(Guid? userId = null)
     {
         var jobContext = new Mock<IJobExecutionContext>();
         jobContext.SetupGet(c => c.CancellationToken).Returns(CancellationToken.None);
+        var data = new JobDataMap();
+        if (userId is { } id)
+        {
+            data["UserId"] = id.ToString();
+        }
+        jobContext.SetupGet(c => c.MergedJobDataMap).Returns(data);
         return jobContext;
     }
 
@@ -290,7 +297,7 @@ public class SyncCalendarJobTests
 
         var job = CreateJob(context, new Mock<IGoogleCalendarClient>(), oauthClient);
         await job.Execute(CreateJobContext().Object);
-        await job.Execute(CreateJobContext().Object); // the next 5-minute run no longer polls it
+        await job.Execute(CreateJobContext().Object); // the next sync no longer includes it
 
         Assert.False((await context.CalendarIntegrations.SingleAsync()).IsActive);
         var mail = Assert.Single(context.EmailOutbox);
@@ -1054,5 +1061,54 @@ public class SyncCalendarJobTests
         var kept = await context.CalendarItems.SingleAsync();
         Assert.Equal(mine.Id, kept.Id);
         Assert.Null(kept.BlockedByTaskId);
+    }
+
+    // --- Google is fetched only on the "Sync now" button, for the pressing user's account (step 7.5.9) ---
+
+    [Fact]
+    public async Task Execute_SyncNowPressed_SyncsOnlyThePressingUsersAccount()
+    {
+        var context = CreateInMemoryContext();
+        var (pressing, pressingTeam) = SeedUserWithTeam(context);
+        var (bystander, _) = SeedUserWithTeam(context);
+        var pressingIntegration = SeedActiveIntegration(context, pressing.Id);
+        var bystanderIntegration = SeedActiveIntegration(context, bystander.Id);
+        var calendarClient = ClientReturning(new GoogleCalendarEvent("e1", "Standup", DateTime.UtcNow.AddHours(2), DateTime.UtcNow.AddHours(3), IsCancelled: false));
+
+        await CreateJob(context, calendarClient).Execute(CreateJobContext(pressing.Id).Object);
+
+        calendarClient.Verify(c => c.ListEventsAsync(It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(pressingTeam.Id, (await context.CalendarItems.SingleAsync()).TeamId);
+        Assert.NotNull((await context.CalendarIntegrations.SingleAsync(i => i.Id == pressingIntegration.Id)).LastSyncedAtUtc);
+        Assert.Null((await context.CalendarIntegrations.SingleAsync(i => i.Id == bystanderIntegration.Id)).LastSyncedAtUtc);
+    }
+
+    [Fact]
+    public async Task Execute_SyncNowPressedByAUserWithoutAnAccount_SyncsNothing()
+    {
+        var context = CreateInMemoryContext();
+        var (connected, _) = SeedUserWithTeam(context);
+        SeedActiveIntegration(context, connected.Id);
+        var calendarClient = ClientReturning(new GoogleCalendarEvent("e1", "Standup", DateTime.UtcNow.AddHours(2), DateTime.UtcNow.AddHours(3), IsCancelled: false));
+
+        await CreateJob(context, calendarClient).Execute(CreateJobContext(Guid.NewGuid()).Object);
+
+        calendarClient.Verify(c => c.ListEventsAsync(It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Empty(context.CalendarItems);
+    }
+
+    [Fact]
+    public async Task Execute_SyncNowPressedDaysAfterTheLastFullPass_IsAFullPassAgain()
+    {
+        var (context, integration) = SetUp();
+        integration.LastSyncedAtUtc = DateTime.UtcNow.AddHours(-30);
+        integration.LastFullSyncAtUtc = DateTime.UtcNow.AddHours(-30);
+        await context.SaveChangesAsync();
+        var calendarClient = ClientReturning();
+
+        await CreateJob(context, calendarClient).Execute(CreateJobContext(integration.UserId).Object);
+
+        calendarClient.Verify(c => c.ListEventsAsync(It.IsAny<string>(), null, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.True((await context.CalendarIntegrations.SingleAsync()).LastFullSyncAtUtc > DateTime.UtcNow.AddMinutes(-1));
     }
 }

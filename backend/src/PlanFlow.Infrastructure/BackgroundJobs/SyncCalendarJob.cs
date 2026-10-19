@@ -15,27 +15,27 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Infrastructure.BackgroundJobs;
 
 /// <summary>
-/// Polls every active Google Calendar connection every 5 minutes and upserts Google events into
-/// <see cref="CalendarItem"/> rows of type Event (start–end), reading an optional <c>[planflow]</c> line for impact/effort and
-/// flagging events that still lack data. Idempotency comes from the unique (SourceCalendarIntegrationId,
-/// ExternalCalendarEventId) pair enforced in <c>CalendarItemConfiguration</c> — re-running the job
-/// never creates duplicates, it just finds and updates the same row.
+/// Fetches the Google Calendar of the user who pressed "Sync now" (see <see cref="GoogleSyncTrigger"/>; there is no timer) and upserts
+/// Google events into <see cref="CalendarItem"/> rows of type Event (start–end), reading an optional <c>[planflow]</c> line for
+/// impact/effort and flagging events that still lack data. Idempotency comes from the unique (SourceCalendarIntegrationId,
+/// ExternalCalendarEventId) pair enforced in <c>CalendarItemConfiguration</c> — running it again
+/// never creates duplicates, it just finds and updates the same row. Runs never overlap, so two presses cannot race for the same row.
 ///
 /// Google owns the fields it has (title, time, place, colour, template, status, reminders, description); PlanFlow owns what Google
 /// has no field for (impact, effort, blocked-by, the item's own status choices). A sync therefore overwrites the first group and
 /// never touches the second, except through the <c>[planflow]</c> tag when its text really changed.
 ///
-/// Most polls are incremental (only events changed since the last poll). Once a day an integration gets a full pass over the whole
-/// 90-day window instead: an incremental poll cannot see an event that merely drifts into the window as time passes, and the full
-/// pass also repairs anything a poll missed.
+/// Most syncs are incremental (only events changed since the last one). A press more than a day after the last full pass gets a full
+/// pass over the whole 90-day window instead: an incremental sync cannot see an event that merely drifts into the window as time passes,
+/// and the full pass also repairs anything a sync missed.
 ///
-/// One user's Google account failing (revoked consent, Google outage) must not stop the other
-/// accounts in the same run, so each integration is processed and committed independently inside
-/// its own try/catch.
+/// One account failing (revoked consent, Google outage) must not stop the others when a run covers several, so each integration is
+/// processed and committed independently inside its own try/catch.
 /// </summary>
+[DisallowConcurrentExecution]
 public class SyncCalendarJob : IJob
 {
-    /// <summary>How often an integration gets a full pass over the window instead of an incremental poll.</summary>
+    /// <summary>How long after the last full pass the next sync becomes a full pass again.</summary>
     private static readonly TimeSpan FullPassInterval = TimeSpan.FromHours(24);
 
     // Column widths (see CalendarItemConfiguration); Google's text is cut to fit instead of failing the whole sync.
@@ -71,9 +71,10 @@ public class SyncCalendarJob : IJob
     public async Task Execute(IJobExecutionContext context)
     {
         var cancellationToken = context.CancellationToken;
+        var userId = GoogleSyncTrigger.UserIdOf(context);
 
         var integrations = await _context.CalendarIntegrations
-            .Where(i => i.IsActive)
+            .Where(i => i.IsActive && (userId == null || i.UserId == userId))
             .ToListAsync(cancellationToken);
 
         if (integrations.Count == 0)
@@ -97,8 +98,8 @@ public class SyncCalendarJob : IJob
             }
             catch (UnauthorizedException ex)
             {
-                // Google no longer accepts this connection (consent revoked, refresh token dead). Retrying every
-                // 5 minutes would never succeed, so the connection is switched off and the user is e-mailed once
+                // Google no longer accepts this connection (consent revoked, refresh token dead). Pressing Sync now
+                // again would never succeed, so the connection is switched off and the user is e-mailed once
                 // to reconnect (reconnecting reactivates the same row).
                 failedAccounts++;
                 _logger.LogWarning(ex, "Google rejected CalendarIntegration {IntegrationId} (user {UserId}); deactivating it.",
@@ -153,7 +154,7 @@ public class SyncCalendarJob : IJob
         }
 
         // Taken BEFORE asking Google: an event edited while the request is in flight is then newer than this moment and
-        // comes back in the next poll, instead of falling into the gap between "fetched" and "now".
+        // comes back in the next sync, instead of falling into the gap between "fetched" and "now".
         var syncStartedAtUtc = DateTime.UtcNow;
         var fullPass = integration.LastSyncedAtUtc is null
             || integration.LastFullSyncAtUtc is null
@@ -170,8 +171,8 @@ public class SyncCalendarJob : IJob
         {
             // Google rejected the token even though our locally stored expiry said it was still
             // valid (e.g. consent was revoked and re-granted out of band). Force a refresh and
-            // retry exactly once instead of failing this run and waiting for the next 5-minute
-            // poll — a second UnauthorizedException here is a genuine failure and propagates to
+            // retry exactly once instead of failing this run and making the user press the button
+            // again — a second UnauthorizedException here is a genuine failure and propagates to
             // the caller's per-integration catch block like any other.
             accessToken = await _accessTokenProvider.RefreshAccessTokenAsync(integration, cancellationToken);
             events = await _calendarClient.ListEventsAsync(accessToken, updatedSinceUtc, cancellationToken);

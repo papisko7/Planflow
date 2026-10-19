@@ -15,9 +15,10 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Infrastructure.BackgroundJobs;
 
 /// <summary>
-/// Polls the Google Tasks of every connected account that agreed to the tasks permission (every 5 minutes) and upserts them into
-/// <see cref="CalendarItem"/> rows of type Task. Idempotency comes from the unique (SourceCalendarIntegrationId, ExternalTaskId)
-/// pair in <c>CalendarItemConfiguration</c>, so re-running the job finds and updates the same row.
+/// Fetches the Google Tasks of the user who pressed "Sync now" (see <see cref="GoogleSyncTrigger"/>; there is no timer), provided the
+/// account agreed to the tasks permission, and upserts them into <see cref="CalendarItem"/> rows of type Task. Idempotency comes from
+/// the unique (SourceCalendarIntegrationId, ExternalTaskId) pair in <c>CalendarItemConfiguration</c>, so running it again finds and
+/// updates the same row. Runs never overlap, so two presses cannot race for the same row.
 ///
 /// Ownership mirrors the calendar import. Google owns what it has (title, notes, due day, done / deleted); PlanFlow owns what Google
 /// Tasks has no field for (impact, effort, the planned start, blocked-by, its own status choices).
@@ -28,9 +29,11 @@ namespace PlanFlow.Infrastructure.BackgroundJobs;
 /// impact nor effort nor a real start, and only the user saving the item clears that. To keep a first import from burying the app in
 /// history, only tasks that are still open are imported; completed or deleted ones are followed only when already imported.
 ///
-/// One account failing must not stop the others, so each is processed and committed on its own inside a try/catch. A rejected token is
-/// only logged here: the calendar job owns deactivating a connection Google no longer accepts, and the calendar may well still work.
+/// One account failing must not stop the others when a run covers several, so each is processed and committed on its own inside a
+/// try/catch. A rejected token is only logged here: the calendar job owns deactivating a connection Google no longer accepts, and the
+/// calendar may well still work.
 /// </summary>
+[DisallowConcurrentExecution]
 public class SyncTasksJob : IJob
 {
     // Column widths (see CalendarItemConfiguration / ExternalTaskListConfiguration); Google's text is cut to fit instead of failing the sync.
@@ -69,10 +72,11 @@ public class SyncTasksJob : IJob
     public async Task Execute(IJobExecutionContext context)
     {
         var cancellationToken = context.CancellationToken;
+        var userId = GoogleSyncTrigger.UserIdOf(context);
 
         // An account connected before Google Tasks existed has no tasks permission yet; it is skipped until the user reconnects.
         var integrations = await _context.CalendarIntegrations
-            .Where(i => i.IsActive && i.GrantedScopes.Contains(CalendarIntegration.TasksScope))
+            .Where(i => i.IsActive && i.GrantedScopes.Contains(CalendarIntegration.TasksScope) && (userId == null || i.UserId == userId))
             .ToListAsync(cancellationToken);
 
         if (integrations.Count == 0)
@@ -117,7 +121,7 @@ public class SyncTasksJob : IJob
             return (0, 0);
         }
 
-        // Taken BEFORE asking Google: a task edited while the request is in flight is then newer than this moment and comes back next poll.
+        // Taken BEFORE asking Google: a task edited while the request is in flight is then newer than this moment and comes back next sync.
         var syncStartedAtUtc = DateTime.UtcNow;
         var updatedSinceUtc = integration.LastTasksSyncedAtUtc;
 

@@ -56,7 +56,7 @@ public interface IGoogleCalendarClient
     /// <param name="accessToken">A valid (non-expired) OAuth access token for the calendar.readonly scope.</param>
     /// <param name="updatedSinceUtc">
     /// When set, only events changed since this timestamp are returned (Google's incremental-sync
-    /// <c>updatedMin</c> parameter) — keeps a 5-minute poll cheap. When null (first sync, or the daily full pass),
+    /// <c>updatedMin</c> parameter) — keeps a sync cheap. When null (first sync, or the daily full pass),
     /// every event of the window is fetched, cancelled ones included. The window is always the same: from now to
     /// <see cref="WindowDays"/> days ahead, never the account's history, and its far end bounds the expansion of repeating
     /// events (a daily series would otherwise be endless). Either way every page of Google's answer is read.
