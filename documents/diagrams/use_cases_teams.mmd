@@ -18,7 +18,8 @@ flowchart LR
             newteam(["Create team"]):::uc
             myteams(["View my teams and members"]):::uc
             avail(["View availability and workload"]):::uc
-            tmcal(["View a teammate's calendar"]):::uc
+            tmcal(["View a teammate's week"]):::uc
+            tmfull(["Browse a teammate's full calendar by month"]):::uc
             leaveitem(["Leave an item I was added to"]):::uc
             mute(["Mute team notifications and chat"]):::uc
             leaveteam(["Leave team"]):::uc
@@ -48,6 +49,7 @@ flowchart LR
     member --- myteams
     member --- avail
     member --- tmcal
+    member --- tmfull
     member --- leaveitem
     member --- mute
     member --- leaveteam

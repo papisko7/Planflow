@@ -26,13 +26,14 @@ import {
   STATUS_LABEL,
   taskDueOnDay,
 } from '../utils/availability';
+import { MemberMonthCalendar } from './MemberMonthCalendar';
 
 type Props = {
   teams: TeamDto[];
 };
 
 const WEEKDAY = (d: Date) => d.toLocaleDateString(undefined, { weekday: 'short' });
-const DAY_TITLE = (d: Date) => d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+const DAY_TITLE = (d: Date) => d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
 // "People" view of the Calendar: who in a team is free, busy or away this week and how loaded they are, and - on tap - one person's
 // calendar. What a person shares is decided on the server by their own setting (Settings > Calendar sharing), not here.
@@ -166,8 +167,10 @@ function MemberRow({ member, onPress }: { member: MemberAvailabilityDto; onPress
 function MemberCalendarPanel({ teamId, member, onBack }: { teamId: string; member: MemberAvailabilityDto; onBack: () => void }) {
   const [calendar, setCalendar] = useState<MemberCalendarDto | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'week' | 'month'>('week');
 
   useEffect(() => {
+    if (view !== 'week') return;
     let cancelled = false;
     setCalendar(null);
     setError(null);
@@ -177,7 +180,7 @@ function MemberCalendarPanel({ teamId, member, onBack }: { teamId: string; membe
     return () => {
       cancelled = true;
     };
-  }, [teamId, member.userId]);
+  }, [teamId, member.userId, view]);
 
   const days = calendar?.member.days ?? member.days;
 
@@ -199,10 +202,25 @@ function MemberCalendarPanel({ teamId, member, onBack }: { teamId: string; membe
         </Text>
       ) : null}
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {!calendar && !error ? <ActivityIndicator color={colors.primary} style={styles.spinner} /> : null}
+      <View style={styles.viewRow}>
+        {(['week', 'month'] as const).map((v) => (
+          <Pressable
+            key={v}
+            testID={`member-view-${v}`}
+            onPress={() => setView(v)}
+            style={[styles.chip, view === v ? styles.chipActive : null]}
+          >
+            <Text style={view === v ? styles.chipTextActive : styles.chipText}>{v === 'week' ? 'Week' : 'Full calendar'}</Text>
+          </Pressable>
+        ))}
+      </View>
 
-      {days.map((day) => {
+      {view === 'month' ? <MemberMonthCalendar teamId={teamId} userId={member.userId} /> : null}
+
+      {view === 'week' && error ? <Text style={styles.error}>{error}</Text> : null}
+      {view === 'week' && !calendar && !error ? <ActivityIndicator color={colors.primary} style={styles.spinner} /> : null}
+
+      {view === 'week' ? days.map((day) => {
         const date = parseApiDay(day.date);
         const entries = calendar?.entries.filter((e) => entryOnDay(e, date)) ?? [];
         const tasks = calendar?.tasks.filter((t) => taskDueOnDay(t, date)) ?? [];
@@ -236,7 +254,7 @@ function MemberCalendarPanel({ teamId, member, onBack }: { teamId: string; membe
             ))}
           </View>
         );
-      })}
+      }) : null}
     </View>
   );
 }
@@ -256,6 +274,7 @@ const styles = StyleSheet.create({
   errorBox: { gap: spacing.xs },
   error: { ...typography.body, color: colors.danger },
   link: { ...typography.body, color: colors.primary, fontWeight: '600' },
+  viewRow: { flexDirection: 'row', gap: spacing.xs, marginVertical: spacing.xs },
   weekHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs },
   row: {
     flexDirection: 'row',

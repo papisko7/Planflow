@@ -93,6 +93,7 @@ describe('PeopleView', () => {
         { itemId: 'e2', source: 'Team', kind: BlockKind.Busy, startUtc: new Date(2026, 9, 20, 9, 0).toISOString(), endUtc: new Date(2026, 9, 20, 10, 0).toISOString(), isAllDay: false, title: 'Sprint review', location: 'Room 4' },
       ],
       tasks: [{ itemId: 't1', title: 'Write report', deadlineUtc: '2026-10-21T00:00:00Z', isAllDay: true, effortHours: 3, status: 0, urgencyScore: 0.5 }],
+      finishedTasks: [],
     });
     await render(<PeopleView teams={[team('t1', 'Core team')]} />);
     await waitFor(() => expect(screen.getByTestId('people-row-ann')).toBeTruthy());
@@ -105,14 +106,35 @@ describe('PeopleView', () => {
     expect(screen.getAllByText('Busy').length).toBeGreaterThan(0); // the hidden block shows only its kind
     expect(screen.getByText('Write report (3 h)')).toBeTruthy();
     expect(screen.getByText('Shares: availability only.')).toBeTruthy();
+    expect(screen.getAllByText(/2026/).length).toBe(3); // every date of the week carries its year
 
     await fireEvent.press(screen.getByTestId('member-calendar-back'));
     expect(screen.getByTestId('people-row-ann')).toBeTruthy();
   });
 
+  it('switches from the week to the full calendar of the person and back', async () => {
+    mockedCalendar.mockResolvedValue({
+      teamId: 't1', timeZoneId: null, entries: [], tasks: [], finishedTasks: [], member: person('ann', 'Ann'),
+    });
+    await render(<PeopleView teams={[team('t1', 'Core team')]} />);
+    await waitFor(() => expect(screen.getByTestId('people-row-ann')).toBeTruthy());
+    await fireEvent.press(screen.getByTestId('people-row-ann'));
+    await waitFor(() => expect(screen.getByTestId('member-day-2026-10-19')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('member-view-month'));
+
+    await waitFor(() => expect(screen.getByTestId('member-month-calendar')).toBeTruthy());
+    expect(screen.queryByTestId('member-day-2026-10-19')).toBeNull();
+    expect(mockedCalendar).toHaveBeenLastCalledWith('t1', 'ann', expect.any(Number), expect.any(Date));
+
+    await fireEvent.press(screen.getByTestId('member-view-week'));
+    await waitFor(() => expect(screen.getByTestId('member-day-2026-10-19')).toBeTruthy());
+    expect(screen.queryByTestId('member-month-calendar')).toBeNull();
+  });
+
   it('says when a person shares nothing, and when load is understated because tasks have no estimate', async () => {
     mockedCalendar.mockResolvedValue({
-      teamId: 't1', timeZoneId: null, entries: [], tasks: [],
+      teamId: 't1', timeZoneId: null, entries: [], tasks: [], finishedTasks: [],
       member: person('ann', 'Ann', { sharingLevel: CalendarSharingLevel.Off, tasksWithoutEffort: 2 }),
     });
     mockedGrid.mockResolvedValue(grid([person('ann', 'Ann', { sharingLevel: CalendarSharingLevel.Off, tasksWithoutEffort: 2 })]));

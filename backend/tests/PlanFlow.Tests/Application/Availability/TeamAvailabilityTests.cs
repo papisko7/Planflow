@@ -245,6 +245,77 @@ public class TeamAvailabilityTests
         Assert.Single(calendar.Tasks);
     }
 
+    private static Task<PlanFlow.Application.Availability.Common.MemberCalendarDto> CalendarFrom(Setup s, User asker, User member, DateTime from, int days) =>
+        new GetMemberCalendarQueryHandler(s.Db)
+            .Handle(new GetMemberCalendarQuery(s.Team.Id, member.Id, asker.Id, from, days), CancellationToken.None);
+
+    private static CalendarItem FinishedTask(Setup s, User assignee, DateTime deadline)
+    {
+        var item = TeamTask(s, assignee, 2, deadline);
+        item.Status = TaskStatus.Completed;
+        s.Db.SaveChanges();
+        return item;
+    }
+
+    [Fact]
+    public async Task MemberCalendar_ListsFinishedTasksOfTheWindow_NotOpenOnesAndNotOtherDays()
+    {
+        var s = await SetUpAsync();
+        var first = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc);
+        var done = FinishedTask(s, s.Anna, first.AddDays(9));
+        FinishedTask(s, s.Anna, first.AddDays(40));
+        FinishedTask(s, s.Owner, first.AddDays(9));
+        TeamTask(s, s.Anna, 2, first.AddDays(12));
+
+        var calendar = await CalendarFrom(s, s.Owner, s.Anna, first, 30);
+
+        Assert.Equal(done.Id, Assert.Single(calendar.FinishedTasks).ItemId);
+        Assert.Equal(TaskStatus.Completed, calendar.FinishedTasks[0].Status);
+        Assert.Single(calendar.Tasks);
+    }
+
+    [Fact]
+    public async Task MemberCalendar_FinishedTasksOfACoContractor_AreListedToo()
+    {
+        var s = await SetUpAsync();
+        var first = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc);
+        var shared = FinishedTask(s, s.Owner, first.AddDays(3));
+        s.Db.ItemParticipants.Add(new ItemParticipant { CalendarItemId = shared.Id, UserId = s.Anna.Id, Role = ParticipantRole.CoContractor });
+        await s.Db.SaveChangesAsync();
+
+        var calendar = await CalendarFrom(s, s.Owner, s.Anna, first, 30);
+
+        Assert.Equal(shared.Id, Assert.Single(calendar.FinishedTasks).ItemId);
+    }
+
+    [Fact]
+    public async Task MemberCalendar_FinishedTasksAreTeamData_SoTheyShowEvenWhenThePersonSharesNothing()
+    {
+        var s = await SetUpAsync(CalendarSharingLevel.Off);
+        var first = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc);
+        FinishedTask(s, s.Anna, first.AddDays(5));
+        ImportedEvent(s, "Therapy", first.AddDays(5).AddHours(10), first.AddDays(5).AddHours(11));
+
+        var calendar = await CalendarFrom(s, s.Owner, s.Anna, first, 30);
+
+        Assert.Single(calendar.FinishedTasks);
+        Assert.Empty(calendar.Entries);
+    }
+
+    [Fact]
+    public async Task MemberCalendar_AWindowInThePast_ReturnsItsEventsAndKeepsTheLoadAtZero()
+    {
+        var s = await SetUpAsync(CalendarSharingLevel.Details);
+        var past = DateTime.UtcNow.Date.AddDays(-60);
+        ImportedEvent(s, "Old meeting", past.AddHours(9), past.AddHours(10));
+        TeamTask(s, s.Anna, 4, DateTime.UtcNow.Date.AddDays(5));
+
+        var calendar = await CalendarFrom(s, s.Owner, s.Anna, past.AddDays(-3), 10);
+
+        Assert.Equal("Old meeting", Assert.Single(calendar.Entries).Title);
+        Assert.All(calendar.Member.Days, d => Assert.Equal(0, d.LoadHours));
+    }
+
     [Fact]
     public async Task AnotherUsersImportedEvent_NeverShowsInAMembersCalendar()
     {

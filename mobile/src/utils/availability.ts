@@ -122,6 +122,11 @@ export function taskDueOnDay(task: MemberTaskDto, day: Date): boolean {
   return due.getTime() === startOfDay(day).getTime();
 }
 
+// The request window of a month view: its first day and how many days it has.
+export function monthWindow(month: Date): { from: Date; days: number } {
+  return { from: new Date(month.getFullYear(), month.getMonth(), 1), days: new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate() };
+}
+
 const pad = (n: number) => String(n).padStart(2, '0');
 const clock = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 

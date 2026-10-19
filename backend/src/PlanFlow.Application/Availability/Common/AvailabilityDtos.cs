@@ -35,9 +35,14 @@ public record MemberCalendarEntryDto(
 public record MemberTaskDto(
     Guid ItemId, string Title, DateTime DeadlineUtc, bool IsAllDay, double? EffortHours, Domain.Enums.TaskStatus Status, double UrgencyScore);
 
+/// <summary>
+/// <see cref="Tasks"/> are the member's open tasks; <see cref="FinishedTasks"/> are their completed tasks of this team whose
+/// deadline falls in the requested window (an item keeps no completion time, so a finished task stays on its deadline day).
+/// </summary>
 public record MemberCalendarDto(
     Guid TeamId,
     MemberAvailabilityDto Member,
     string? TimeZoneId,
     IReadOnlyList<MemberCalendarEntryDto> Entries,
-    IReadOnlyList<MemberTaskDto> Tasks);
+    IReadOnlyList<MemberTaskDto> Tasks,
+    IReadOnlyList<MemberTaskDto> FinishedTasks);

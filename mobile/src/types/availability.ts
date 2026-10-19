@@ -99,4 +99,6 @@ export interface MemberCalendarDto {
   timeZoneId: string | null;
   entries: MemberCalendarEntryDto[];
   tasks: MemberTaskDto[];
+  // Completed tasks of this team whose deadline is in the requested window (an item keeps no completion time).
+  finishedTasks: MemberTaskDto[];
 }

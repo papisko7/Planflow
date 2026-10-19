@@ -16,6 +16,7 @@ import {
   entryTitle,
   formatLoad,
   hoursLabel,
+  monthWindow,
   parseApiDay,
   pickerHint,
   taskDueOnDay,
@@ -142,6 +143,14 @@ describe('labels', () => {
     expect(hoursLabel(null)).toBe('no estimate');
     expect(hoursLabel(2)).toBe('2 h');
     expect(hoursLabel(0.5)).toBe('30 min');
+  });
+});
+
+describe('monthWindow', () => {
+  it('spans the whole month from its first day, leap February included', () => {
+    expect(monthWindow(new Date(2026, 9, 19))).toEqual({ from: new Date(2026, 9, 1), days: 31 });
+    expect(monthWindow(new Date(2026, 1, 10)).days).toBe(28);
+    expect(monthWindow(new Date(2028, 1, 10)).days).toBe(29);
   });
 });
 
