@@ -6,52 +6,59 @@
 
 ## 🔒 Copyright & Licensing
 
-**All Rights Reserved © 2026 Kacper Kowalski**[cite: 1]
+**All Rights Reserved © 2026 Kacper Kowalski**
 
-This source code, architecture design, and documentation form an integral part of an engineering thesis conducted at the University of Zielona Góra[cite: 1].  
+This source code, architecture design, and documentation form an integral part of an engineering thesis conducted at the University of Zielona Góra.  
 **Copying, distributing, modifying, or using this codebase** (for both commercial and non-commercial purposes) without explicit, written permission from the author is strictly prohibited.
 
 ---
 
 ## 🎓 Academic Thesis Details
 
-* **University:** University of Zielona Góra (*Uniwersytet Zielonogórski*)[cite: 1]
-* **Faculty:** Faculty of Computer Science, Electrical Engineering and Automatics (*Wydział Nauk Inżynieryjno-Technicznych*)[cite: 1]
-* **Major:** Computer Science (*Informatyka*)[cite: 1]
-* **Specialization:** Microinformatics Systems Engineering (*Inżynieria Systemów Mikroinformatycznych*)[cite: 1]
-* **Degree & Mode:** Bachelor of Engineering (B.Sc.), Full-time studies[cite: 1]
-* **Author:** Kacper Kowalski (Student ID: 112090)[cite: 1]
-* **Thesis Supervisor:** Tomasz Gratkowski, Ph.D., Eng.[cite: 1]
-* **Project Start Date:** March 24, 2026[cite: 1]
+* **University:** University of Zielona Góra (*Uniwersytet Zielonogórski*)
+* **Faculty:** *Wydział Nauk Inżynieryjno-Technicznych*
+* **Major:** Computer Science (*Informatyka*)
+* **Specialization:** Microinformatics Systems Engineering (*Inżynieria Systemów Mikroinformatycznych*)
+* **Level & Mode:** First-cycle studies, full-time
+* **Author:** Kacper Kowalski (Student ID: 112090)
+* **Thesis Supervisor:** Tomasz Gratkowski, Ph.D., Eng.
+* **Project Start Date:** March 24, 2026
 
 ---
 
 ## 🎯 Project Goal
 
-The primary objective of this project is to design and implement the **PlanFlow** mobile system, engineered to automate routine tasks and schedule management within groups (e.g., households)[cite: 1]. The system addresses and reduces decision paralysis by leveraging automated prioritization algorithms and seamless integration with external calendars[cite: 1].
+The primary objective of this project is to design and implement the **PlanFlow** mobile system, engineered to automate routine tasks and schedule management within groups (e.g., households). The system reduces decision paralysis with a deterministic, explainable **Urgency Score** algorithm (no AI), team availability and workload hints, and read-only integration with Google Calendar and Google Tasks.
 
 ---
 
 ## 📋 Scope of Work
 
-1. 📚 **Literature Review** on mobile time organization and decision-support systems[cite: 1].
-2. 🔍 **Problem Identification** and analysis of decision paralysis in group settings[cite: 1].
-3. 🧠 **Algorithmic Model Development** to automate group decision-making and event planning[cite: 1].
-4. 🏗️ **System Architecture Design** for a multi-layered cross-platform mobile system[cite: 1].
-5. ⚙️ **Backend API Implementation** managing core business logic, background processing, and recalculations[cite: 1].
-6. 📅 **External Integration** with the Google Calendar API ecosystem[cite: 1].
-7. 📱 **Mobile Application & Dashboard Implementation** providing a native user interface[cite: 1].
-8. 🧪 **System Validation** including performance, functional, and evaluation testing[cite: 1].
+1. 📚 **Literature Review** on mobile time organization and decision-support systems.
+2. 🔍 **Problem Identification** and analysis of decision paralysis in group settings.
+3. 🧠 **Decision Model Development** (Urgency Score v2) to automate prioritization in group planning.
+4. 🏗️ **System Architecture Design** for a layered mobile system.
+5. ⚙️ **Backend API Implementation** (business logic, background jobs, recalculations).
+6. 📅 **Integration** with the Google Calendar API (OAuth 2.0 with PKCE, import on demand).
+7. 📱 **Mobile Application & Dashboard Implementation** (React Native).
+8. 🧪 **System Validation**: unit, integration, end-to-end and performance tests.
 
 ---
 
-## 🛠️ System Architecture & Repository Structure
+## 🛠️ Repository Structure
 
-The repository structure reflects the engineering milestones and corresponds to the thesis chapters:
+* `backend/` – .NET 10 solution. `src/PlanFlow.Domain` (entities, pure rules such as `UrgencyScoreCalculator`), `src/PlanFlow.Application` (MediatR commands and queries), `src/PlanFlow.Infrastructure` (EF Core, Redis, Quartz jobs, Google/SMTP/Expo clients), `src/PlanFlow.Api` (controllers, SignalR chat hub); `tests/PlanFlow.Tests` (xUnit, Testcontainers PostgreSQL); `benchmarks/PlanFlow.Benchmarks` (NBomber load tests).
+* `mobile/` – React Native (Expo, TypeScript) app; unit tests with Jest and React Testing Library; end-to-end scenario in `.maestro/`.
+* `documents/diagrams/` – Mermaid diagrams: ERD (21 tables), C4 container diagram, Urgency Score activity diagram (algorithm v2).
+* `scripts/` – `start-demo.cmd` / `start-demo.ps1`: one-command demo startup (containers, backend, tunnels, Expo).
 
-* `01_RESEARCH/` – Problem definition, existing solutions analysis, and literature review[cite: 1].
-* `02_ARCHITECTURE/` – System architecture design, layered patterns, and real-time communication models[cite: 1].
-* `03_AI_AND_ALGORITHMS/` – Hybrid AI engine, adaptive *Urgency Score* algorithm, and alerting modules[cite: 1].
-* `04_IMPLEMENTATION/` – Source code for backend services, mobile UI dashboard, and Google Calendar integration[cite: 1].
-* `05_VALIDATION/` – Benchmark results, performance metrics, and effectiveness evaluation[cite: 1].
-* `06_THESIS/` – Thesis draft structure, code snippets, and academic support materials.
+## ▶️ Running and Testing
+
+* Demo: `scripts\start-demo.cmd` (checks tools, starts PostgreSQL/Redis/Mailpit containers, applies migrations, starts the backend and Expo).
+* Backend tests (Docker required for the PostgreSQL/Redis tests): `dotnet test backend/tests/PlanFlow.Tests/PlanFlow.Tests.csproj`.
+* Mobile tests: `cd mobile && npx jest` and `npx tsc --noEmit`.
+* Secrets (JWT key, Google OAuth credentials, SMTP) belong in `dotnet user-secrets` or environment variables; the committed `appsettings.json` holds development defaults only.
+
+## ✅ Status
+
+Implementation complete (all code-related thesis scope points delivered). Backend: 1282 tests; mobile: 563 tests; all passing. Documentation and the thesis knowledge base are kept outside the repository (Obsidian vault).
