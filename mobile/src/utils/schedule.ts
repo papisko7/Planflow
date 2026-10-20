@@ -212,6 +212,7 @@ export function normalizeSchedule(s: ScheduleFields): ScheduleFields {
     deadlineUtc: isEvent ? null : s.deadlineUtc,
     startUtc: s.startUtc,
     endUtc: isEvent ? s.endUtc : null,
+    estimatedEffortHours: rules.informational ? null : s.estimatedEffortHours, // a day off or a birthday is not ranked, so it has no effort
     recurrenceFrequency: s.isRecurring ? s.recurrenceFrequency : null,
     recurrenceInterval: s.isRecurring ? s.recurrenceInterval : null,
     recurrenceWeekdays: s.isRecurring && s.recurrenceFrequency === RecurrenceFrequency.Weekly ? s.recurrenceWeekdays : null,

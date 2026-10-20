@@ -52,7 +52,7 @@ public class NotificationPreference : BaseEntity
     /// <summary>Your Google Calendar connection stopped working.</summary>
     public bool CalendarIssues { get; set; } = true;
 
-    /// <summary>A daily push about items that still need details (impact, end time). Inbox + push only, never e-mail.</summary>
+    /// <summary>A daily push about items that still need details (impact, effort, end time), at most five times per item. Inbox + push only, never e-mail.</summary>
     public bool IncompleteItemsReminder { get; set; } = true;
 
     /// <summary>When the last daily reminder was raised; at most one per local day, even if the user deleted the entry meanwhile.</summary>

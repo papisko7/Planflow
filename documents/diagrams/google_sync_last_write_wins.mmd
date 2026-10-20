@@ -1,0 +1,49 @@
+---
+title: Google sync, both ways with last write wins - Activity Diagram
+---
+flowchart TD
+    START(["Sync now<br/>one account"]):::terminal
+    START --> LIST["Read from Google<br/>events / tasks changed since the last sync<br/>(a full pass once a day)"]
+    LIST --> EACH[For each returned item]
+
+    EACH --> KNOWN{"Imported before?"}
+    KNOWN -- No --> CREATE["Create the item from Google<br/>store the fingerprint of Google's values"]
+    KNOWN -- Yes --> DELETED{"Deleted in Google?"}
+    DELETED -- Yes --> CANCEL["Cancel the item, forget the waiting edit<br/>a deletion in Google always wins"]
+    DELETED -- No --> CHANGED{"Google's values differ from<br/>the stored fingerprint?"}
+
+    CHANGED -- No --> NEXT
+    CHANGED -- Yes --> WAITING{"Edit made in the app<br/>waiting to be sent?"}
+    WAITING -- No --> TAKE["Take Google's version"]
+    WAITING -- Yes --> LATER{"Google's updated time later than<br/>the time of the edit in the app?"}
+    LATER -- Yes --> REPLACE["Google's version replaces the edit<br/>the waiting edit is forgotten"]
+    LATER -- No --> KEEP["Keep the fields edited in the app<br/>take the other fields from Google"]
+
+    CREATE --> NEXT
+    CANCEL --> NEXT
+    TAKE --> NEXT
+    REPLACE --> NEXT
+    KEEP --> NEXT
+    NEXT{More items?}
+    NEXT -- Yes --> EACH
+    NEXT -- No --> SEND
+
+    SEND["Items with an edit waiting<br/>(also those Google did not return: unchanged there)"]
+    SEND --> ALLOWED{"Account allowed PlanFlow<br/>to change its data?"}
+    ALLOWED -- No --> HOLD["Edits wait until the user reconnects"]
+    ALLOWED -- Yes --> READ["Read the item from Google if it was not returned<br/>build the patch: only the edited fields<br/>that differ from Google, [planflow] line kept"]
+    READ --> PATCH["PATCH, guests are not notified"]
+    PATCH --> ANSWER{Google's answer}
+    ANSWER -- accepted --> DONE["Fingerprints taken from Google's answer<br/>edit no longer waits"]
+    ANSWER -- item gone --> GONE["Cancel the item"]
+    ANSWER -- refused --> LOCAL["The edit stays in the app only"]
+    ANSWER -- temporary failure --> RETRY["The edit waits for the next sync"]
+
+    HOLD --> FIN
+    DONE --> FIN
+    GONE --> FIN
+    LOCAL --> FIN
+    RETRY --> FIN
+    FIN(["Save, rescore the team"]):::terminal
+
+    classDef terminal fill:#1d4ed8,stroke:#1d4ed8,color:#fff

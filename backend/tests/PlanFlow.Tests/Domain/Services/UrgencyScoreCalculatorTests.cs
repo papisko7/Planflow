@@ -128,10 +128,10 @@ public class UrgencyScoreCalculatorTests
         Assert.Equal(1.0, result, precision: 5);
     }
 
-    // ---- Scheduled (planned start), algorithm version 2 ----
+    // ---- Scheduled (planned start), algorithm version 2; version 3 adds the effort of events ----
 
     [Fact]
-    public void AlgorithmVersion_IsTwo() => Assert.Equal(2, UrgencyScoreCalculator.AlgorithmVersion);
+    public void AlgorithmVersion_IsThree() => Assert.Equal(3, UrgencyScoreCalculator.AlgorithmVersion);
 
     [Fact]
     public void Calculate_ScheduledWeight_IsFivePercent()

@@ -49,6 +49,10 @@ erDiagram
         float CurrentUrgencyScore "cached, 0-1"
         bool IsAssignmentLocked
         bool IsDataIncomplete "imported, not verified yet"
+        int IncompleteRemindersSent "daily reminders that listed it, at most 5"
+        text ExternalFieldsHash "Google values at the last sync, tells whether Google changed the item"
+        int LocalEditedFields "bit set of Google fields edited in the app and not sent yet, 0 = none"
+        timestamptz LocalEditedAtUtc "when the app version was last edited, compared with Google updated time"
         text ExternalCalendarEventId "Google event id"
         text ExternalTaskId "Google task id"
     }

@@ -1,5 +1,8 @@
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Web;
 using PlanFlow.Application.Common.Exceptions;
@@ -9,6 +12,7 @@ namespace PlanFlow.Infrastructure.ExternalServices.Google;
 
 /// <summary>
 /// Raw HttpClient calls to the Google Tasks REST API — same minimal-dependency convention as <see cref="GoogleCalendarClient"/>.
+/// Lists task lists and tasks, reads one task and changes one (tasks.patch).
 /// </summary>
 public class GoogleTasksClient : IGoogleTasksClient
 {
@@ -88,6 +92,78 @@ public class GoogleTasksClient : IGoogleTasksClient
         throw new InvalidOperationException($"Google Tasks returned more than {MaxPages} pages of tasks; refusing to read on.");
     }
 
+    public async Task<GoogleTask?> GetTaskAsync(string accessToken, string taskListId, string taskId, CancellationToken cancellationToken)
+    {
+        using var request = Authorized(HttpMethod.Get, TaskUrl(taskListId, taskId), accessToken);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Gone)
+        {
+            return null;
+        }
+
+        await GoogleWriteErrors.EnsureAcceptedAsync(response, cancellationToken);
+        return await ReadTaskAsync(response, cancellationToken);
+    }
+
+    public async Task<GoogleTask> PatchTaskAsync(
+        string accessToken, string taskListId, string taskId, GoogleTaskPatch patch, CancellationToken cancellationToken)
+    {
+        using var request = Authorized(HttpMethod.Patch, TaskUrl(taskListId, taskId), accessToken);
+        request.Content = new StringContent(PatchBody(patch).ToJsonString(), Encoding.UTF8, "application/json");
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        await GoogleWriteErrors.EnsureAcceptedAsync(response, cancellationToken);
+        return await ReadTaskAsync(response, cancellationToken);
+    }
+
+    /// <summary>
+    /// The body of tasks.patch. Only what the patch names is sent. The due day goes out as Google writes it (midnight UTC, the time carries no
+    /// meaning); reopening a task also clears its completion time, which Google would otherwise keep.
+    /// </summary>
+    internal static JsonObject PatchBody(GoogleTaskPatch patch)
+    {
+        var body = new JsonObject();
+        if (patch.Title is not null)
+        {
+            body["title"] = patch.Title;
+        }
+        if (patch.Notes is not null)
+        {
+            body["notes"] = patch.Notes;
+        }
+        if (patch.DueDay is { } due)
+        {
+            body["due"] = due.Date.ToString("yyyy-MM-dd'T'00:00:00.000'Z'", CultureInfo.InvariantCulture);
+        }
+        if (patch.IsCompleted is { } completed)
+        {
+            body["status"] = completed ? "completed" : "needsAction";
+            if (!completed)
+            {
+                body["completed"] = null;
+            }
+        }
+
+        return body;
+    }
+
+    private static string TaskUrl(string taskListId, string taskId) =>
+        $"{BaseUrl}/lists/{Uri.EscapeDataString(taskListId)}/tasks/{Uri.EscapeDataString(taskId)}";
+
+    private static HttpRequestMessage Authorized(HttpMethod method, string url, string accessToken)
+    {
+        var request = new HttpRequestMessage(method, url);
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        return request;
+    }
+
+    private static async Task<GoogleTask> ReadTaskAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        var item = await response.Content.ReadFromJsonAsync<TaskItem>(cancellationToken)
+            ?? throw new InvalidOperationException("Google returned an empty task.");
+        return ToTask(item);
+    }
+
     private async Task<T> GetAsync<T>(string accessToken, string url, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -112,7 +188,8 @@ public class GoogleTasksClient : IGoogleTasksClient
         DueDay(item.Due),
         IsCompleted: item.Status == "completed",
         IsDeleted: item.Deleted == true,
-        IsSubtask: !string.IsNullOrEmpty(item.Parent));
+        IsSubtask: !string.IsNullOrEmpty(item.Parent),
+        UpdatedUtc: item.Updated?.UtcDateTime);
 
     /// <summary>
     /// Google's <c>due</c> is an RFC 3339 timestamp whose time part is always <c>00:00:00Z</c> and carries no meaning: the task is due on
@@ -143,5 +220,6 @@ public class GoogleTasksClient : IGoogleTasksClient
         [property: JsonPropertyName("status")] string? Status,
         [property: JsonPropertyName("due")] string? Due,
         [property: JsonPropertyName("deleted")] bool? Deleted,
-        [property: JsonPropertyName("parent")] string? Parent);
+        [property: JsonPropertyName("parent")] string? Parent,
+        [property: JsonPropertyName("updated")] DateTimeOffset? Updated);
 }

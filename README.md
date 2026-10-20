@@ -28,7 +28,7 @@ This source code, architecture design, and documentation form an integral part o
 
 ## 🎯 Project Goal
 
-The primary objective of this project is to design and implement the **PlanFlow** mobile system, engineered to automate routine tasks and schedule management within groups (e.g., households). The system reduces decision paralysis with a deterministic, explainable **Urgency Score** algorithm (no AI), team availability and workload hints, and read-only integration with Google Calendar and Google Tasks.
+The primary objective of this project is to design and implement the **PlanFlow** mobile system, engineered to automate routine tasks and schedule management within groups (e.g., households). The system reduces decision paralysis with a deterministic, explainable **Urgency Score** algorithm (no AI), team availability and workload hints, and two-way integration with Google Calendar and Google Tasks (edits made in the app reach Google; when both sides changed an item, the later change wins).
 
 ---
 
@@ -39,7 +39,7 @@ The primary objective of this project is to design and implement the **PlanFlow*
 3. 🧠 **Decision Model Development** (Urgency Score v2) to automate prioritization in group planning.
 4. 🏗️ **System Architecture Design** for a layered mobile system.
 5. ⚙️ **Backend API Implementation** (business logic, background jobs, recalculations).
-6. 📅 **Integration** with the Google Calendar API (OAuth 2.0 with PKCE, import on demand).
+6. 📅 **Integration** with the Google Calendar API (OAuth 2.0 with PKCE, two-way sync on demand, last write wins).
 7. 📱 **Mobile Application & Dashboard Implementation** (React Native).
 8. 🧪 **System Validation**: unit, integration, end-to-end and performance tests.
 
@@ -49,7 +49,7 @@ The primary objective of this project is to design and implement the **PlanFlow*
 
 * `backend/` – .NET 10 solution. `src/PlanFlow.Domain` (entities, pure rules such as `UrgencyScoreCalculator`), `src/PlanFlow.Application` (MediatR commands and queries), `src/PlanFlow.Infrastructure` (EF Core, Redis, Quartz jobs, Google/SMTP/Expo clients), `src/PlanFlow.Api` (controllers, SignalR chat hub); `tests/PlanFlow.Tests` (xUnit, Testcontainers PostgreSQL); `benchmarks/PlanFlow.Benchmarks` (NBomber load tests).
 * `mobile/` – React Native (Expo, TypeScript) app; unit tests with Jest and React Testing Library; end-to-end scenario in `.maestro/`.
-* `documents/diagrams/` – Mermaid diagrams: ERD (21 tables), C4 container diagram, Urgency Score activity diagram (algorithm v2), use case diagrams (overview, account, tasks and prioritisation, teams, automatic functions).
+* `documents/diagrams/` – Mermaid diagrams: ERD (21 tables), C4 container diagram, Urgency Score activity diagram (algorithm v3), Google sync activity diagram (last write wins), use case diagrams (overview, account, tasks and prioritisation, teams, automatic functions).
 * `scripts/` – `start-demo.cmd` / `start-demo.ps1`: one-command demo startup (containers, backend, tunnels, Expo).
 
 ## ▶️ Running and Testing
@@ -61,4 +61,4 @@ The primary objective of this project is to design and implement the **PlanFlow*
 
 ## ✅ Status
 
-Implementation complete (all code-related thesis scope points delivered). Backend: 1282 tests; mobile: 563 tests; all passing. Documentation and the thesis knowledge base are kept outside the repository (Obsidian vault).
+Implementation complete (all code-related thesis scope points delivered). Backend: 1443 tests; mobile: 598 tests; all passing. Documentation and the thesis knowledge base are kept outside the repository (Obsidian vault).

@@ -316,7 +316,7 @@ public class TaskSchedulingApiTests : IClassFixture<CustomWebApplicationFactory>
         var detail = await client.GetFromJsonAsync<JsonElement>($"api/tasks/{id}");
         var breakdown = detail.GetProperty("latestScoreBreakdown");
         Assert.True(breakdown.GetProperty("scheduledComponent").GetDouble() > 0.0);
-        Assert.Equal(2, breakdown.GetProperty("algorithmVersion").GetInt32());
+        Assert.Equal(3, breakdown.GetProperty("algorithmVersion").GetInt32());
         Assert.Contains("planned start in", breakdown.GetProperty("reasonText").GetString());
 
         // An old client (no startUtc in the body, no taskType) must not wipe the planned start.
@@ -334,7 +334,7 @@ public class TaskSchedulingApiTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task EditingAnImportedEvent_ChangesOnlyPlanflowFields()
+    public async Task EditingAnImportedEvent_TakesEveryField_ButKeepsItsKind()
     {
         var (client, teamId) = await OwnerWithTeamAsync();
         var start = DateTime.UtcNow.Date.AddDays(4).AddHours(9);
@@ -361,11 +361,12 @@ public class TaskSchedulingApiTests : IClassFixture<CustomWebApplicationFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var after = (await client.GetFromJsonAsync<JsonElement>($"api/tasks/{id}")).GetProperty("task");
-        Assert.Equal("Google title", after.GetProperty("title").GetString());
-        Assert.Equal("Google notes", after.GetProperty("description").GetString());
-        Assert.Equal("Google place", after.GetProperty("location").GetString());
-        Assert.Equal("sage", after.GetProperty("colorKey").GetString());
-        Assert.Equal(start, after.GetProperty("startUtc").GetDateTime().ToUniversalTime());
+        Assert.Equal("Mine", after.GetProperty("title").GetString());
+        Assert.Equal("Mine", after.GetProperty("description").GetString());
+        Assert.Equal("Mine", after.GetProperty("location").GetString());
+        Assert.Equal("tomato", after.GetProperty("colorKey").GetString());
+        Assert.Equal(start.AddDays(1), after.GetProperty("startUtc").GetDateTime().ToUniversalTime());
+        Assert.Equal(1, after.GetProperty("taskType").GetInt32());
         Assert.Equal(9, after.GetProperty("impactScore").GetInt32());
         Assert.Equal(2.0, after.GetProperty("estimatedEffortHours").GetDouble());
         Assert.Equal((int)TaskStatus.Tentative, after.GetProperty("status").GetInt32());

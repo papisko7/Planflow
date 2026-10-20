@@ -41,13 +41,68 @@ public class GoogleTasksScopeTests
 
     // ---- what the account agreed to ----
 
+    private const string WriteBoth = "openid email " + CalendarIntegration.CalendarWriteScope + " " + CalendarIntegration.TasksWriteScope;
+
     [Theory]
     [InlineData(CalendarAndTasks, true)]
+    [InlineData(WriteBoth, true)]                                                  // the full tasks scope also reads
     [InlineData(CalendarOnly, false)]
     [InlineData("", false)]
     [InlineData("https://www.googleapis.com/auth/tasks.readonly.extra", false)] // exact scope, not a prefix
+    [InlineData("https://www.googleapis.com/auth/tasks.extra", false)]
     public void HasTasksScope_RequiresTheExactScope(string scopes, bool expected) =>
         Assert.Equal(expected, new CalendarIntegration { GrantedScopes = scopes }.HasTasksScope);
+
+    [Theory]
+    [InlineData(WriteBoth, true, true)]
+    [InlineData(CalendarAndTasks, false, false)]                                    // connected before changes could be sent back
+    [InlineData("openid email https://www.googleapis.com/auth/calendar", true, false)] // the full calendar scope also changes events
+    [InlineData("openid email " + CalendarIntegration.CalendarWriteScope, true, false)] // the user unticked Google Tasks
+    [InlineData("openid email " + CalendarIntegration.TasksWriteScope, false, true)]
+    [InlineData("", false, false)]
+    public void WritePermissions_AreKnownPerService(string scopes, bool calendar, bool tasks)
+    {
+        var integration = new CalendarIntegration { GrantedScopes = scopes };
+
+        Assert.Equal(calendar, integration.CanWriteCalendar);
+        Assert.Equal(tasks, integration.CanWriteTasks);
+    }
+
+    [Fact]
+    public async Task Status_ReportsWhetherEditsMayBeSentBack_SoTheAppCanOfferToReconnect()
+    {
+        var db = CreateDb();
+        var writer = Guid.NewGuid();
+        var reader = Guid.NewGuid();
+        db.CalendarIntegrations.Add(Integration(writer, WriteBoth));
+        db.CalendarIntegrations.Add(Integration(reader, CalendarAndTasks));
+        await db.SaveChangesAsync();
+        var handler = new GetGoogleCalendarStatusQueryHandler(db);
+
+        var writes = await handler.Handle(new GetGoogleCalendarStatusQuery(writer), CancellationToken.None);
+        var reads = await handler.Handle(new GetGoogleCalendarStatusQuery(reader), CancellationToken.None);
+
+        Assert.True(writes.CanWriteCalendar);
+        Assert.True(writes.CanWriteTasks);
+        Assert.True(writes.TasksConnected);
+        Assert.False(reads.CanWriteCalendar);
+        Assert.False(reads.CanWriteTasks);
+        Assert.True(reads.TasksConnected);
+    }
+
+    [Fact]
+    public void AuthorizationUrl_AsksForTheScopesThatLetEditsBeSentBack()
+    {
+        var options = Microsoft.Extensions.Options.Options.Create(new PlanFlow.Infrastructure.Security.GoogleOAuthOptions { ClientId = "id", RedirectUri = "https://x/cb" });
+        var client = new PlanFlow.Infrastructure.ExternalServices.Google.GoogleOAuthClient(new HttpClient(), options);
+
+        var url = new Uri(client.BuildAuthorizationUrl("state", "challenge"));
+        var scopes = System.Web.HttpUtility.ParseQueryString(url.Query)["scope"]!.Split(' ');
+
+        Assert.Contains(CalendarIntegration.CalendarWriteScope, scopes);
+        Assert.Contains(CalendarIntegration.TasksWriteScope, scopes);
+        Assert.DoesNotContain(scopes, s => s.EndsWith(".readonly"));
+    }
 
     [Fact]
     public async Task Callback_StoresTheScopesGoogleReports_SoADeclinedTasksPermissionIsNoticed()

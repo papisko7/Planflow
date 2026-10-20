@@ -21,9 +21,12 @@ namespace PlanFlow.Infrastructure.BackgroundJobs;
 /// ExternalCalendarEventId) pair enforced in <c>CalendarItemConfiguration</c> — running it again
 /// never creates duplicates, it just finds and updates the same row. Runs never overlap, so two presses cannot race for the same row.
 ///
-/// Google owns the fields it has (title, time, place, colour, template, status, reminders, description); PlanFlow owns what Google
-/// has no field for (impact, effort, blocked-by, the item's own status choices). A sync therefore overwrites the first group and
-/// never touches the second, except through the <c>[planflow]</c> tag when its text really changed.
+/// The fields Google has (title, time, place, colour, busy / free, reminders, description) can be edited in the app as well, and the sync goes
+/// both ways with "last write wins": an event that changed in Google since the last sync is taken over (see
+/// <see cref="CalendarItem.ExternalFieldsHash"/>), an edit made in the app (see <see cref="CalendarItem.LocalEditedFields"/>) is sent to Google,
+/// and when both happened to the same event the later change - Google's own update time against the time of the app's edit - replaces the other.
+/// What Google has no field for (impact, effort, blocked-by, the item's own status choices) belongs to PlanFlow and is never sent; it is read from
+/// the <c>[planflow]</c> tag only when the tag's text really changed.
 ///
 /// Most syncs are incremental (only events changed since the last one). A press more than a day after the last full pass gets a full
 /// pass over the whole 90-day window instead: an incremental sync cannot see an event that merely drifts into the window as time passes,
@@ -86,14 +89,16 @@ public class SyncCalendarJob : IJob
         var failedAccounts = 0;
         var totalCreated = 0;
         var totalUpdated = 0;
+        var totalSent = 0;
 
         foreach (var integration in integrations)
         {
             try
             {
-                var (created, updated) = await SyncIntegrationAsync(integration, cancellationToken);
+                var (created, updated, sent) = await SyncIntegrationAsync(integration, cancellationToken);
                 totalCreated += created;
                 totalUpdated += updated;
+                totalSent += sent;
                 syncedAccounts++;
             }
             catch (UnauthorizedException ex)
@@ -115,8 +120,8 @@ public class SyncCalendarJob : IJob
         }
 
         _logger.LogInformation(
-            "SyncCalendarJob run complete: {SyncedAccounts} account(s) synced, {FailedAccounts} failed, {Created} item(s) created, {Updated} item(s) updated.",
-            syncedAccounts, failedAccounts, totalCreated, totalUpdated);
+            "SyncCalendarJob run complete: {SyncedAccounts} account(s) synced, {FailedAccounts} failed, {Created} item(s) created, {Updated} item(s) updated, {Sent} edit(s) sent to Google.",
+            syncedAccounts, failedAccounts, totalCreated, totalUpdated, totalSent);
     }
 
     private async Task DeactivateAndNotifyAsync(CalendarIntegration integration, CancellationToken cancellationToken)
@@ -138,7 +143,7 @@ public class SyncCalendarJob : IJob
         }
     }
 
-    private async Task<(int Created, int Updated)> SyncIntegrationAsync(CalendarIntegration integration, CancellationToken cancellationToken)
+    private async Task<(int Created, int Updated, int Sent)> SyncIntegrationAsync(CalendarIntegration integration, CancellationToken cancellationToken)
     {
         var destinationTeamId = await SyncDestination.FindTeamIdAsync(_context, integration.UserId, cancellationToken);
 
@@ -146,7 +151,7 @@ public class SyncCalendarJob : IJob
         {
             _logger.LogWarning("Skipping CalendarIntegration {IntegrationId}: user {UserId} has no team to sync tasks into.",
                 integration.Id, integration.UserId);
-            return (0, 0);
+            return (0, 0, 0);
         }
 
         // Taken BEFORE asking Google: an event edited while the request is in flight is then newer than this moment and
@@ -192,9 +197,8 @@ public class SyncCalendarJob : IJob
                     continue; // nothing to cancel — either never imported, or already cancelled
                 }
 
-                task.Status = TaskStatus.Cancelled;
-                task.ExternalStatus = "cancelled";
-                task.UpdatedAtUtc = nowUtc;
+                // A deletion in Google is final: an edit waiting in the app has nothing left to be sent to.
+                CancelAsDeletedInGoogle(task, nowUtc);
                 affectedTeamIds.Add(task.TeamId);
                 updated++;
                 continue;
@@ -219,6 +223,7 @@ public class SyncCalendarJob : IJob
             var tag = isInformational ? null : PlanflowTagParser.Parse(calendarEvent.Title, plainDescription);
             var title = string.IsNullOrWhiteSpace(calendarEvent.Title) ? string.Empty : PlanflowTagParser.StripFromTitle(calendarEvent.Title);
             var contentHash = ExternalContentHash.Compute(calendarEvent.Title, calendarEvent.Description);
+            var fieldsHash = FieldsHash(calendarEvent);
 
             var googleStatus = string.IsNullOrWhiteSpace(calendarEvent.Status) ? "confirmed" : calendarEvent.Status;
             var description = rules.AllowsDescription ? PlanflowTagParser.StripTagLines(plainDescription) : null;
@@ -226,6 +231,8 @@ public class SyncCalendarJob : IJob
             var colorKey = rules.AllowsColor ? ItemColors.FromGoogleColorId(calendarEvent.ColorId) : null;
             var isBusy = rules.Busy != BusyMode.Choice || !calendarEvent.IsFree; // only a plain event can be "free"
 
+            var googleChanged = true; // a new item is Google's as it comes
+            var keptReminders = false;
             if (task is null)
             {
                 var fallbackTitle = rules.DefaultTitle ?? "(untitled Google Calendar event)";
@@ -251,6 +258,7 @@ public class SyncCalendarJob : IJob
                     ImpactScore = tag?.ImpactScore,
                     EstimatedEffortHours = tag?.EffortHours,
                     ExternalDescriptionHash = contentHash,
+                    ExternalFieldsHash = fieldsHash,
                     SourceCalendarIntegrationId = integration.Id,
                     ExternalCalendarEventId = calendarEvent.Id
                 };
@@ -265,18 +273,58 @@ public class SyncCalendarJob : IJob
             }
             else
             {
-                task.Title = title.Length == 0 ? task.Title : Truncate(title, MaxTitleLength)!;
-                task.Description = description;
-                // Also converts rows imported before events existed (they were Tasks with a deadline) on their next change.
-                task.TaskType = TaskType.Event;
-                task.EventTemplate = template;
-                task.StartUtc = calendarEvent.StartUtc;
-                task.EndUtc = calendarEvent.EndUtc;
-                task.DeadlineUtc = null;
-                task.IsAllDay = calendarEvent.IsAllDay;
-                task.Location = location;
-                task.ColorKey = colorKey;
-                task.IsBusy = isBusy;
+                // Google's values are taken over only when the event changed in Google. If the person also edited it in the app since the
+                // last sync, the later of the two changes wins (last write wins): Google's version replaces the edit, or the edit stays
+                // (the fields in "kept") and is sent to Google after the loop.
+                googleChanged = task.ExternalFieldsHash != fieldsHash;
+                var kept = MirroredFields.None;
+                if (googleChanged && task.LocalEditedFields != MirroredFields.None)
+                {
+                    if (GoogleMirror.GoogleIsNewer(calendarEvent.UpdatedUtc, task.LocalEditedAtUtc))
+                    {
+                        GoogleMirror.Settle(task);
+                    }
+                    else
+                    {
+                        kept = task.LocalEditedFields;
+                    }
+                }
+
+                if (googleChanged)
+                {
+                    if (title.Length > 0 && !kept.HasFlag(MirroredFields.Title))
+                    {
+                        task.Title = Truncate(title, MaxTitleLength)!;
+                    }
+                    if (!kept.HasFlag(MirroredFields.Description))
+                    {
+                        task.Description = description;
+                    }
+                    // Also converts rows imported before events existed (they were Tasks with a deadline) on their next change.
+                    task.TaskType = TaskType.Event;
+                    task.EventTemplate = template;
+                    if (!kept.HasFlag(MirroredFields.Time))
+                    {
+                        task.StartUtc = calendarEvent.StartUtc;
+                        task.EndUtc = calendarEvent.EndUtc;
+                        task.IsAllDay = calendarEvent.IsAllDay;
+                    }
+                    task.DeadlineUtc = null;
+                    if (!kept.HasFlag(MirroredFields.Location))
+                    {
+                        task.Location = location;
+                    }
+                    if (!kept.HasFlag(MirroredFields.Color))
+                    {
+                        task.ColorKey = colorKey;
+                    }
+                    if (!kept.HasFlag(MirroredFields.Busy))
+                    {
+                        task.IsBusy = isBusy;
+                    }
+                    task.ExternalFieldsHash = fieldsHash;
+                }
+                keptReminders = kept.HasFlag(MirroredFields.Reminders);
                 task.IsPrivate = calendarEvent.IsPrivate;
                 task.SeriesId = Truncate(calendarEvent.RecurringEventId, MaxSeriesIdLength);
                 task.ExternalSettings = Truncate(calendarEvent.SettingsText, MaxExternalSettingsLength);
@@ -309,12 +357,12 @@ public class SyncCalendarJob : IJob
                 updated++;
             }
 
-            // Reminders belong to Google for an imported event: its list replaces ours whenever it differs. A template without
+            // Reminders follow Google like the other fields: its list replaces ours when the event changed there. A template without
             // alerts (Out of office, Working location) keeps none. A caller that sent no list leaves the stored ones alone.
             IReadOnlyList<ItemReminder>? reminders = !rules.AllowsAlerts
                 ? []
                 : calendarEvent.ReminderMinutes is null ? null : GoogleReminderMapper.Map(calendarEvent.ReminderMinutes, calendarEvent.IsAllDay);
-            if (reminders is not null)
+            if (reminders is not null && googleChanged && !keptReminders)
             {
                 ReplaceRemindersIfChanged(task, reminders);
             }
@@ -326,6 +374,8 @@ public class SyncCalendarJob : IJob
         {
             await RemoveItemsBeyondWindowAsync(integration, syncStartedAtUtc, affectedTeamIds, cancellationToken);
         }
+
+        var sent = await SendLocalEditsAsync(integration, events, affectedTeamIds, nowUtc, cancellationToken);
 
         if (incompleteItems.Count > 0)
         {
@@ -356,7 +406,131 @@ public class SyncCalendarJob : IJob
             await TeamUrgencyRecalculator.InvalidateCachesAsync(_cache, teamId, changedTaskIds, cancellationToken);
         }
 
-        return (created, updated);
+        return (created, updated, sent);
+    }
+
+    /// <summary>
+    /// The way back: sends to Google the edits the person made in the app and Google has not seen (those the loop above did not replace with a
+    /// newer Google version). An edit leaves only if the account allowed PlanFlow to change its calendar; otherwise it waits. A failure of one
+    /// event never stops the others: a change Google will not take is dropped (the edit then stays in the app only), a temporary failure
+    /// leaves the edit waiting for the next sync. Returns how many events were changed in Google.
+    /// </summary>
+    private async Task<int> SendLocalEditsAsync(
+        CalendarIntegration integration, IReadOnlyList<GoogleCalendarEvent> listed, HashSet<Guid> affectedTeamIds, DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        // The query sees what was saved before this sync; an edit the loop just replaced with Google's version is settled in memory only,
+        // so the tracked items are filtered once more on their present state.
+        var waiting = (await _context.CalendarItems
+                .Include(i => i.Reminders)
+                .Where(i => i.SourceCalendarIntegrationId == integration.Id && i.ExternalCalendarEventId != null && i.LocalEditedFields != MirroredFields.None)
+                .ToListAsync(cancellationToken))
+            .Where(i => i.LocalEditedFields != MirroredFields.None)
+            .ToList();
+        if (waiting.Count == 0)
+        {
+            return 0;
+        }
+
+        if (!integration.CanWriteCalendar)
+        {
+            _logger.LogInformation("{Count} edit(s) wait to be sent to Google: integration {IntegrationId} has not allowed PlanFlow to change the calendar yet.",
+                waiting.Count, integration.Id);
+            return 0;
+        }
+
+        var current = listed.GroupBy(e => e.Id).ToDictionary(g => g.Key, g => g.Last());
+        var sent = 0;
+        foreach (var item in waiting)
+        {
+            try
+            {
+                if (await SendOneAsync(integration, item, current, nowUtc, cancellationToken))
+                {
+                    sent++;
+                }
+                affectedTeamIds.Add(item.TeamId);
+            }
+            catch (UnauthorizedException)
+            {
+                throw; // the whole connection is the problem, not this event
+            }
+            catch (GoogleWriteRejectedException ex) when (ex.Failure == GoogleWriteFailure.MissingPermission)
+            {
+                _logger.LogWarning("Google refused to let integration {IntegrationId} change its calendar; the remaining edits wait until the user reconnects.", integration.Id);
+                break;
+            }
+            catch (GoogleWriteRejectedException ex) when (ex.Failure == GoogleWriteFailure.Gone)
+            {
+                CancelAsDeletedInGoogle(item, nowUtc);
+                affectedTeamIds.Add(item.TeamId);
+            }
+            catch (GoogleWriteRejectedException ex)
+            {
+                // Final: an event owned by somebody else, a kind of event Google does not let anyone change... Asking again would only fail again.
+                _logger.LogWarning(ex, "Google will not take the edit of event {EventId} (integration {IntegrationId}); it stays in PlanFlow only.",
+                    item.ExternalCalendarEventId, integration.Id);
+                GoogleMirror.Settle(item);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not send the edit of event {EventId} (integration {IntegrationId}); it waits for the next sync.",
+                    item.ExternalCalendarEventId, integration.Id);
+            }
+        }
+
+        return sent;
+    }
+
+    /// <summary>
+    /// Sends one waiting edit. The event is read first when the list did not return it (it is unchanged in Google, but the text of its title and
+    /// description must be known to keep the <c>[planflow]</c> part). Afterwards the item and Google agree again, so the fingerprints are taken
+    /// from the event as Google now holds it - the next sync then sees no change. False when nothing had to be sent.
+    /// </summary>
+    private async Task<bool> SendOneAsync(
+        CalendarIntegration integration, CalendarItem item, IReadOnlyDictionary<string, GoogleCalendarEvent> listed, DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        var eventId = item.ExternalCalendarEventId!;
+        var current = listed.TryGetValue(eventId, out var fromList)
+            ? fromList
+            : await _accessTokenProvider.CallAsync(integration, token => _calendarClient.GetEventAsync(token, eventId, cancellationToken), cancellationToken);
+        if (current is null || current.IsCancelled)
+        {
+            CancelAsDeletedInGoogle(item, nowUtc);
+            return false;
+        }
+
+        var patch = GoogleMirror.BuildEventPatch(item, current);
+        var after = patch is null
+            ? current
+            : await _accessTokenProvider.CallAsync(integration, token => _calendarClient.PatchEventAsync(token, eventId, patch, cancellationToken), cancellationToken);
+
+        item.ExternalFieldsHash = FieldsHash(after);
+        item.ExternalDescriptionHash = ExternalContentHash.Compute(after.Title, after.Description);
+        GoogleMirror.Settle(item);
+        item.UpdatedAtUtc = nowUtc;
+        return patch is not null;
+    }
+
+    private static void CancelAsDeletedInGoogle(CalendarItem item, DateTime nowUtc)
+    {
+        item.Status = TaskStatus.Cancelled;
+        item.ExternalStatus = "cancelled";
+        GoogleMirror.Settle(item);
+        item.UpdatedAtUtc = nowUtc;
+    }
+
+    /// <summary>
+    /// Fingerprint of everything Google holds for an event that the app lets the person edit too. Reminders count only for a kind of event that
+    /// has alerts, and in a fixed order, so the same event always gives the same value whichever way Google lists them.
+    /// </summary>
+    private static string FieldsHash(GoogleCalendarEvent e)
+    {
+        var rules = EventTemplateRules.For(TaskType.Event, EventTemplateRules.FromGoogleEventType(e.EventType));
+        return ExternalContentHash.ComputeFields(
+            e.Title, e.Description, e.EventType, e.StartUtc, e.EndUtc, e.IsAllDay, e.Location, e.ColorId, e.IsFree,
+            rules.AllowsAlerts && e.ReminderMinutes is not null ? string.Join(',', e.ReminderMinutes.Order()) : null);
     }
 
     /// <summary>
@@ -422,11 +596,12 @@ public class SyncCalendarJob : IJob
         string.IsNullOrEmpty(value) ? null : value.Length <= maxLength ? value : value[..maxLength];
 
     /// <summary>
-    /// An imported event is "incomplete" when the ranking lacks data only the user can add: no impact (Google has no such field —
-    /// it can come from the <c>[planflow]</c> tag) or no end time. An event that is already over is never flagged: nothing to rank.
+    /// An imported event is "incomplete" when the ranking lacks data only the user can add: no impact or effort (Google has no such
+    /// fields — they can come from the <c>[planflow]</c> tag) or no end time. An event that is already over is never flagged: nothing to rank.
     /// Informational templates (Out of office, Focus time, ...) are never ranked, so they are never incomplete.
     /// </summary>
     private static bool IsMissingData(CalendarItem item, DateTime nowUtc) =>
         EventTemplateRules.ProfileOf(item) == ScoringProfile.Full
-        && (item.ImpactScore is null || item.EndUtc is null) && (item.EndUtc is null || item.EndUtc > nowUtc);
+        && (item.ImpactScore is null || item.EstimatedEffortHours is null || item.EndUtc is null)
+        && (item.EndUtc is null || item.EndUtc > nowUtc);
 }

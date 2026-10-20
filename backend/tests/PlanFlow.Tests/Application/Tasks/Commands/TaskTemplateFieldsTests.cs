@@ -70,6 +70,18 @@ public class TaskTemplateFieldsTests
     }
 
     [Fact]
+    public async Task EffortIsKeptForAPlainEvent_ButDroppedForAnItemThatIsNotRanked()
+    {
+        var (db, teamId, userId) = await SetUpAsync();
+
+        var plain = await CreateAsync(db, NewEvent(teamId, userId, EventTemplate.Default) with { EstimatedEffortHours = 2 });
+        var dayOff = await CreateAsync(db, NewEvent(teamId, userId, EventTemplate.OutOfOffice) with { EstimatedEffortHours = 2 });
+
+        Assert.Equal(2, plain.EstimatedEffortHours);
+        Assert.Null(dayOff.EstimatedEffortHours);
+    }
+
+    [Fact]
     public async Task WorkingLocation_KeepsTheLabel_ButDropsColourAndDescription()
     {
         var (db, teamId, userId) = await SetUpAsync();
@@ -172,7 +184,7 @@ public class TaskTemplateFieldsTests
     }
 
     [Fact]
-    public async Task Update_OfAnImportedItem_KeepsGoogleFields_AndTakesOnlyPlanflowFields()
+    public async Task Update_OfAnImportedEvent_TakesEveryField_ButKeepsItsKind()
     {
         var (db, teamId, userId) = await SetUpAsync();
         var start = NextWeek.AddHours(9);
@@ -191,15 +203,17 @@ public class TaskTemplateFieldsTests
                 EventTemplate: EventTemplate.OutOfOffice, Location: "My place", ColorKey: "tomato", IsBusy: true),
             CancellationToken.None);
 
-        // Google's: unchanged.
-        Assert.Equal("Google title", dto.Title);
-        Assert.Equal("Google notes", dto.Description);
-        Assert.Equal(start, dto.StartUtc);
-        Assert.Equal(start.AddHours(1), dto.EndUtc);
+        // Editable in the app as well: taken.
+        Assert.Equal("My title", dto.Title);
+        Assert.Equal("My notes", dto.Description);
+        Assert.Equal(start.AddDays(1), dto.StartUtc);
+        Assert.Equal(start.AddDays(1).AddHours(2), dto.EndUtc);
+        Assert.Equal("My place", dto.Location);
+        Assert.Equal("tomato", dto.ColorKey);
+        Assert.True(dto.IsBusy);
+        // Its kind is Google's: the template in the request is ignored.
         Assert.Equal(EventTemplate.Default, dto.EventTemplate);
-        Assert.Equal("Google place", dto.Location);
-        Assert.Equal("sage", dto.ColorKey);
-        Assert.False(dto.IsBusy);
+        Assert.Equal(TaskType.Event, dto.TaskType);
         // PlanFlow's: taken. Saving the form also confirms the data.
         Assert.Equal(8, dto.ImpactScore);
         Assert.Equal(3, dto.EstimatedEffortHours);

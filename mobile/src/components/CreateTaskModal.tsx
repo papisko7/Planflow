@@ -17,6 +17,7 @@ import { useTeamAvailability } from '../hooks/useTeamAvailability';
 import { getTeamMembers } from '../services/teamService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { AssigneePicker } from './AssigneePicker';
+import { FieldLabel } from './FieldLabel';
 import { ListPicker } from './ListPicker';
 import { ParticipantPicker } from './ParticipantPicker';
 import { RemindersEditor } from './RemindersEditor';
@@ -25,6 +26,7 @@ import type { ApiError } from '../types/api';
 import { TeamRole, type TeamDto, type TeamMemberDto } from '../types/team';
 import { TaskType, type ReminderInput, type ScheduleFields, type TaskDto } from '../types/task';
 import { ItemListKind } from '../types/itemList';
+import { IMPACT_HINT, IMPACT_LABEL } from '../utils/fieldHints';
 import { collapseSeries } from '../utils/seriesGrouping';
 import { isFinishedStatus } from '../utils/taskStatus';
 import { emptySchedule, scheduleForRequest, validateSchedule } from '../utils/schedule';
@@ -163,25 +165,24 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
         <View style={styles.sheet}>
           <Text style={styles.heading}>{`New ${rules.label.toLowerCase()}`}</Text>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.form}>
-            <TextInput
-              testID="create-task-title-input"
-              style={styles.input}
-              placeholder={rules.titlePlaceholder}
-              placeholderTextColor={colors.textMuted}
-              value={title}
-              onChangeText={setTitle}
-              autoFocus
-            />
-            {rules.allowsDescription ? (
-              <TextInput
-                testID="create-task-description-input"
-                style={[styles.input, styles.multiline]}
-                placeholder="Description"
-                placeholderTextColor={colors.textMuted}
-                multiline
-                value={description}
-                onChangeText={setDescription}
+            <View>
+              <FieldLabel
+                title={rules.titleLabel}
+                hint={rules.defaultTitle ? `Leave it empty to use "${rules.defaultTitle}".` : undefined}
               />
+              <TextInput testID="create-task-title-input" style={styles.input} value={title} onChangeText={setTitle} autoFocus />
+            </View>
+            {rules.allowsDescription ? (
+              <View>
+                <FieldLabel title="Description (optional)" hint="Notes, links or anything worth remembering." />
+                <TextInput
+                  testID="create-task-description-input"
+                  style={[styles.input, styles.multiline]}
+                  multiline
+                  value={description}
+                  onChangeText={setDescription}
+                />
+              </View>
             ) : null}
             <ScheduleForm value={schedule} onChange={setSchedule} isNew />
             {rules.allowsAlerts ? (
@@ -190,15 +191,16 @@ export function CreateTaskModal({ visible, teams, tasks, defaultTeamId, defaultT
             {rules.informational ? null : (
               <>
                 <Text style={styles.sectionTitle}>PlanFlow</Text>
-                <TextInput
-                  testID="create-task-impact-input"
-                  style={styles.input}
-                  placeholder="Impact score (0-10, empty = not rated)"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="numeric"
-                  value={impactScore}
-                  onChangeText={setImpactScore}
-                />
+                <View>
+                  <FieldLabel title={IMPACT_LABEL} hint={IMPACT_HINT} />
+                  <TextInput
+                    testID="create-task-impact-input"
+                    style={styles.input}
+                    keyboardType="numeric"
+                    value={impactScore}
+                    onChangeText={setImpactScore}
+                  />
+                </View>
               </>
             )}
 

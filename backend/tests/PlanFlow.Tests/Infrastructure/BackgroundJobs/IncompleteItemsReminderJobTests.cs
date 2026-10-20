@@ -203,6 +203,67 @@ public class IncompleteItemsReminderJobTests
     }
 
     [Fact]
+    public async Task Run_AnItemIsListedInAtMostFiveReminders_ThenLeftOutButStaysMarked()
+    {
+        var (db, ann, team) = await SetUpAsync();
+        var item = Incomplete(team, ann, "Write chapter 3", TaskType.Task);   // a task: unlike an event it never "ends" and drops out
+        db.CalendarItems.Add(item);
+        await db.SaveChangesAsync();
+        var job = Job(db);
+
+        for (var day = 0; day < IncompleteItemsReminderJob.MaxRemindersPerItem; day++)
+        {
+            Assert.Equal(1, await job.RunAsync(Morning.AddDays(day), CancellationToken.None));
+        }
+
+        Assert.Equal(5, db.CalendarItems.Single().IncompleteRemindersSent);
+        Assert.Equal(0, await job.RunAsync(Morning.AddDays(5), CancellationToken.None));   // the sixth morning stays quiet
+        Assert.Equal(0, await job.RunAsync(Morning.AddDays(6), CancellationToken.None));
+        Assert.True(db.CalendarItems.Single().IsDataIncomplete);                           // still marked "needs details" in the lists
+        Assert.Equal(5, db.CalendarItems.Single().IncompleteRemindersSent);
+    }
+
+    [Fact]
+    public async Task Run_EachReminderCountsOnlyTheItemsItListed_AndAnItemOverTheLimitIsLeftOutOfTheText()
+    {
+        var (db, ann, team) = await SetUpAsync();
+        var used = Incomplete(team, ann, "Used up");
+        used.IncompleteRemindersSent = IncompleteItemsReminderJob.MaxRemindersPerItem;
+        var almost = Incomplete(team, ann, "Last chance");
+        almost.IncompleteRemindersSent = IncompleteItemsReminderJob.MaxRemindersPerItem - 1;
+        var fresh = Incomplete(team, ann, "Fresh");
+        var finished = Incomplete(team, ann, "Done", TaskType.Task);
+        finished.Status = TaskStatus.Completed;
+        db.CalendarItems.AddRange(used, almost, fresh, finished);
+        await db.SaveChangesAsync();
+
+        await Job(db).RunAsync(Morning, CancellationToken.None);
+
+        var entry = Assert.Single(db.Notifications);
+        Assert.Equal("2 items need your details", entry.Title);
+        Assert.DoesNotContain("Used up", entry.Body);
+        Assert.Equal(5, db.CalendarItems.Single(i => i.Title == "Used up").IncompleteRemindersSent);   // not listed, not counted
+        Assert.Equal(5, db.CalendarItems.Single(i => i.Title == "Last chance").IncompleteRemindersSent);
+        Assert.Equal(1, db.CalendarItems.Single(i => i.Title == "Fresh").IncompleteRemindersSent);
+        Assert.Equal(0, db.CalendarItems.Single(i => i.Title == "Done").IncompleteRemindersSent);       // never listed
+    }
+
+    [Fact]
+    public async Task Run_WhenNothingIsSent_NoReminderIsUsedUp()
+    {
+        var (db, ann, team) = await SetUpAsync();
+        db.CalendarItems.Add(Incomplete(team, ann, "Dentist"));
+        await db.SaveChangesAsync();
+        var job = Job(db);
+
+        await job.RunAsync(Morning, CancellationToken.None);
+        await job.RunAsync(Morning.AddHours(3), CancellationToken.None);       // the same day: skipped
+        await job.RunAsync(new DateTime(2026, 10, 21, 3, 0, 0, DateTimeKind.Utc), CancellationToken.None); // too early the next day
+
+        Assert.Equal(1, db.CalendarItems.Single().IncompleteRemindersSent);
+    }
+
+    [Fact]
     public async Task Run_SwitchedOff_SendsNothing()
     {
         var (db, ann, team) = await SetUpAsync();

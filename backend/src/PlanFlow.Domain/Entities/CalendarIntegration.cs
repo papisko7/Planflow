@@ -33,13 +33,33 @@ public class CalendarIntegration : BaseEntity
     /// <summary>When the Google Tasks job last started a poll for this account. The next poll asks only for tasks changed since then; null = nothing imported yet.</summary>
     public DateTime? LastTasksSyncedAtUtc { get; set; }
 
-    /// <summary>Space-separated OAuth scopes Google reported at the last consent/refresh. An account connected before Google Tasks existed lacks the tasks scope and must reconnect.</summary>
+    /// <summary>Space-separated OAuth scopes Google reported at the last consent/refresh. An account connected before Google Tasks existed lacks the tasks scope, and one connected before changes could be sent back lacks the write scopes; both must reconnect.</summary>
     public string GrantedScopes { get; set; } = string.Empty;
 
     public bool IsActive { get; set; } = true;
 
-    public const string TasksScope = "https://www.googleapis.com/auth/tasks.readonly";
+    /// <summary>Start shared by both Tasks scopes ("tasks" and "tasks.readonly"): a stored scope list containing it grants some access to Google Tasks.</summary>
+    public const string TasksScopeBase = "https://www.googleapis.com/auth/tasks";
+
+    /// <summary>Read and change Google Tasks.</summary>
+    public const string TasksWriteScope = TasksScopeBase;
+
+    /// <summary>Read Google Tasks only (what accounts connected before changes could be sent back have).</summary>
+    public const string TasksScope = TasksScopeBase + ".readonly";
+
+    /// <summary>Read and change events of the user's calendars.</summary>
+    public const string CalendarWriteScope = "https://www.googleapis.com/auth/calendar.events";
+
+    private const string CalendarFullScope = "https://www.googleapis.com/auth/calendar";
+
+    private bool Has(string scope) => GrantedScopes.Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains(scope);
 
     /// <summary>True when the user agreed (on the consent screen) to let PlanFlow read their Google Tasks.</summary>
-    public bool HasTasksScope => GrantedScopes.Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains(TasksScope);
+    public bool HasTasksScope => Has(TasksScope) || Has(TasksWriteScope);
+
+    /// <summary>True when PlanFlow may change the user's Google Tasks, so an edit made in the app can be sent back.</summary>
+    public bool CanWriteTasks => Has(TasksWriteScope);
+
+    /// <summary>True when PlanFlow may change the user's calendar events, so an edit made in the app can be sent back.</summary>
+    public bool CanWriteCalendar => Has(CalendarWriteScope) || Has(CalendarFullScope);
 }

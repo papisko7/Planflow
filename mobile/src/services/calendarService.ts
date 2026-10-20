@@ -8,6 +8,10 @@ export type GoogleCalendarStatus = {
   tasksConnected: boolean;
   lastTasksSyncedAtUtc: string | null;
   syncing: boolean;
+  // Whether the account allowed PlanFlow to change its events / tasks, i.e. whether an edit made here can be sent to Google.
+  // Absent on an older server.
+  canWriteCalendar?: boolean;
+  canWriteTasks?: boolean;
 };
 
 export type GoogleSyncResult = { started: boolean };

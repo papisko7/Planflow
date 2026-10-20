@@ -93,6 +93,7 @@ export interface TaskDto {
   isAllDay: boolean;
   externalSettings: string | null; // read-only note about Google-only settings of an imported Out of office / Focus time
   isExternal: boolean;
+  hasUnsentChanges?: boolean; // an edit of an imported item that no sync has sent to Google yet
   isDeadlineDefaulted: boolean;
   googleTaskListId: string | null;
   googleTaskListTitle: string | null;

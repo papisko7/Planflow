@@ -6,6 +6,7 @@ import { useTeamAvailability } from '../hooks/useTeamAvailability';
 import { AssigneePicker } from './AssigneePicker';
 import { DeadlinePicker } from './DeadlinePicker';
 import { DurationInput } from './DurationInput';
+import { FieldLabel } from './FieldLabel';
 import { ListPicker } from './ListPicker';
 import { ParticipantPicker } from './ParticipantPicker';
 import { RemindersEditor } from './RemindersEditor';
@@ -14,7 +15,7 @@ import type { ApiError } from '../types/api';
 import type { TeamMemberDto } from '../types/team';
 import { ItemListKind } from '../types/itemList';
 import { TaskType, type ReminderDto, type ReminderInput, type ScheduleFields, type SeriesScope, type TaskDto } from '../types/task';
-import { formatWhen } from '../utils/itemDisplay';
+import { EFFORT_LABEL, IMPACT_HINT, IMPACT_LABEL, TASK_EFFORT_HINT } from '../utils/fieldHints';
 import {
   pickerToWireDay,
   scheduleForEditing,
@@ -27,7 +28,7 @@ import {
 import { recurrenceChanged } from '../utils/recurrence';
 import { fitReminders, toReminderInput, validateReminders, type ReminderContext } from '../utils/reminders';
 import { askSeriesScope } from '../utils/seriesScope';
-import { rulesFor } from '../utils/templateRules';
+import { rulesFor, sendsEditsToGoogle } from '../utils/templateRules';
 import { normalizeStatus, STATUS_LABEL, statusesFor } from '../utils/taskStatus';
 
 type Props = {
@@ -50,12 +51,12 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
   const [itemListId, setItemListId] = useState<string | null>(task.itemListId ?? null);
   const [saving, setSaving] = useState(false);
   const rules = rulesFor(schedule.taskType, schedule.eventTemplate);
-  // An item imported from Google: Google owns its title, time, place, description and colour (the next sync would overwrite
-  // them, and the server ignores edits), so they are shown read-only here; what PlanFlow adds stays editable.
+  // An item imported from Google is edited like any other, except for its kind (task / event / template) and its repeat rule, which are
+  // Google's. The next sync sends the edit to Google; if the item was also changed there, the later of the two changes wins.
   const imported = task.isExternal;
+  const sentToGoogle = imported && sendsEditsToGoogle(task);
   const googleTask = imported && task.taskType === TaskType.Task;
-  // An imported item keeps Google's schedule, but the effort (and, for a Google task, the start) are PlanFlow's own to set.
-  // A Google task's days are stored as midnight UTC; the date pickers work with local timestamps, hence the conversions.
+  // A Google task keeps whole days (midnight UTC); the date pickers work with local timestamps, hence the conversions.
   const [effort, setEffort] = useState<number | null>(task.estimatedEffortHours);
   const [start, setStart] = useState<string | null>(() => wireDayToPicker(task.startUtc));
   const [deadline, setDeadline] = useState<string | null>(() => wireDayToPicker(task.deadlineUtc));
@@ -63,17 +64,17 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
   const [participants, setParticipants] = useState<string[]>(task.participantUserIds ?? []);
   const [error, setError] = useState<string | null>(null);
 
-  const ownAlerts = rules.allowsAlerts && (!imported || googleTask);
+  const allowsDescription = googleTask || rules.allowsDescription;
   const reminderContext: ReminderContext = {
     taskType: schedule.taskType,
     allowsAlerts: rules.allowsAlerts,
     isAllDay: schedule.isAllDay,
     hasStart: googleTask ? start !== null : schedule.startUtc !== null,
-    hasDeadline: googleTask ? (task.isDeadlineDefaulted ? deadline !== null : task.deadlineUtc !== null) : schedule.deadlineUtc !== null,
+    hasDeadline: googleTask ? deadline !== null : schedule.deadlineUtc !== null,
   };
   const shownAlerts = fitReminders(alerts, reminderContext);
   const availability = useTeamAvailability(task.teamId, members.length > 1);
-  const canInvite = members.length > 1 && (!imported || googleTask) && (schedule.taskType === TaskType.Task || rules.allowsGuests);
+  const canInvite = members.length > 1 && (schedule.taskType === TaskType.Task || rules.allowsGuests);
   const shownParticipants = canInvite ? participants.filter((id) => id !== assignedUserId) : [];
 
   const save = async () => {
@@ -90,16 +91,15 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
     }
 
     const startDay = pickerToWireDay(start);
-    const deadlineDay = task.isDeadlineDefaulted ? pickerToWireDay(deadline) : task.deadlineUtc;
-    const scheduleError = imported
-      ? validateEffort(effort) ??
-        (googleTask && startDay && deadlineDay && startDay > deadlineDay ? 'The start must not be after the deadline.' : null)
+    const deadlineDay = pickerToWireDay(deadline);
+    const scheduleError = googleTask
+      ? validateEffort(effort) ?? (startDay && deadlineDay && startDay > deadlineDay ? 'The start must not be after the deadline.' : null)
       : validateSchedule(schedule, false);
     if (scheduleError) {
       setError(scheduleError);
       return;
     }
-    const alertsError = ownAlerts ? validateReminders(shownAlerts, reminderContext) : null;
+    const alertsError = rules.allowsAlerts ? validateReminders(shownAlerts, reminderContext) : null;
     if (alertsError) {
       setError(alertsError);
       return;
@@ -125,33 +125,20 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
       await updateTask(
         task.id,
         task.teamId,
-        toUpdateRequest(
-          task,
-          imported
-            ? {
-                status,
-                assignedUserId,
-                itemListId,
-                impactScore: rules.informational ? null : impactNumber,
-                estimatedEffortHours: rules.informational ? task.estimatedEffortHours : effort,
-                ...(googleTask ? { startUtc: startDay, deadlineUtc: deadlineDay } : {}),
-                ...(ownAlerts ? { reminders: shownAlerts } : {}),
-                ...(canInvite ? { participantUserIds: shownParticipants } : {}),
-                ...scopePart,
-              }
-            : {
-                title: trimmedTitle,
-                description: rules.allowsDescription ? description.trim() || null : null,
-                status,
-                assignedUserId,
-                itemListId,
-                impactScore: rules.informational ? null : impactNumber,
-                ...scheduleForRequest(schedule),
-                ...(ownAlerts ? { reminders: shownAlerts } : {}),
-                ...(canInvite ? { participantUserIds: shownParticipants } : {}),
-                ...scopePart,
-              },
-        ),
+        toUpdateRequest(task, {
+          title: trimmedTitle,
+          description: allowsDescription ? description.trim() || null : null,
+          status,
+          assignedUserId,
+          itemListId,
+          impactScore: rules.informational ? null : impactNumber,
+          ...(googleTask
+            ? { estimatedEffortHours: effort, startUtc: startDay, deadlineUtc: deadlineDay }
+            : scheduleForRequest(schedule)),
+          ...(rules.allowsAlerts ? { reminders: shownAlerts } : {}),
+          ...(canInvite ? { participantUserIds: shownParticipants } : {}),
+          ...scopePart,
+        }),
       );
       onSaved();
     } catch (err) {
@@ -166,85 +153,80 @@ export function TaskEditForm({ task, members, canAssign, reminders, onSaved, onC
     <View style={styles.form}>
       {task.isDataIncomplete ? (
         <View testID="edit-task-verify-banner" style={styles.banner}>
-          <Text style={styles.bannerText}>
-            Please check this item: set its impact{rules.informational ? '' : ' and effort'}, then save to confirm it.
-          </Text>
+          <Text style={styles.bannerText}>Please check this item: set its impact and effort, then save to confirm it.</Text>
         </View>
       ) : null}
 
       {imported ? (
-        <>
-          <View testID="edit-task-imported-notice" style={styles.notice}>
-            <Text style={styles.noticeText}>
-              {googleTask
-                ? 'Imported from Google Tasks. Its title, notes and due day are edited there; here you plan it: when to start, how long it takes and how much it matters.'
-                : 'Imported from Google Calendar. Its title, time, place, description and colour are edited there; here you set what PlanFlow adds.'}
+        <View testID="edit-task-imported-notice" style={styles.notice}>
+          <Text style={styles.noticeText}>
+            {googleTask ? 'Imported from Google Tasks.' : 'Imported from Google Calendar.'} You can change everything here.{' '}
+            {sentToGoogle
+              ? 'Your changes are sent to Google at the next sync. If the item was also changed in Google, the later change wins.'
+              : "Google keeps this kind of event for itself, so your changes stay in PlanFlow, and Google's version replaces them if it changes."}
+          </Text>
+          {task.hasUnsentChanges ? (
+            <Text testID="edit-task-unsent-notice" style={styles.noticeText}>
+              Your earlier changes have not been sent to Google yet.
             </Text>
-          </View>
-          <Text style={styles.readOnlyTitle}>{task.title}</Text>
-          {formatWhen(task) ? <Text style={styles.label}>{formatWhen(task)}</Text> : null}
+          ) : null}
+        </View>
+      ) : null}
+
+      <View>
+        <FieldLabel title={rules.titleLabel} />
+        <TextInput testID="edit-task-title-input" style={styles.input} value={title} onChangeText={setTitle} />
+      </View>
+      {allowsDescription ? (
+        <View>
+          <FieldLabel title="Description (optional)" hint="Notes, links or anything worth remembering." />
+          <TextInput
+            testID="edit-task-description-input"
+            style={[styles.input, styles.multiline]}
+            multiline
+            value={description}
+            onChangeText={setDescription}
+          />
+        </View>
+      ) : null}
+
+      {googleTask ? (
+        <>
+          <DeadlinePicker
+            testIDPrefix="task-start-picker"
+            label="Start"
+            hint="When you plan to begin the work."
+            allowAllDay={false}
+            dateOnly
+            value={start}
+            onChange={setStart}
+          />
+          <DeadlinePicker
+            label="Deadline"
+            hint="When the work has to be finished."
+            optional={false}
+            allowAllDay={false}
+            dateOnly
+            value={deadline}
+            onChange={setDeadline}
+          />
+          <DurationInput testID="effort" label={EFFORT_LABEL} hint={TASK_EFFORT_HINT} hours={effort} onChange={setEffort} />
         </>
       ) : (
-        <>
-          <TextInput
-            testID="edit-task-title-input"
-            style={styles.input}
-            placeholder={rules.titlePlaceholder}
-            placeholderTextColor={colors.textMuted}
-            value={title}
-            onChangeText={setTitle}
-          />
-          {rules.allowsDescription ? (
-            <TextInput
-              testID="edit-task-description-input"
-              style={[styles.input, styles.multiline]}
-              placeholder="Description (optional)"
-              placeholderTextColor={colors.textMuted}
-              multiline
-              value={description}
-              onChangeText={setDescription}
-            />
-          ) : null}
-          <ScheduleForm value={schedule} onChange={setSchedule} isNew={false} />
-        </>
+        <ScheduleForm value={schedule} onChange={setSchedule} isNew={false} lockKind={imported} hideRepeat={imported} />
       )}
 
-      {ownAlerts ? (
+      {rules.allowsAlerts ? (
         <RemindersEditor value={shownAlerts} onChange={setAlerts} taskType={schedule.taskType} isAllDay={schedule.isAllDay} />
       ) : null}
 
       {rules.informational ? null : (
         <>
           <Text style={styles.sectionTitle}>PlanFlow</Text>
-          <TextInput
-            testID="edit-task-impact-input"
-            style={styles.input}
-            placeholder="Impact score (0-10, empty = not rated)"
-            placeholderTextColor={colors.textMuted}
-            keyboardType="numeric"
-            value={impact}
-            onChangeText={setImpact}
-          />
-          {imported ? (
-            <>
-              <DurationInput testID="effort" label="Estimated effort (optional)" hours={effort} onChange={setEffort} />
-              {googleTask ? (
-                <>
-                  <DeadlinePicker
-                    testIDPrefix="task-start-picker"
-                    label="Start"
-                    allowAllDay={false}
-                    dateOnly
-                    value={start}
-                    onChange={setStart}
-                  />
-                  {task.isDeadlineDefaulted ? (
-                    <DeadlinePicker label="Deadline" optional={false} allowAllDay={false} dateOnly value={deadline} onChange={setDeadline} />
-                  ) : null}
-                </>
-              ) : null}
-            </>
-          ) : null}
+          <View>
+            <FieldLabel title={IMPACT_LABEL} hint={IMPACT_HINT} />
+            <TextInput testID="edit-task-impact-input" style={styles.input} keyboardType="numeric" value={impact} onChangeText={setImpact} />
+          </View>
         </>
       )}
 
@@ -312,7 +294,6 @@ const styles = StyleSheet.create({
   },
   multiline: { minHeight: 72, textAlignVertical: 'top' },
   sectionTitle: { ...typography.subtitle, color: colors.text, marginTop: spacing.xs },
-  readOnlyTitle: { ...typography.subtitle, color: colors.text },
   banner: { backgroundColor: colors.primaryMuted, borderRadius: radius.md, padding: spacing.md },
   bannerText: { ...typography.body, color: colors.primary, fontWeight: '600' },
   notice: { backgroundColor: colors.background, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md },

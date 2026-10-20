@@ -60,7 +60,8 @@ public static class TaskScheduleMapper
         // An all-day event without an end lasts that one day (end = the midnight after it, the exclusive end Google uses too).
         task.EndUtc = !isEvent ? null : allDay && fields.EndUtc is null && fields.StartUtc is { } start ? start.AddDays(1) : fields.EndUtc;
         task.IsAllDay = allDay;
-        task.EstimatedEffortHours = fields.EstimatedEffortHours;
+        // A day off or a birthday is not ranked, so it has no effort to count.
+        task.EstimatedEffortHours = rules.Profile == Domain.Enums.ScoringProfile.Informational ? null : fields.EstimatedEffortHours;
 
         task.Description = rules.AllowsDescription && !string.IsNullOrWhiteSpace(fields.Description) ? fields.Description : null;
         task.Location = rules.Location == LocationMode.None || string.IsNullOrWhiteSpace(fields.Location) ? null : fields.Location.Trim();

@@ -17,15 +17,49 @@ namespace PlanFlow.Tests.Infrastructure.BackgroundJobs;
 /// <summary>The Google Tasks import (lists, due day as deadline, first-seen day as start, unverified by default).</summary>
 public class SyncTasksJobTests
 {
-    /// <summary>A scripted Google Tasks account: lists, their tasks, and a record of how each list was asked for.</summary>
+    /// <summary>
+    /// A scripted Google Tasks account: lists, their tasks (Google's own copy, which a patch changes like the real service would) and a
+    /// record of how each list was asked for and which changes were sent.
+    /// </summary>
     private sealed class FakeTasksClient : IGoogleTasksClient
     {
         public List<GoogleTaskList> Lists { get; } = [];
         public Dictionary<string, List<GoogleTask>> Tasks { get; } = [];
         public List<(string ListId, DateTime? Since)> TaskCalls { get; } = [];
+        public List<(string ListId, string TaskId, GoogleTaskPatch Patch)> Patches { get; } = [];
+        public List<string> Gets { get; } = [];
+        public Exception? PatchFailure { get; set; }
         public HashSet<string> FailingLists { get; } = [];
         public string? RejectedToken { get; set; }
         public int ListsCalls { get; private set; }
+
+        public Task<GoogleTask?> GetTaskAsync(string accessToken, string taskListId, string taskId, CancellationToken cancellationToken)
+        {
+            Gets.Add(taskId);
+            return Task.FromResult(Tasks.GetValueOrDefault(taskListId)?.FirstOrDefault(t => t.Id == taskId));
+        }
+
+        public Task<GoogleTask> PatchTaskAsync(string accessToken, string taskListId, string taskId, GoogleTaskPatch patch, CancellationToken cancellationToken)
+        {
+            Patches.Add((taskListId, taskId, patch));
+            if (PatchFailure is not null)
+            {
+                throw PatchFailure;
+            }
+
+            var list = Tasks[taskListId];
+            var index = list.FindIndex(t => t.Id == taskId);
+            var task = list[index];
+            list[index] = task with
+            {
+                Title = patch.Title ?? task.Title,
+                Notes = patch.Notes is null ? task.Notes : patch.Notes.Length == 0 ? null : patch.Notes,
+                DueDay = patch.DueDay ?? task.DueDay,
+                IsCompleted = patch.IsCompleted ?? task.IsCompleted,
+                UpdatedUtc = DateTime.UtcNow
+            };
+            return Task.FromResult(list[index]);
+        }
 
         public FakeTasksClient WithList(string id, string title, params GoogleTask[] tasks)
         {
@@ -157,7 +191,7 @@ public class SyncTasksJobTests
         Assert.Equal(Day(5), item.DeadlineUtc);
         Assert.Equal(Day(0), item.StartUtc);                  // the day it was first seen
         Assert.False(item.IsDeadlineDefaulted);
-        Assert.True(item.IsDataIncomplete);                   // always unverified
+        Assert.True(item.IsDataIncomplete);                   // Google has neither impact nor effort: unverified
         Assert.Null(item.ImpactScore);
         Assert.Equal(integration.Id, item.SourceCalendarIntegrationId);
         Assert.Equal("t1", item.ExternalTaskId);
@@ -429,7 +463,7 @@ public class SyncTasksJobTests
         Assert.Equal(8, item.ImpactScore);
         Assert.Equal(3, item.EstimatedEffortHours);
         Assert.Equal("Plan it", item.Description);       // the tag line is not kept in the stored notes
-        Assert.True(item.IsDataIncomplete);               // still unverified until the user saves it
+        Assert.False(item.IsDataIncomplete);              // the tag gave both impact and effort: nothing left to confirm
 
         item.ImpactScore = 2; // the user rated it differently in the app
         await context.SaveChangesAsync();
@@ -441,6 +475,71 @@ public class SyncTasksJobTests
         var changed = await context.CalendarItems.SingleAsync();
         Assert.Equal(9, changed.ImpactScore);
         Assert.Equal(3, changed.EstimatedEffortHours);    // a missing part of the tag never erases what we hold
+    }
+
+    [Fact]
+    public async Task Execute_TagWithImpactOnly_StaysUnverified_UntilTheEffortArrivesInGoogle()
+    {
+        var context = CreateInMemoryContext();
+        var (user, _) = SeedUserWithTeam(context);
+        SeedIntegration(context, user.Id);
+        var client = new FakeTasksClient().WithList("l1", "Tasks", Open("t1", "Task", Day(4), "[planflow] impact=8"));
+        var job = CreateJob(context, client);
+        await Run(job);
+        Assert.True((await context.CalendarItems.SingleAsync()).IsDataIncomplete);
+
+        client.Tasks["l1"][0] = Open("t1", "Task", Day(4), "[planflow] impact=8 effort=2h");
+        await Run(job);
+
+        var item = await context.CalendarItems.SingleAsync();
+        Assert.Equal(2, item.EstimatedEffortHours);
+        Assert.False(item.IsDataIncomplete);               // both fields are filled now, so the item is no longer flagged
+    }
+
+    [Fact]
+    public async Task Execute_FullyTaggedTask_IsNotListedInTheIncompleteNotification()
+    {
+        var context = CreateInMemoryContext();
+        var (user, _) = SeedUserWithTeam(context);
+        SeedIntegration(context, user.Id);
+        var client = new FakeTasksClient().WithList("l1", "Tasks",
+            Open("t1", "Tagged", Day(4), "[planflow] impact=5 effort=1h"),
+            Open("t2", "Plain", Day(4)));
+
+        await Run(CreateJob(context, client));
+
+        var inbox = Assert.Single(context.Notifications);
+        Assert.Contains("\"Plain\"", inbox.Body);
+        Assert.DoesNotContain("Tagged", inbox.Body);
+    }
+
+    [Fact]
+    public async Task Execute_GoogleUnchanged_KeepsWhatTheUserEditedInTheApp_ButGoogleChangesWin()
+    {
+        var context = CreateInMemoryContext();
+        var (user, _) = SeedUserWithTeam(context);
+        SeedIntegration(context, user.Id);
+        var client = new FakeTasksClient().WithList("l1", "Tasks", Open("t1", "Google title", Day(4), "Google notes"));
+        var job = CreateJob(context, client);
+        await Run(job);
+
+        var item = await context.CalendarItems.SingleAsync();
+        item.Title = "My title";
+        item.Description = "My notes";
+        item.DeadlineUtc = Day(9);
+        await context.SaveChangesAsync();
+
+        await Run(job);      // Google sends the same task again (e.g. another list changed)
+        item = await context.CalendarItems.SingleAsync();
+        Assert.Equal("My title", item.Title);
+        Assert.Equal("My notes", item.Description);
+        Assert.Equal(Day(9), item.DeadlineUtc);
+
+        client.Tasks["l1"][0] = Open("t1", "Google title 2", Day(6), "Google notes");
+        await Run(job);      // the task changed in Google: Google wins
+        item = await context.CalendarItems.SingleAsync();
+        Assert.Equal("Google title 2", item.Title);
+        Assert.Equal(Day(6), item.DeadlineUtc);
     }
 
     [Fact]

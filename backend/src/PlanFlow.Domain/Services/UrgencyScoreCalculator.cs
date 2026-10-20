@@ -4,7 +4,7 @@ namespace PlanFlow.Domain.Services;
 /// Pure, deterministic implementation of the Urgency Score formula (algorithm version 2). In plain words:
 /// 1) a weighted sum of five factors: 0.40*Deadline + 0.20*Blocking + 0.25*Impact + 0.10*UserOverride + 0.05*Scheduled;
 /// 2) two floors so important things cannot sink: an imminent deadline (overdue, or inside a window that
-///    depends on the item's type and effort estimate, 24h by default for a task) keeps the score
+///    equals the item's effort estimate, 24h by default for a task and 1h for an event) keeps the score
 ///    at 0.85 or more, and a task never scores below the urgency it inherits from the work it blocks;
 /// 3) a blocked task (its blocker is not finished yet) is halved, because it cannot be started now
 ///    and so should drop down the "what do I do next" list.
@@ -18,9 +18,10 @@ public static class UrgencyScoreCalculator
     /// <summary>
     /// Version of the weights and rules below, stored on every score log so history from before and after a change is never
     /// compared blindly. 1 = the original four weights (0.45 / 0.20 / 0.25 / 0.10); 2 = adds Scheduled, with no floor and no
-    /// alerts for unverified items, and informational items out of the ranking.
+    /// alerts for unverified items, and informational items out of the ranking; 3 = an event's effort counts like a task's
+    /// (the clock runs out at start minus effort, the imminent window is the effort, no 2h cap).
     /// </summary>
-    public const int AlgorithmVersion = 2;
+    public const int AlgorithmVersion = 3;
 
     /// <summary>Deadline pressure carries the most weight — an overdue/imminent task should dominate the score.</summary>
     private const double DeadlineWeight = 0.40;

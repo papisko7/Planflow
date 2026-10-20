@@ -14,8 +14,8 @@ flowchart TB
 
     subgraph ext ["External systems"]
         direction LR
-        gcal["<b>Google Calendar API</b><br/>[External system]<br/>Events of the user's calendar"]:::external
-        gtasks["<b>Google Tasks API</b><br/>[External system]<br/>Task lists and tasks of the user"]:::external
+        gcal["<b>Google Calendar API</b><br/>[External system]<br/>Events of the user's calendar, read and changed"]:::external
+        gtasks["<b>Google Tasks API</b><br/>[External system]<br/>Task lists and tasks of the user, read and changed"]:::external
         goauth["<b>Google OAuth 2.0</b><br/>[External system]<br/>Consent screen and tokens"]:::external
         expo["<b>Expo push service</b><br/>[External system]<br/>Delivers push notifications to phones"]:::external
         smtp["<b>SMTP server</b><br/>[External system]<br/>Delivers e-mail: codes, invitations, reminders"]:::external
@@ -26,8 +26,8 @@ flowchart TB
     mobile -.->|"Opens the consent screen<br/>in the phone's browser"| goauth
     api -->|"EF Core, Npgsql"| db
     api -->|"StackExchange.Redis"| redis
-    api -->|"HTTPS, REST<br/>imports events on Sync now"| gcal
-    api -->|"HTTPS, REST<br/>imports tasks on Sync now"| gtasks
+    api -->|"HTTPS, REST<br/>reads and patches events on Sync now"| gcal
+    api -->|"HTTPS, REST<br/>reads and patches tasks on Sync now"| gtasks
     api -->|"HTTPS, OAuth 2.0 with PKCE<br/>code for tokens, token refresh"| goauth
     api -->|HTTPS| expo
     api -->|SMTP| smtp

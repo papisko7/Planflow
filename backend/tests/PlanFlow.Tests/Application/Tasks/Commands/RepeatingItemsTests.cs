@@ -466,10 +466,10 @@ public class RepeatingItemsTests
     }
 
     private static UpdateTaskCommand ImportedForm(Setup s, CalendarItem item, SeriesScope scope) =>
-        Form(s, item, scope) with { ImpactScore = 9, EstimatedEffortHours = 2.0, Title = "Not Google's to rename" };
+        Form(s, item, scope) with { ImpactScore = 9, EstimatedEffortHours = 2.0, Title = "Renamed in the app" };
 
     [Fact]
-    public async Task ImportedSeries_All_PassesOnOnlyWhatPlanFlowAdds()
+    public async Task ImportedSeries_All_PassesOnTheTitleAndPlanFlowFields_AndEachOccurrenceKeepsItsOwnDay()
     {
         var s = await SetUpAsync();
         var rows = await SeedImportedSeriesAsync(s);
@@ -477,7 +477,8 @@ public class RepeatingItemsTests
         await UpdateAsync(s, ImportedForm(s, rows[1], SeriesScope.All));
 
         var after = s.Db.CalendarItems.AsNoTracking().ToList();
-        Assert.All(after, r => { Assert.Equal(9, r.ImpactScore); Assert.Equal(2.0, r.EstimatedEffortHours); Assert.Equal("Google weekly", r.Title); });
+        Assert.All(after, r => { Assert.Equal(9, r.ImpactScore); Assert.Equal(2.0, r.EstimatedEffortHours); Assert.Equal("Renamed in the app", r.Title); });
+        Assert.Equal(rows.Select(r => r.StartUtc), after.OrderBy(r => r.StartUtc).Select(r => r.StartUtc));
     }
 
     [Fact]

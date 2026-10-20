@@ -6,7 +6,8 @@ namespace PlanFlow.Application.Tasks.Common;
 /// <summary>
 /// Flat projection of a <see cref="CalendarItem"/> returned to callers outside the Application layer,
 /// so handlers never leak EF Core-tracked entities across the CQRS boundary.
-/// <see cref="IsExternal"/> marks an item imported from Google (its Google-owned fields are read-only in the app).
+/// <see cref="IsExternal"/> marks an item imported from Google (it can be edited in the app except for its kind and repeat rule; the next sync sends the edit to Google).
+/// <see cref="HasUnsentChanges"/> = an edit of such an item that no sync has sent to Google yet.
 /// <see cref="IsDeadlineDefaulted"/> marks a Google task that had no due day (its deadline is a placeholder the user can still set).
 /// <see cref="GoogleTaskListId"/> / <see cref="GoogleTaskListTitle"/> name the Google Tasks list an imported task belongs to (the title is filled by the queries that load it).
 /// <see cref="ReasonText"/> is the latest urgency explanation; only the list query fills it (null elsewhere).
@@ -54,7 +55,8 @@ public record TaskDto(
     string? SeriesId = null,
     Guid? ItemListId = null,
     bool IsAssignmentLocked = false,
-    Guid? AssignedByUserId = null)
+    Guid? AssignedByUserId = null,
+    bool HasUnsentChanges = false)
 {
     public static TaskDto FromEntity(CalendarItem task, RecurrenceSeries? series = null) => FromEntityCore(task, series ?? task.RecurrenceSeries);
 
@@ -97,5 +99,6 @@ public record TaskDto(
         SeriesId: task.SeriesKey,
         ItemListId: task.ItemListId,
         IsAssignmentLocked: task.IsAssignmentLocked,
-        AssignedByUserId: task.AssignedByUserId);
+        AssignedByUserId: task.AssignedByUserId,
+        HasUnsentChanges: task.LocalEditedFields != Domain.Enums.MirroredFields.None);
 }

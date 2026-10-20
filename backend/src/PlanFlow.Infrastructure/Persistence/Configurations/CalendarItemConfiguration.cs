@@ -18,6 +18,7 @@ public class CalendarItemConfiguration : IEntityTypeConfiguration<CalendarItem>
         builder.Property(t => t.SeriesId).HasMaxLength(512);
         builder.Property(t => t.ExternalStatus).HasMaxLength(32);
         builder.Property(t => t.ExternalDescriptionHash).HasMaxLength(64); // hex SHA-256
+        builder.Property(t => t.ExternalFieldsHash).HasMaxLength(64); // hex SHA-256
         builder.Property(t => t.ExternalSettings).HasMaxLength(1000);
         builder.Property(t => t.ExternalTaskId).HasMaxLength(512);
 

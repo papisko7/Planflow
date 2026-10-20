@@ -181,4 +181,16 @@ describe('TaskDetailScreen - task from Google Tasks', () => {
 
     expect(screen.getByText(`${day(25)} (not set in Google)`)).toBeTruthy();
   });
+
+  it('says that an edit has not reached Google yet', async () => {
+    await showDetail({ task: googleTask({ hasUnsentChanges: true }), latestScoreBreakdown: null });
+
+    expect(screen.getByText('Your changes are sent at the next sync')).toBeTruthy();
+  });
+
+  it('says nothing about sending once the edit has reached Google', async () => {
+    await showDetail({ task: googleTask({ hasUnsentChanges: false }), latestScoreBreakdown: null });
+
+    expect(screen.queryByText('Your changes are sent at the next sync')).toBeNull();
+  });
 });

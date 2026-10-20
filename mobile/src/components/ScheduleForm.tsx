@@ -4,19 +4,23 @@ import { colors, radius, spacing, typography } from '../theme/theme';
 import { RecurrenceFrequency, TaskType, type ScheduleFields } from '../types/task';
 import { startOfDay } from '../utils/dateUtils';
 import { defaultRecurrence, FREQUENCY_LABEL, MAX_INTERVAL, WEEKDAYS, weekdayBit } from '../utils/recurrence';
+import { EFFORT_LABEL, EVENT_EFFORT_HINT, TASK_EFFORT_HINT } from '../utils/fieldHints';
 import { allDayToTimed, pairAllDayDates, pairEventTimes, switchKind } from '../utils/schedule';
 import { ITEM_KINDS, rulesFor, WORKING_LOCATION_PRESETS } from '../utils/templateRules';
 import { ColorPicker } from './ColorPicker';
 import { DeadlinePicker } from './DeadlinePicker';
 import { DurationInput } from './DurationInput';
+import { FieldLabel } from './FieldLabel';
 
 type Props = {
   value: ScheduleFields;
   onChange: (next: ScheduleFields) => void;
   isNew: boolean;
+  lockKind?: boolean; // an imported item stays what Google says it is: no type / template chips
+  hideRepeat?: boolean; // ... and repeats by Google's rule, which cannot be changed here
 };
 
-export function ScheduleForm({ value, onChange, isNew }: Props) {
+export function ScheduleForm({ value, onChange, isNew, lockKind = false, hideRepeat = false }: Props) {
   const isEvent = value.taskType === TaskType.Event;
   const rules = rulesFor(value.taskType, value.eventTemplate);
   const patch = (changes: Partial<ScheduleFields>) => onChange({ ...value, ...changes });
@@ -40,18 +44,23 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
 
   return (
     <View style={styles.wrapper}>
-      <View style={styles.chipRow}>
-        {ITEM_KINDS.map((kind) => (
-          <Pressable
-            key={kind.id}
-            testID={kind.testID}
-            onPress={() => onChange(switchKind(value, kind))}
-            style={[styles.chip, isActive(kind) ? styles.chipActive : null]}
-          >
-            <Text style={isActive(kind) ? styles.chipTextActive : styles.chipText}>{kind.label}</Text>
-          </Pressable>
-        ))}
-      </View>
+      {lockKind ? null : (
+        <View>
+          <FieldLabel title="Type" hint="A task is work with a deadline; an event happens at a set time." />
+          <View style={styles.chipRow}>
+            {ITEM_KINDS.map((kind) => (
+              <Pressable
+                key={kind.id}
+                testID={kind.testID}
+                onPress={() => onChange(switchKind(value, kind))}
+                style={[styles.chip, isActive(kind) ? styles.chipActive : null]}
+              >
+                <Text style={isActive(kind) ? styles.chipTextActive : styles.chipText}>{kind.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
 
       {isEvent ? (
         <>
@@ -65,6 +74,7 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
             <DeadlinePicker
               testIDPrefix="event-start-picker"
               label="Date"
+              hint="The day of the birthday."
               optional={false}
               allowAllDay={false}
               dateOnly
@@ -76,6 +86,7 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
               <DeadlinePicker
                 testIDPrefix="event-start-picker"
                 label="Start"
+                hint="When the event begins."
                 optional={false}
                 allowAllDay={false}
                 dateOnly={value.isAllDay}
@@ -87,6 +98,7 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
               <DeadlinePicker
                 testIDPrefix="event-end-picker"
                 label="End"
+                hint="When the event ends."
                 optional={false}
                 allowAllDay={false}
                 dateOnly={value.isAllDay}
@@ -98,20 +110,36 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
               />
             </>
           )}
+          {rules.informational ? null : (
+            <DurationInput
+              testID="effort"
+              label={EFFORT_LABEL}
+              hint={EVENT_EFFORT_HINT}
+              hours={value.estimatedEffortHours}
+              onChange={(estimatedEffortHours) => patch({ estimatedEffortHours })}
+            />
+          )}
         </>
       ) : (
         <>
           <DeadlinePicker
             testIDPrefix="task-start-picker"
             label="Start"
+            hint="When you plan to begin the work."
             allowAllDay={false}
             value={value.startUtc}
             onChange={(startUtc) => patch({ startUtc })}
           />
-          <DeadlinePicker futureOnly={isNew} value={value.deadlineUtc} onChange={(deadlineUtc) => patch({ deadlineUtc })} />
+          <DeadlinePicker
+            futureOnly={isNew}
+            hint="When the work has to be finished."
+            value={value.deadlineUtc}
+            onChange={(deadlineUtc) => patch({ deadlineUtc })}
+          />
           <DurationInput
             testID="effort"
-            label="Estimated effort (optional)"
+            label={EFFORT_LABEL}
+            hint={TASK_EFFORT_HINT}
             hours={value.estimatedEffortHours}
             onChange={(estimatedEffortHours) => patch({ estimatedEffortHours })}
           />
@@ -119,14 +147,15 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
       )}
 
       {rules.location === 'text' ? (
-        <TextInput
-          testID="schedule-location-input"
-          style={styles.input}
-          placeholder="Location"
-          placeholderTextColor={colors.textMuted}
-          value={value.location ?? ''}
-          onChangeText={(location) => patch({ location })}
-        />
+        <View>
+          <FieldLabel title="Location (optional)" hint="Where it takes place." />
+          <TextInput
+            testID="schedule-location-input"
+            style={styles.input}
+            value={value.location ?? ''}
+            onChangeText={(location) => patch({ location })}
+          />
+        </View>
       ) : null}
       {rules.location === 'workingLocation' ? (
         <WorkingLocationField value={value.location} onChange={(location) => patch({ location })} />
@@ -134,7 +163,7 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
 
       {rules.busy === 'choice' ? (
         <View>
-          <Text style={styles.label}>Show me as:</Text>
+          <FieldLabel title="Show me as" hint="Busy blocks your time for teammates; Free does not." />
           <View style={styles.chipRow}>
             {[
               { busy: true, label: 'Busy', testID: 'schedule-busy' },
@@ -155,16 +184,18 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
 
       {rules.allowsColor ? <ColorPicker value={value.colorKey} onChange={(colorKey) => patch({ colorKey })} /> : null}
 
-      <View style={styles.switchRow}>
-        <Text style={styles.switchLabel}>Repeats</Text>
-        <Switch
-          testID="schedule-recurring-switch"
-          value={value.isRecurring}
-          onValueChange={(isRecurring) => patch(isRecurring ? defaultRecurrence(isEvent ? value.startUtc : value.deadlineUtc) : { isRecurring })}
-          trackColor={{ true: colors.primary }}
-        />
-      </View>
-      {value.isRecurring ? (
+      {hideRepeat ? null : (
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>Repeats</Text>
+          <Switch
+            testID="schedule-recurring-switch"
+            value={value.isRecurring}
+            onValueChange={(isRecurring) => patch(isRecurring ? defaultRecurrence(isEvent ? value.startUtc : value.deadlineUtc) : { isRecurring })}
+            trackColor={{ true: colors.primary }}
+          />
+        </View>
+      )}
+      {value.isRecurring && !hideRepeat ? (
         <>
           <View style={styles.chipRow}>
             {Object.values(RecurrenceFrequency)
@@ -219,6 +250,7 @@ export function ScheduleForm({ value, onChange, isNew }: Props) {
           <DeadlinePicker
             testIDPrefix="recurrence-end-picker"
             label="Repeat until"
+            hint="The last day the item repeats. Leave it empty to repeat without an end."
             allowAllDay
             value={value.recurrenceEndsAtUtc}
             onChange={(recurrenceEndsAtUtc) => patch({ recurrenceEndsAtUtc })}
@@ -234,7 +266,7 @@ function WorkingLocationField({ value, onChange }: { value: string | null; onCha
   const [custom, setCustom] = useState(() => Boolean(value) && !isPreset);
   return (
     <View>
-      <Text style={styles.label}>Working from:</Text>
+      <FieldLabel title="Working from" hint="Where you work on that day." />
       <View style={styles.chipRow}>
         {WORKING_LOCATION_PRESETS.map((preset) => (
           <Pressable
@@ -261,14 +293,10 @@ function WorkingLocationField({ value, onChange }: { value: string | null; onCha
         </Pressable>
       </View>
       {custom ? (
-        <TextInput
-          testID="schedule-location-input"
-          style={[styles.input, styles.customInput]}
-          placeholder="Label, e.g. Client site"
-          placeholderTextColor={colors.textMuted}
-          value={value ?? ''}
-          onChangeText={onChange}
-        />
+        <View style={styles.customInput}>
+          <FieldLabel title="Your label" hint="For example: Client site." />
+          <TextInput testID="schedule-location-input" style={styles.input} value={value ?? ''} onChangeText={onChange} />
+        </View>
       ) : null}
     </View>
   );

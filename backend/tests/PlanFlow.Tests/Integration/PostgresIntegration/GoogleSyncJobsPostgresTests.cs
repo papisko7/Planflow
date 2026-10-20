@@ -1,4 +1,6 @@
 using System.Net;
+using System.Text;
+using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -36,7 +38,7 @@ public class GoogleSyncJobsPostgresTests
 
     private sealed record Account(Guid UserId, Guid TeamId, Guid IntegrationId);
 
-    private async Task<Account> SeedAccountAsync(DateTime? lastSyncedAtUtc = null, DateTime? lastFullSyncAtUtc = null)
+    private async Task<Account> SeedAccountAsync(DateTime? lastSyncedAtUtc = null, DateTime? lastFullSyncAtUtc = null, string scopes = CalendarIntegration.TasksScope)
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<PlanFlowDbContext>();
@@ -51,7 +53,7 @@ public class GoogleSyncJobsPostgresTests
             EncryptedAccessToken = "access-token",
             EncryptedRefreshToken = "refresh-token",
             AccessTokenExpiresAtUtc = DateTime.UtcNow.AddHours(1),
-            GrantedScopes = CalendarIntegration.TasksScope,
+            GrantedScopes = scopes,
             LastSyncedAtUtc = lastSyncedAtUtc,
             LastFullSyncAtUtc = lastFullSyncAtUtc,
             IsActive = true
@@ -359,6 +361,93 @@ public class GoogleSyncJobsPostgresTests
         Assert.Equal(TaskStatus.Backlog, items.Single(i => i.ExternalTaskId == "b").Status);
         var lists = await ReadAsync(db => db.ExternalTaskLists.AsNoTracking().Where(l => l.CalendarIntegrationId == account.IntegrationId).Select(l => l.ExternalId).ToListAsync());
         Assert.Equal(["l2"], lists);
+    }
+
+    // --- Edits made in the app travel back to Google ---------------------------------------
+
+    private const string WriteScopes = "openid email " + CalendarIntegration.CalendarWriteScope + " " + CalendarIntegration.TasksWriteScope;
+
+    private static HttpResponseMessage Json(string body) => new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
+
+    [Fact]
+    public async Task Calendar_EditMadeInTheApp_IsReadAndPatchedInGoogle_AndNothingWaitsAfterwards()
+    {
+        var account = await SeedAccountAsync(scopes: WriteScopes);
+        var soon = InDays(2);
+        await PressCalendarAsync(account, Calendar(GoogleJson.Event("e1", "Standup", soon, soon.AddHours(1), location: "Room 1")));
+
+        // The person edits the title and the place in the app; the edit command notes it exactly like this.
+        await WriteAsync(async db =>
+        {
+            var item = await db.CalendarItems.Include(i => i.Reminders).SingleAsync(i => i.TeamId == account.TeamId);
+            var before = GoogleMirror.Capture(item);
+            item.Title = "Daily";
+            item.Location = "Room 7";
+            GoogleMirror.Track(item, before, GoogleMirror.Capture(item), DateTime.UtcNow);
+        });
+        var waiting = await ReadAsync(db => db.CalendarItems.AsNoTracking().SingleAsync(i => i.TeamId == account.TeamId));
+        Assert.Equal(MirroredFields.Title | MirroredFields.Location, waiting.LocalEditedFields);
+
+        string? patchBody = null;
+        var google = new StubHttpMessageHandler()
+            .Enqueue(HttpStatusCode.OK, GoogleJson.Events())                                                       // nothing changed in Google since the last press
+            .Enqueue(HttpStatusCode.OK, GoogleJson.Event("e1", "Standup", soon, soon.AddHours(1), location: "Room 1")) // the event as Google holds it
+            .Enqueue(request =>
+            {
+                patchBody = request.Content!.ReadAsStringAsync().Result;
+                return Json(GoogleJson.Event("e1", "Daily", soon, soon.AddHours(1), location: "Room 7"));
+            });
+        await PressCalendarAsync(account, google);
+
+        Assert.Equal(3, google.Requests.Count);
+        Assert.Equal(HttpMethod.Get, google.Requests[1].Method);
+        Assert.EndsWith("/events/e1", google.Requests[1].RequestUri!.AbsolutePath);
+        Assert.Equal(new HttpMethod("PATCH"), google.Requests[2].Method);
+        Assert.Contains("sendUpdates=none", google.Requests[2].RequestUri!.Query);
+        var sent = JsonNode.Parse(patchBody!)!;
+        Assert.Equal("Daily", (string?)sent["summary"]);
+        Assert.Equal("Room 7", (string?)sent["location"]);
+
+        var item = await ReadAsync(db => db.CalendarItems.AsNoTracking().SingleAsync(i => i.TeamId == account.TeamId));
+        Assert.Equal("Daily", item.Title);
+        Assert.Equal(MirroredFields.None, item.LocalEditedFields);
+        Assert.Null(item.LocalEditedAtUtc);
+    }
+
+    [Fact]
+    public async Task Tasks_TaskMarkedDoneInTheApp_IsClosedInGoogle()
+    {
+        var account = await SeedAccountAsync(scopes: WriteScopes);
+        await PressTasksAsync(account, TasksOf(("l1", "My Tasks", [GoogleJson.Task("t1", "Draft", due: Day(7))])));
+        await WriteAsync(async db =>
+        {
+            var item = await db.CalendarItems.Include(i => i.Reminders).SingleAsync(i => i.TeamId == account.TeamId);
+            var before = GoogleMirror.Capture(item);
+            item.Status = TaskStatus.Completed;
+            GoogleMirror.Track(item, before, GoogleMirror.Capture(item), DateTime.UtcNow);
+        });
+
+        string? patchBody = null;
+        var google = new StubHttpMessageHandler()
+            .Enqueue(HttpStatusCode.OK, GoogleJson.TaskLists(("l1", "My Tasks")))
+            .Enqueue(HttpStatusCode.OK, GoogleJson.Tasks())                                         // nothing changed in Google since the last press
+            .Enqueue(HttpStatusCode.OK, GoogleJson.Task("t1", "Draft", due: Day(7)))                // the task as Google holds it
+            .Enqueue(request =>
+            {
+                patchBody = request.Content!.ReadAsStringAsync().Result;
+                return Json(GoogleJson.Task("t1", "Draft", due: Day(7), status: "completed"));
+            });
+        await PressTasksAsync(account, google);
+
+        Assert.Equal(4, google.Requests.Count);
+        Assert.Equal(new HttpMethod("PATCH"), google.Requests[3].Method);
+        Assert.EndsWith("/lists/l1/tasks/t1", google.Requests[3].RequestUri!.AbsolutePath);
+        Assert.Equal("completed", (string?)JsonNode.Parse(patchBody!)!["status"]);
+
+        var item = await ReadAsync(db => db.CalendarItems.AsNoTracking().SingleAsync(i => i.TeamId == account.TeamId));
+        Assert.Equal(TaskStatus.Completed, item.Status);
+        Assert.Equal("completed", item.ExternalStatus);
+        Assert.Equal(MirroredFields.None, item.LocalEditedFields);
     }
 
     // --- The database itself ---------------------------------------------------------------

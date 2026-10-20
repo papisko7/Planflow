@@ -1,4 +1,8 @@
+using System.Globalization;
+using System.Net;
 using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Web;
 using PlanFlow.Application.Common.Exceptions;
@@ -8,7 +12,7 @@ namespace PlanFlow.Infrastructure.ExternalServices.Google;
 
 /// <summary>
 /// Raw HttpClient calls to the Google Calendar REST API — same minimal-dependency convention as
-/// <see cref="GoogleOAuthClient"/> (no Google.Apis SDK).
+/// <see cref="GoogleOAuthClient"/> (no Google.Apis SDK). Lists events, reads one and changes one (events.patch).
 /// </summary>
 public class GoogleCalendarClient : IGoogleCalendarClient
 {
@@ -43,6 +47,111 @@ public class GoogleCalendarClient : IGoogleCalendarClient
         }
 
         throw new InvalidOperationException($"Google Calendar returned more than {MaxPages} pages of events; refusing to read on.");
+    }
+
+    public async Task<GoogleCalendarEvent?> GetEventAsync(string accessToken, string eventId, CancellationToken cancellationToken)
+    {
+        using var request = Authorized(HttpMethod.Get, EventUrl(eventId), accessToken);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Gone)
+        {
+            return null;
+        }
+
+        await GoogleWriteErrors.EnsureAcceptedAsync(response, cancellationToken);
+        return await ReadEventAsync(accessToken, response, cancellationToken);
+    }
+
+    public async Task<GoogleCalendarEvent> PatchEventAsync(string accessToken, string eventId, GoogleEventPatch patch, CancellationToken cancellationToken)
+    {
+        // sendUpdates=none: an edit made in PlanFlow must not e-mail the event's guests.
+        using var request = Authorized(HttpMethod.Patch, $"{EventUrl(eventId)}?sendUpdates=none", accessToken);
+        request.Content = new StringContent(PatchBody(patch).ToJsonString(), Encoding.UTF8, "application/json");
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        await GoogleWriteErrors.EnsureAcceptedAsync(response, cancellationToken);
+        return await ReadEventAsync(accessToken, response, cancellationToken);
+    }
+
+    /// <summary>
+    /// The body of events.patch. Only what the patch names is sent; Google leaves everything else alone. A value of JSON null removes a field,
+    /// which is how an empty colour is expressed and how the unused half of start / end is cleared when an event turns all-day or timed.
+    /// </summary>
+    internal static JsonObject PatchBody(GoogleEventPatch patch)
+    {
+        var body = new JsonObject();
+        if (patch.Title is not null)
+        {
+            body["summary"] = patch.Title;
+        }
+        if (patch.Description is not null)
+        {
+            body["description"] = patch.Description;
+        }
+        if (patch.Location is not null)
+        {
+            body["location"] = patch.Location;
+        }
+        if (patch.ColorId is not null)
+        {
+            body["colorId"] = patch.ColorId.Length == 0 ? null : patch.ColorId;
+        }
+        if (patch.IsFree is { } isFree)
+        {
+            body["transparency"] = isFree ? "transparent" : "opaque";
+        }
+        if (patch.Time is { } time)
+        {
+            body["start"] = TimeNode(time.StartUtc, time.IsAllDay);
+            body["end"] = TimeNode(time.EndUtc, time.IsAllDay);
+        }
+        if (patch.ReminderMinutes is { } minutes)
+        {
+            // useDefault=false with an explicit list: the person's alerts replace the calendar's defaults for this event.
+            body["reminders"] = new JsonObject
+            {
+                ["useDefault"] = false,
+                ["overrides"] = new JsonArray(minutes.Select(m => (JsonNode)new JsonObject { ["method"] = "popup", ["minutes"] = m }).ToArray())
+            };
+        }
+
+        return body;
+    }
+
+    private static JsonObject TimeNode(DateTime utc, bool isAllDay) => isAllDay
+        ? new JsonObject { ["date"] = utc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), ["dateTime"] = null }
+        : new JsonObject { ["dateTime"] = utc.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture), ["date"] = null };
+
+    private static string EventUrl(string eventId) => $"{EventsEndpoint}/{Uri.EscapeDataString(eventId)}";
+
+    private static HttpRequestMessage Authorized(HttpMethod method, string url, string accessToken)
+    {
+        var request = new HttpRequestMessage(method, url);
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        return request;
+    }
+
+    /// <summary>
+    /// Reads one event the way the list would have returned it. A single event does not carry the calendar's default reminders, so an event
+    /// that "uses the defaults" costs one more (tiny) request to learn what they are.
+    /// </summary>
+    private async Task<GoogleCalendarEvent> ReadEventAsync(string accessToken, HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        var item = await response.Content.ReadFromJsonAsync<GoogleEventItem>(cancellationToken)
+            ?? throw new InvalidOperationException("Google returned an empty event.");
+
+        List<GoogleReminderOverride>? defaults = null;
+        if (item.Reminders is { UseDefault: true })
+        {
+            var now = DateTime.UtcNow;
+            var query = HttpUtility.ParseQueryString(string.Empty);
+            query["maxResults"] = "1";
+            query["timeMin"] = now.ToString("o");
+            query["timeMax"] = now.AddMinutes(1).ToString("o");
+            defaults = (await GetPageAsync(accessToken, query.ToString()!, cancellationToken)).DefaultReminders;
+        }
+
+        return ToEvent(defaults)(item);
     }
 
     private static string BuildQuery(DateTime? updatedSinceUtc, DateTime now, string? pageToken)
@@ -115,7 +224,8 @@ public class GoogleCalendarClient : IGoogleCalendarClient
             Status: item.Status,
             SettingsText: SettingsText(item),
             ReminderMinutes: ReminderMinutes(item.Reminders, calendarDefaults),
-            IsPrivate: item.Visibility is "private" or "confidential");
+            IsPrivate: item.Visibility is "private" or "confidential",
+            UpdatedUtc: item.Updated?.UtcDateTime);
     };
 
     /// <summary>
@@ -141,8 +251,8 @@ public class GoogleCalendarClient : IGoogleCalendarClient
     };
 
     /// <summary>
-    /// What an Out of office / Focus time event does in Google (declines invitations, silences chat, auto-reply text). We cannot
-    /// act on it - the integration is read-only - so it is kept as one readable line the app shows as information.
+    /// What an Out of office / Focus time event does in Google (declines invitations, silences chat, auto-reply text). The app has no
+    /// such behaviour of its own, so it is kept as one readable line the app shows as information.
     /// </summary>
     private static string? SettingsText(GoogleEventItem item)
     {
@@ -198,6 +308,7 @@ public class GoogleCalendarClient : IGoogleCalendarClient
         [property: JsonPropertyName("transparency")] string? Transparency,
         [property: JsonPropertyName("visibility")] string? Visibility,
         [property: JsonPropertyName("recurringEventId")] string? RecurringEventId,
+        [property: JsonPropertyName("updated")] DateTimeOffset? Updated,
         [property: JsonPropertyName("reminders")] GoogleReminders? Reminders,
         [property: JsonPropertyName("outOfOfficeProperties")] GoogleTemplateSettings? OutOfOfficeProperties,
         [property: JsonPropertyName("focusTimeProperties")] GoogleTemplateSettings? FocusTimeProperties,

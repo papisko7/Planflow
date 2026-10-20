@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { DURATION_UNIT_LABEL, EFFORT_UNITS, fromHours, toHours, type DurationUnit } from '../utils/duration';
+import { FieldLabel } from './FieldLabel';
 
 type Props = {
   label: string;
+  hint?: string; // what the amount is used for, shown under the caption
   hours: number | null;
   onChange: (hours: number | null) => void;
   units?: DurationUnit[];
@@ -12,7 +14,7 @@ type Props = {
   testID: string;
 };
 
-export function DurationInput({ label, hours, onChange, units = EFFORT_UNITS, defaultUnit = 'hour', testID }: Props) {
+export function DurationInput({ label, hint, hours, onChange, units = EFFORT_UNITS, defaultUnit = 'hour', testID }: Props) {
   const initial = hours !== null ? fromHours(hours, units) : null;
   const [text, setText] = useState(initial ? String(initial.value) : '');
   const [unit, setUnit] = useState<DurationUnit>(initial?.unit ?? defaultUnit);
@@ -24,12 +26,10 @@ export function DurationInput({ label, hours, onChange, units = EFFORT_UNITS, de
 
   return (
     <View style={styles.wrapper}>
-      <Text style={styles.label}>{label}</Text>
+      <FieldLabel title={label} hint={hint} />
       <TextInput
         testID={`${testID}-input`}
         style={styles.input}
-        placeholder="Amount (empty = not set)"
-        placeholderTextColor={colors.textMuted}
         keyboardType="decimal-pad"
         value={text}
         onChangeText={(next) => {
@@ -58,7 +58,6 @@ export function DurationInput({ label, hours, onChange, units = EFFORT_UNITS, de
 
 const styles = StyleSheet.create({
   wrapper: { gap: spacing.xs },
-  label: { ...typography.body, color: colors.textMuted },
   input: {
     backgroundColor: colors.background,
     borderWidth: 1,

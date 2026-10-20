@@ -1,6 +1,7 @@
 using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using PlanFlow.Application.Calendar.Common;
 using PlanFlow.Application.Common.Caching;
 using PlanFlow.Application.Common.Interfaces;
 using PlanFlow.Application.Notifications;
@@ -171,8 +172,10 @@ public class BulkSetStatusCommandHandler : IRequestHandler<BulkSetStatusCommand,
         foreach (var task in fitting.Where(t => t.Status != request.Status))
         {
             var before = TaskSnapshot.Of(task);
+            var mirrorBefore = GoogleMirror.Capture(task);
             task.Status = request.Status;
             task.UpdatedAtUtc = nowUtc;
+            GoogleMirror.Track(task, mirrorBefore, GoogleMirror.Capture(task), nowUtc); // a Google task marked done is closed in Google by the next sync
             _context.TaskHistories.Add(new TaskHistory
             {
                 CalendarItemId = task.Id,

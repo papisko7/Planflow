@@ -176,6 +176,10 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<string>("ExternalFieldsHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("ExternalSettings")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -192,6 +196,9 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<int?>("ImpactScore")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("IncompleteRemindersSent")
                         .HasColumnType("integer");
 
                     b.Property<bool>("IsAllDay")
@@ -217,6 +224,12 @@ namespace PlanFlow.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("ItemListId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("LocalEditedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("LocalEditedFields")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Location")
                         .HasMaxLength(512)

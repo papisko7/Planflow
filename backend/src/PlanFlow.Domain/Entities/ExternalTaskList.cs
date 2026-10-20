@@ -4,7 +4,7 @@ namespace PlanFlow.Domain.Entities;
 
 /// <summary>
 /// One Google Tasks list (e.g. "My Tasks", "Shopping") of a connected account. Tasks imported from it point back here, so the
-/// app can show them grouped under the list's name. Read-only mirror: PlanFlow never writes to Google.
+/// app can show them grouped under the list's name. The lists themselves are a read-only mirror: PlanFlow changes tasks in Google, never the lists.
 /// </summary>
 public class ExternalTaskList : BaseEntity
 {

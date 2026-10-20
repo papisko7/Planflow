@@ -190,13 +190,21 @@ public class UrgencyReasonTextTests
     // ---- Case 5: Task vs. Event ----
 
     [Fact]
-    public void SameMoment_TaskCountsItsDeadlineMinusEffort_EventIgnoresEffort()
+    public void SameMoment_TaskAndEventBothCountTheirEffort()
     {
         var task = Score(Item(deadline: Now.AddDays(3), effort: 24));
         var evt = Score(Item(TaskType.Event, start: Now.AddDays(3), effort: 24));
 
         Assert.Equal(Math.Exp(-2.0 / 7.0), task.DeadlineComponent, precision: 9);
-        Assert.Equal(Math.Exp(-3.0 / 7.0), evt.DeadlineComponent, precision: 9);
+        Assert.Equal(Math.Exp(-2.0 / 7.0), evt.DeadlineComponent, precision: 9);
+    }
+
+    [Fact]
+    public void Event_WhoseEffortDoesNotFitBeforeTheStart_SaysThereIsNotEnoughTime()
+    {
+        var evt = Score(Item(TaskType.Event, start: Now.AddHours(5), effort: 8));
+
+        Assert.Contains("not enough time: needs 8h of effort, starts in 5h", evt.ReasonText);
     }
 
     [Fact]

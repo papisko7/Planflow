@@ -1,6 +1,6 @@
 namespace PlanFlow.Infrastructure.Security;
 
-/// <summary>Bound from the "GoogleOAuth" configuration section. ClientId/ClientSecret come from the Google Cloud Console OAuth client (free tier, no billing required for Calendar API read scopes).</summary>
+/// <summary>Bound from the "GoogleOAuth" configuration section. ClientId/ClientSecret come from the Google Cloud Console OAuth client (free tier, no billing required for the Calendar and Tasks API scopes).</summary>
 public class GoogleOAuthOptions
 {
     public string ClientId { get; set; } = string.Empty;
@@ -9,7 +9,8 @@ public class GoogleOAuthOptions
     /// <summary>Must exactly match a redirect URI registered on the Google OAuth client (e.g. https://api.planflow.dev/api/calendar/google/callback).</summary>
     public string RedirectUri { get; set; } = string.Empty;
 
-    public string Scopes { get; set; } = "openid email https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/tasks.readonly";
+    /// <summary>Read and change events (calendar.events) and tasks (tasks): an edit of an imported item is sent back to Google by the next sync.</summary>
+    public string Scopes { get; set; } = "openid email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/tasks";
 
     public string AuthorizationEndpoint { get; set; } = "https://accounts.google.com/o/oauth2/v2/auth";
     public string TokenEndpoint { get; set; } = "https://oauth2.googleapis.com/token";

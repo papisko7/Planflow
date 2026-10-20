@@ -49,9 +49,11 @@ public class RemoveAiColumnsMigrationPostgresTests : IAsyncLifetime
         await migrator.MigrateAsync(ThisMigration);
 
         Assert.Equal(0, await CountDroppedColumnsAsync(db));
-        var item = await db.CalendarItems.AsNoTracking().SingleAsync(i => i.Id == itemId);
-        Assert.Equal("Old item", item.Title);
-        Assert.Equal(0.42, item.CurrentUrgencyScore);
+        // Read with SQL: the entity already has columns that later migrations add.
+        var title = await db.Database.SqlQuery<string>($"SELECT \"Title\" AS \"Value\" FROM calendar_items WHERE \"Id\" = {itemId}").SingleAsync();
+        var score = await db.Database.SqlQuery<double>($"SELECT \"CurrentUrgencyScore\" AS \"Value\" FROM calendar_items WHERE \"Id\" = {itemId}").SingleAsync();
+        Assert.Equal("Old item", title);
+        Assert.Equal(0.42, score);
 
         await migrator.MigrateAsync(PreviousMigration);
 

@@ -257,7 +257,7 @@ public class ItemAlertsTests
     }
 
     [Fact]
-    public async Task Update_AnImportedEvent_KeepsGooglesAlerts_WhateverTheRequestSays()
+    public async Task Update_AnImportedEvent_CanHaveItsOwnAlerts()
     {
         var (db, teamId, userId) = await SetUpAsync();
         var item = new CalendarItem
@@ -271,7 +271,7 @@ public class ItemAlertsTests
 
         await UpdateAsync(db, item, [Before(99)], userId);
 
-        Assert.Equal(10, Assert.Single(await RemindersOf(db, item.Id)).OffsetMinutes);
+        Assert.Equal(99, Assert.Single(await RemindersOf(db, item.Id)).OffsetMinutes);
     }
 
     [Fact]

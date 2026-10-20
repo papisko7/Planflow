@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { addDays, composeDeadline, dayKey, formatDay, formatDeadline, splitDeadline, startOfDay } from '../utils/dateUtils';
+import { FieldLabel } from './FieldLabel';
 import { MonthGrid } from './MonthGrid';
 
 type Props = {
@@ -9,6 +10,7 @@ type Props = {
   onChange: (deadlineUtc: string | null) => void;
   futureOnly?: boolean;
   label?: string;
+  hint?: string; // what the date is used for, shown under the caption
   optional?: boolean;
   allowAllDay?: boolean;
   minDate?: Date;
@@ -24,6 +26,7 @@ export function DeadlinePicker({
   onChange,
   futureOnly = false,
   label = 'Deadline',
+  hint,
   optional = true,
   allowAllDay = true,
   minDate,
@@ -65,11 +68,14 @@ export function DeadlinePicker({
 
   return (
     <>
-      <Pressable testID={`${testIDPrefix}-button`} style={styles.field} onPress={openPicker}>
-        <Text style={value ? styles.fieldText : styles.fieldPlaceholder}>
-          {value ? `${label}: ${dateOnly ? formatDay(value) : formatDeadline(value)}` : optional ? `${label} (optional)` : label}
-        </Text>
-      </Pressable>
+      <View style={styles.block}>
+        <FieldLabel title={optional ? `${label} (optional)` : label} hint={hint} />
+        <Pressable testID={`${testIDPrefix}-button`} style={styles.field} onPress={openPicker}>
+          <Text style={value ? styles.fieldText : styles.fieldPlaceholder}>
+            {value ? (dateOnly ? formatDay(value) : formatDeadline(value)) : 'Not set'}
+          </Text>
+        </Pressable>
+      </View>
 
       <Modal transparent animationType="fade" visible={open} onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
@@ -122,11 +128,10 @@ export function DeadlinePicker({
                       </Pressable>
                     ))}
                   </View>
+                  <Text style={styles.timeLabel}>Other time (24-hour, e.g. 08:30)</Text>
                   <TextInput
                     testID={`${testIDPrefix}-time-input`}
                     style={styles.timeInput}
-                    placeholder="Other time, e.g. 08:30"
-                    placeholderTextColor={colors.textMuted}
                     value={customTime}
                     onChangeText={(text) => {
                       setCustomTime(text);
@@ -176,6 +181,7 @@ export function DeadlinePicker({
 }
 
 const styles = StyleSheet.create({
+  block: { gap: spacing.xs },
   field: {
     backgroundColor: colors.background,
     borderWidth: 1,
@@ -195,6 +201,7 @@ const styles = StyleSheet.create({
   },
   heading: { ...typography.title, color: colors.text, marginBottom: spacing.sm },
   label: { ...typography.body, color: colors.textMuted, marginTop: spacing.md },
+  timeLabel: { ...typography.body, color: colors.textMuted },
   timeInput: {
     backgroundColor: colors.background,
     borderWidth: 1,

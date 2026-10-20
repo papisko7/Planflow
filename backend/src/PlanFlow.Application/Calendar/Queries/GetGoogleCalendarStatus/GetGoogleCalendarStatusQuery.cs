@@ -10,7 +10,9 @@ public record GetGoogleCalendarStatusQuery(Guid UserId) : IRequest<GoogleCalenda
 /// permission): the app then offers to reconnect.
 /// <paramref name="LastSyncedAtUtc"/> is the moment of the last sync the user asked for. <paramref name="Syncing"/> is filled in by the
 /// API layer (the running jobs live in the scheduler, not in the database): true while a sync is queued or running.
+/// <paramref name="CanWriteCalendar"/> / <paramref name="CanWriteTasks"/> say whether the account allowed PlanFlow to change its events /
+/// tasks: without it an edit made in the app stays in the app, and the app offers to reconnect.
 /// </summary>
 public record GoogleCalendarStatusDto(
     bool Connected, string? Email, DateTime? LastSyncedAtUtc, bool TasksConnected = false, DateTime? LastTasksSyncedAtUtc = null,
-    bool Syncing = false);
+    bool Syncing = false, bool CanWriteCalendar = false, bool CanWriteTasks = false);

@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { ReminderAnchor, TaskType, type ReminderInput } from '../types/task';
 import { formatReminder } from '../utils/itemDisplay';
+import { FieldLabel } from './FieldLabel';
 import {
   dayReminder,
   MAX_DAYS_BEFORE,
@@ -92,6 +93,10 @@ export function RemindersEditor({ value, onChange, taskType, isAllDay }: Props) 
 
       {value.length < MAX_REMINDERS ? (
         <View style={styles.addBox}>
+          <FieldLabel
+            title="New alert"
+            hint={isAllDay ? 'How many days before, and at what time (HH:MM), you want to be reminded.' : 'How long before you want to be reminded.'}
+          />
           {isTask ? (
             <View style={styles.chipRow}>
               {[
@@ -124,8 +129,6 @@ export function RemindersEditor({ value, onChange, taskType, isAllDay }: Props) 
                 <TextInput
                   testID="reminder-time-input"
                   style={[styles.input, styles.time]}
-                  placeholder="09:00"
-                  placeholderTextColor={colors.textMuted}
                   value={time}
                   onChangeText={setTime}
                 />

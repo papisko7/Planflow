@@ -103,7 +103,7 @@ public class ScoringProfileAndScheduledTests
             Now, ScoreTriggerSource.ScheduledRecalculation);
 
         Assert.All(logs.Values, l => Assert.Equal(UrgencyScoreCalculator.AlgorithmVersion, l.AlgorithmVersion));
-        Assert.Equal(2, UrgencyScoreCalculator.AlgorithmVersion);
+        Assert.Equal(3, UrgencyScoreCalculator.AlgorithmVersion);
     }
 
     // ---- Unverified items: no floor ----

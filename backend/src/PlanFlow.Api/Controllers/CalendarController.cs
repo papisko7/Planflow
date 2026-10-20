@@ -40,8 +40,9 @@ public class CalendarController : ControllerBase
     }
 
     /// <summary>
-    /// The only way Google is fetched (no timer): starts the calendar and tasks syncs for the caller's own account. The app then watches
-    /// <c>syncing</c> in the status. A press within a minute of the last sync starts nothing; a press while a sync is running joins it.
+    /// The only way Google is read or changed (no timer): starts the calendar and tasks syncs for the caller's own account, which take in what
+    /// changed in Google and send the edits made in the app (the later change wins). The app then watches <c>syncing</c> in the status. A press
+    /// within a minute of the last sync starts nothing; a press while a sync is running joins it.
     /// </summary>
     [HttpPost("sync")]
     [Authorize]

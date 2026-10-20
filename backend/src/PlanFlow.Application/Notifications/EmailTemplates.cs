@@ -213,7 +213,7 @@ public static class EmailTemplates
     private const int MaxListedTitles = 10;
 
     /// <summary>
-    /// Sent after a Google Calendar import left some events without the data the ranking needs (no impact, no end time).
+    /// Sent after a Google Calendar import left some events without the data the ranking needs (no impact, no effort, no end time).
     /// The first paragraph (it becomes the inbox/push text) lists the events by name; the second says how to fix them.
     /// </summary>
     public static Func<string, EmailContent> CalendarItemsIncomplete(IReadOnlyList<string> titles) => name =>
@@ -227,7 +227,7 @@ public static class EmailTemplates
             name,
             Lines(
                 $"Imported from Google Calendar without enough data to rank {(titles.Count == 1 ? "it" : "them")}: {ListTitles(titles)}.",
-                "Open each one in PlanFlow and fill in its impact — saving it clears this reminder. " +
+                "Open each one in PlanFlow and fill in its impact and effort — saving it clears this reminder. " +
                 "You can also add a line like \"[planflow] impact=8 effort=2h\" to the event's description in Google Calendar."));
     };
 
@@ -259,7 +259,7 @@ public static class EmailTemplates
         name,
         Lines(
             $"Waiting for details so {(titles.Count == 1 ? "it" : "they")} can be ranked: {ListTitles(titles)}.",
-            "Open each one in PlanFlow and fill in its impact — saving it clears this reminder."));
+            "Open each one in PlanFlow and fill in its impact and effort — saving it clears this reminder."));
 
     private static string ListTitles(IReadOnlyList<string> titles)
     {

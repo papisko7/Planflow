@@ -19,7 +19,7 @@ flowchart LR
         subgraph alerts ["Alerts and reminders"]
             alert(["Raise urgency alert<br/>score from 0.8, every minute"]):::uc
             itemrem(["Send item reminders<br/>every minute"]):::uc
-            incomplete(["Remind about incomplete imported items<br/>once a day"]):::uc
+            incomplete(["Remind about incomplete imported items<br/>once a day, at most 5 times per item"]):::uc
             digest(["Send chat digest to offline members<br/>every 15 minutes"]):::uc
             notify(["Create notification<br/>inbox row, push and e-mail"]):::uc
         end
@@ -29,8 +29,8 @@ flowchart LR
             pushjob(["Deliver push notifications<br/>respects Focus time"]):::uc
         end
 
-        subgraph import ["Google import"]
-            syncjob(["Import events and tasks<br/>only on Sync now"]):::uc
+        subgraph import ["Google sync"]
+            syncjob(["Synchronise events and tasks both ways<br/>only on Sync now, the later change wins"]):::uc
             token(["Refresh Google access token"]):::uc
         end
 

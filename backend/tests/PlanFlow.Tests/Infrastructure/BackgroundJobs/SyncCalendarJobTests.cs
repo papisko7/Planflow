@@ -401,7 +401,7 @@ public class SyncCalendarJobTests
         var client = ClientReturning(
             new GoogleCalendarEvent("e1", "Dentist", start, start.AddHours(1), IsCancelled: false),
             new GoogleCalendarEvent("e2", "Gym", start, start.AddHours(1), IsCancelled: false),
-            new GoogleCalendarEvent("e3", "Complete one", start, start.AddHours(1), IsCancelled: false, Description: "[planflow] impact=5"));
+            new GoogleCalendarEvent("e3", "Complete one", start, start.AddHours(1), IsCancelled: false, Description: "[planflow] impact=5 effort=1h"));
         await CreateJob(context, client).Execute(CreateJobContext().Object);
 
         Assert.Equal(new[] { "Dentist", "Gym" }, context.CalendarItems.Where(i => i.IsDataIncomplete).Select(i => i.Title).OrderBy(t => t));
@@ -478,7 +478,7 @@ public class SyncCalendarJobTests
 
         await CreateJob(context, ClientReturning(new GoogleCalendarEvent("e1", "Dentist", start, start.AddHours(1), IsCancelled: false)))
             .Execute(CreateJobContext().Object);
-        await CreateJob(context, ClientReturning(new GoogleCalendarEvent("e1", "Dentist", start, start.AddHours(1), IsCancelled: false, Description: "[planflow] impact=7")))
+        await CreateJob(context, ClientReturning(new GoogleCalendarEvent("e1", "Dentist", start, start.AddHours(1), IsCancelled: false, Description: "[planflow] impact=7 effort=2h")))
             .Execute(CreateJobContext().Object);
 
         var item = await context.CalendarItems.SingleAsync();
@@ -510,6 +510,72 @@ public class SyncCalendarJobTests
         Assert.Equal(9, item.ImpactScore);
         Assert.False(item.IsDataIncomplete);
         Assert.Empty(context.Notifications);
+    }
+
+    [Fact]
+    public async Task Execute_EventWithImpactButNoEffort_IsStillFlagged()
+    {
+        var context = CreateInMemoryContext();
+        var (user, _) = SeedUserWithTeam(context);
+        SeedActiveIntegration(context, user.Id);
+        var start = DateTime.UtcNow.AddDays(1);
+
+        await CreateJob(context, ClientReturning(new GoogleCalendarEvent(
+                "e1", "Workshop", start, start.AddHours(2), IsCancelled: false, Description: "[planflow] impact=6")))
+            .Execute(CreateJobContext().Object);
+
+        var item = await context.CalendarItems.SingleAsync();
+        Assert.Equal(6, item.ImpactScore);
+        Assert.Null(item.EstimatedEffortHours);
+        Assert.True(item.IsDataIncomplete);   // events need impact AND effort, like tasks
+    }
+
+    [Fact]
+    public async Task Execute_GoogleUnchanged_KeepsWhatTheUserEditedInTheApp()
+    {
+        var (context, _) = SetUp();
+        var start = DateTime.UtcNow.AddDays(2);
+        var fromGoogle = new GoogleCalendarEvent("e1", "Standup", start, start.AddHours(1), IsCancelled: false, Location: "Room 1", ColorId: "5");
+        await SyncAsync(context, fromGoogle);
+
+        var item = await context.CalendarItems.SingleAsync();
+        item.Title = "Standup (mine)";
+        item.Location = "Room 7";
+        item.StartUtc = start.AddHours(3);
+        item.EndUtc = start.AddHours(4);
+        item.ColorKey = "tomato";
+        await context.SaveChangesAsync();
+
+        await SyncAsync(context, fromGoogle);   // a full pass returns the same event again
+
+        item = await context.CalendarItems.SingleAsync();
+        Assert.Equal("Standup (mine)", item.Title);
+        Assert.Equal("Room 7", item.Location);
+        Assert.Equal(start.AddHours(3), item.StartUtc);
+        Assert.Equal("tomato", item.ColorKey);
+    }
+
+    [Fact]
+    public async Task Execute_GoogleChanged_BringsItsValuesBack_ButNotTheUsersImpactAndEffort()
+    {
+        var (context, _) = SetUp();
+        var start = DateTime.UtcNow.AddDays(2);
+        await SyncAsync(context, new GoogleCalendarEvent("e1", "Standup", start, start.AddHours(1), IsCancelled: false, Location: "Room 1"));
+
+        var item = await context.CalendarItems.SingleAsync();
+        item.Title = "Standup (mine)";
+        item.Location = "Room 7";
+        item.ImpactScore = 9;
+        item.EstimatedEffortHours = 2;
+        await context.SaveChangesAsync();
+
+        await SyncAsync(context, new GoogleCalendarEvent("e1", "Standup", start, start.AddHours(1), IsCancelled: false, Location: "Room 2"));
+
+        item = await context.CalendarItems.SingleAsync();
+        Assert.Equal("Standup", item.Title);   // the event changed in Google: Google wins
+        Assert.Equal("Room 2", item.Location);
+        Assert.Equal(9, item.ImpactScore);
+        Assert.Equal(2, item.EstimatedEffortHours);
     }
 
     [Fact]
@@ -750,7 +816,7 @@ public class SyncCalendarJobTests
         var (context, _) = SetUp();
         var start = DateTime.UtcNow.AddDays(1);
 
-        await SyncAsync(context, new GoogleCalendarEvent("e1", "Review", start, start.AddHours(1), false, Description: "[planflow] impact=5"));
+        await SyncAsync(context, new GoogleCalendarEvent("e1", "Review", start, start.AddHours(1), false, Description: "[planflow] impact=5 effort=1h"));
         var item = await context.CalendarItems.SingleAsync();
         item.ImpactScore = 9;
         await context.SaveChangesAsync();

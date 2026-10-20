@@ -111,19 +111,21 @@ describe('TaskEditForm - imported items', () => {
     mockedUpdateTask.mockResolvedValue({} as never);
   });
 
-  it('an event imported from Google keeps Google\'s alerts: no editor, none sent', async () => {
+  it('an event imported from Google shows its alerts in the editor and sends them back like any other item\'s', async () => {
     const imported: TaskDto = {
       ...task, taskType: TaskType.Event, status: TaskStatus.Confirmed, isExternal: true, deadlineUtc: null,
       startUtc: '2030-10-19T09:00:00.000Z', endUtc: '2030-10-19T10:00:00.000Z', participantUserIds: [],
     };
-    await form(imported, [{ offsetMinutes: 10, daysBefore: null, timeOfDayMinutes: null }], [member('me', 'Mia')]);
+    await form(imported, [{ offsetMinutes: 10, daysBefore: null, timeOfDayMinutes: null, anchor: ReminderAnchor.Start }], [member('me', 'Mia')]);
 
-    expect(screen.queryByTestId('reminders-editor')).toBeNull();
-    expect(screen.queryByTestId('participant-picker')).toBeNull();
+    expect(screen.getByTestId('reminders-editor')).toBeTruthy();
+    expect(screen.getByTestId('reminder-row-0')).toBeTruthy();
+    expect(screen.queryByTestId('participant-picker')).toBeNull(); // nobody else in the (personal) team to invite
+    await fireEvent.press(screen.getByTestId('reminder-remove-0'));
     await fireEvent.press(screen.getByTestId('edit-task-save'));
 
     await waitFor(() => expect(mockedUpdateTask).toHaveBeenCalled());
-    expect(mockedUpdateTask.mock.calls[0][2].reminders).toBeUndefined();
+    expect(mockedUpdateTask.mock.calls[0][2].reminders).toEqual([]);
     expect(mockedUpdateTask.mock.calls[0][2].participantUserIds).toBeUndefined();
   });
 

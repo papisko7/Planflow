@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PlanFlow.Application.Calendar.Common;
 using PlanFlow.Application.Common.Exceptions;
 using PlanFlow.Application.Common.Interfaces;
 using PlanFlow.Application.Tasks.Commands.UpdateTask;
@@ -40,7 +41,7 @@ public sealed record SeriesEditResult(IReadOnlyList<CalendarItem> Created, Recur
 /// one half never touches the other.
 /// A change of <i>day</i> moves only the occurrence it was made on; a change of time of day or length is passed on, and so is a change of the
 /// repeat rule (the occurrences ahead that nobody finished are then made again from the new rule).
-/// An imported (Google) series has no rule of ours, so only the fields PlanFlow adds (impact, effort, assignee, list) are passed on.
+/// An imported (Google) series has no rule of ours, so only the fields of the occurrences are passed on, never a repeat rule.
 /// </summary>
 public static class SeriesEditing
 {
@@ -152,8 +153,8 @@ public static class SeriesEditing
     }
 
     /// <summary>
-    /// Applies the series part of an edit of an imported item. Google owns the series, so there is no rule to cut or change; the PlanFlow
-    /// fields of the opened occurrence are passed to the ones the scope covers.
+    /// Applies the series part of an edit of an imported item. Google owns the series, so there is no rule to cut or change; the other
+    /// fields of the opened occurrence are passed to the ones the scope covers, each keeping its own day (as for an app-created series).
     /// </summary>
     public static async Task ApplyImportedAsync(IApplicationDbContext context, SeriesEdit edit, DateTime nowUtc, CancellationToken cancellationToken)
     {
@@ -170,12 +171,8 @@ public static class SeriesEditing
         EnsureMayChange(edit.Request, covered);
         foreach (var row in covered)
         {
-            row.EstimatedEffortHours = edit.Request.EstimatedEffortHours;
-            row.ImpactScore = edit.Request.ImpactScore;
-            row.ItemListId = task.ItemListId;
+            ApplyFields(context, row, edit, nowUtc);
             row.IsDataIncomplete = false;
-            row.UpdatedAtUtc = nowUtc;
-            PassOnAssignee(row, edit);
         }
     }
 
@@ -261,6 +258,7 @@ public static class SeriesEditing
         var allDay = EventTemplateRules.ResolveAllDay(request.TaskType, request.EventTemplate, request.IsAllDay);
         var zone = allDay ? TimeZoneInfo.Utc : AllDayTime.ZoneOrUtc(edit.Series?.TimeZoneId ?? edit.ZoneId);
         var (start, end, deadline) = DatesFor(request, row, zone);
+        var mirrorBefore = GoogleMirror.Capture(row); // an imported occurrence is a Google event of its own: the next sync sends it the edit
 
         TaskScheduleMapper.Apply(row, request with { StartUtc = start, EndUtc = end, DeadlineUtc = deadline });
         row.Title = request.Title;
@@ -271,15 +269,20 @@ public static class SeriesEditing
         row.UpdatedAtUtc = nowUtc;
         PassOnAssignee(row, edit);
 
+        var reminderKeys = row.Reminders.Select(r => r.Key);
         if (request.Reminders is not null)
         {
-            TaskReminders.Replace(context, row, TaskReminders.Resolve(request.Reminders, row));
+            var wanted = TaskReminders.Resolve(request.Reminders, row);
+            TaskReminders.Replace(context, row, wanted);
+            reminderKeys = wanted.Select(w => w.ToEntity().Key).ToList();
         }
 
         if (request.ParticipantUserIds is not null)
         {
             TaskParticipants.Replace(context, row, edit.ParticipantIds.Where(id => id != row.AssignedUserId).ToList());
         }
+
+        GoogleMirror.Track(row, mirrorBefore, GoogleMirror.Capture(row, reminderKeys), nowUtc);
     }
 
     private static void PassOnAssignee(CalendarItem row, SeriesEdit edit)

@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using PlanFlow.Application.Calendar.Common;
 using PlanFlow.Application.Common.Caching;
 using PlanFlow.Application.Common.Exceptions;
 using PlanFlow.Application.Common.Interfaces;
@@ -49,23 +50,24 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
         var seriesBefore = SeriesSnapshot.Of(task); // for the series pop-up: did this occurrence change on its own?
         var originalDue = task.DueUtc;
         var originalSeries = task.RecurrenceSeries;
+        var mirrorBefore = GoogleMirror.Capture(task); // for an imported item: what changed here is sent to Google by the next sync
 
         task.AssignedUserId = request.AssignedUserId;
         task.AssignedByUserId = outcome.AssignedByUserId;
         task.IsAssignmentLocked = outcome.IsLocked;
-        if (task.IsExternal)
+        task.Title = request.Title;
+        if (task.IsGoogleTask)
         {
-            // Google owns the title, time, place, description, colour and template of an imported item (the next sync would overwrite
-            // them), so only PlanFlow's own fields are taken from the request: effort here, impact / status / assignee below.
-            task.EstimatedEffortHours = request.EstimatedEffortHours;
-            if (task.IsGoogleTask)
-            {
-                ApplyGoogleTaskPlanning(task, request);
-            }
+            ApplyGoogleTaskPlanning(task, request);
         }
         else
         {
-            task.Title = request.Title;
+            // An imported event can be edited like any other, except for its kind (the event / template Google says it is) and its repeat
+            // rule (Google's): those are kept whatever the request says. The next sync sends the edit to Google (last write wins).
+            if (task.IsExternal)
+            {
+                request = request with { TaskType = task.TaskType, EventTemplate = task.EventTemplate, IsRecurring = false };
+            }
             TaskScheduleMapper.Apply(task, request);
         }
         // A Task is Backlog/InProgress/Completed/Cancelled, an Event Confirmed/Tentative/Cancelled. When the type changed (or an
@@ -78,10 +80,10 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
         task.ManualUrgencyOverride = request.ManualUrgencyOverride;
         task.ManualUrgencyOverrideExpiresAtUtc = request.ManualUrgencyOverrideExpiresAtUtc;
 
-        // Alerts: an imported event's belong to Google (the next sync would overwrite ours), everything else to the person. A caller that
-        // sends no list (a quick action such as "done", an older app) leaves them as they are.
+        // Alerts belong to the person (for an imported event Google's list is only the starting point). A caller that sends no list
+        // (a quick action such as "done", an older app) leaves them as they are.
         IReadOnlyList<ReminderInput> alerts;
-        if (request.Reminders is not null && !(task.IsExternal && !task.IsGoogleTask))
+        if (request.Reminders is not null)
         {
             alerts = TaskReminders.Resolve(request.Reminders, task);
             TaskReminders.Replace(_context, task, alerts);
@@ -100,8 +102,11 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
 
         var nowUtc = DateTime.UtcNow;
         task.UpdatedAtUtc = nowUtc;
+        GoogleMirror.Track(task, mirrorBefore, GoogleMirror.Capture(task, alerts.Select(a => a.ToEntity().Key)), nowUtc);
 
-        var zoneId = !task.IsExternal && request.IsRecurring ? await TaskSeries.ZoneOfAsync(_context, request.UpdatedByUserId, cancellationToken) : null;
+        // The time zone matters when an edit is passed on to other occurrences: their time of day is kept in the person's zone.
+        var passesOnToSeries = task.IsExternal ? task.SeriesId is not null && request.Scope != SeriesScope.This : request.IsRecurring;
+        var zoneId = passesOnToSeries ? await TaskSeries.ZoneOfAsync(_context, request.UpdatedByUserId, cancellationToken) : null;
         var edit = new SeriesEdit(
             request, task, originalSeries, seriesBefore, originalDue, previousAssignedUserId != task.AssignedUserId, participantIds,
             new AlertsAndPeople(alerts, participantIds), zoneId);
@@ -147,14 +152,15 @@ public class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, TaskD
     }
 
     /// <summary>
-    /// What a Google task lets PlanFlow decide. Google Tasks has no planned start, so it is the user's (kept as a whole day, like the deadline).
-    /// A task with no due day in Google got a placeholder deadline ("tomorrow"); until the user saves it, that deadline is theirs to set.
-    /// Saving confirms the item, so the placeholder flag goes either way.
+    /// The fields of a Google task, all editable: notes, effort, the planned start (Google Tasks has none) and the deadline, both kept as
+    /// whole days. A task with no due day in Google got a placeholder deadline ("tomorrow"); saving confirms it, so the placeholder flag goes.
     /// </summary>
     private static void ApplyGoogleTaskPlanning(CalendarItem task, UpdateTaskCommand request)
     {
+        task.Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description;
+        task.EstimatedEffortHours = request.EstimatedEffortHours;
         task.StartUtc = request.StartUtc is { } start ? WholeDay(start) : null;
-        if (task.IsDeadlineDefaulted && request.DeadlineUtc is { } deadline)
+        if (request.DeadlineUtc is { } deadline)
         {
             task.DeadlineUtc = WholeDay(deadline);
         }

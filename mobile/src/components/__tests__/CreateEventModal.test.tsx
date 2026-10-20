@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { CreateTaskModal } from '../CreateTaskModal';
 import { createTask } from '../../services/taskService';
 import { getTeamMembers } from '../../services/teamService';
@@ -37,7 +37,41 @@ describe('CreateTaskModal - Task vs Event', () => {
     );
   });
 
-  it('shows start/end instead of deadline/effort for an Event and requires a start', async () => {
+  it('sends the effort of an Event (the work it needs before it starts) in hours', async () => {
+    mockedCreateTask.mockResolvedValue({} as never);
+
+    await render(<CreateTaskModal visible teams={[personal]} tasks={[]} onClose={jest.fn()} onCreated={jest.fn()} />);
+    await fireEvent.press(screen.getByTestId('schedule-type-event'));
+    await fireEvent.changeText(screen.getByTestId('create-task-title-input'), 'Conference talk');
+    await fireEvent.changeText(screen.getByTestId('effort-input'), '3');
+    await fireEvent.press(screen.getByTestId('event-start-picker-button'));
+    await fireEvent.press(screen.getByTestId('event-start-picker-quick-week'));
+    await fireEvent.press(screen.getByTestId('event-start-picker-set'));
+    await fireEvent.press(screen.getByTestId('create-task-submit-button'));
+
+    await waitFor(() => expect(mockedCreateTask).toHaveBeenCalled());
+    expect(mockedCreateTask.mock.calls[0][1]).toMatchObject({ taskType: 1, estimatedEffortHours: 3 });
+  });
+
+  it('an Out of office item has no effort to set and sends none', async () => {
+    mockedCreateTask.mockResolvedValue({} as never);
+
+    await render(<CreateTaskModal visible teams={[personal]} tasks={[]} onClose={jest.fn()} onCreated={jest.fn()} />);
+    await fireEvent.press(screen.getByTestId('schedule-type-event'));
+    await fireEvent.changeText(screen.getByTestId('effort-input'), '3');
+    await fireEvent.press(screen.getByTestId('schedule-template-out-of-office'));
+
+    expect(screen.queryByTestId('effort-input')).toBeNull();
+    await fireEvent.press(screen.getByTestId('event-start-picker-button'));
+    await fireEvent.press(screen.getByTestId('event-start-picker-quick-week'));
+    await fireEvent.press(screen.getByTestId('event-start-picker-set'));
+    await fireEvent.press(screen.getByTestId('create-task-submit-button'));
+
+    await waitFor(() => expect(mockedCreateTask).toHaveBeenCalled());
+    expect(mockedCreateTask.mock.calls[0][1].estimatedEffortHours).toBeNull();
+  });
+
+  it('shows start/end and an effort estimate instead of a deadline for an Event, and requires a start', async () => {
     await render(<CreateTaskModal visible teams={[personal]} tasks={[]} onClose={jest.fn()} onCreated={jest.fn()} />);
     expect(screen.getByTestId('deadline-picker-button')).toBeTruthy();
     expect(screen.getByTestId('effort-input')).toBeTruthy();
@@ -45,7 +79,7 @@ describe('CreateTaskModal - Task vs Event', () => {
     await fireEvent.press(screen.getByTestId('schedule-type-event'));
 
     expect(screen.queryByTestId('deadline-picker-button')).toBeNull();
-    expect(screen.queryByTestId('effort-input')).toBeNull();
+    expect(screen.getByTestId('effort-input')).toBeTruthy(); // an event has an effort too: the work it needs before it starts
     expect(screen.getByTestId('event-start-picker-button')).toBeTruthy();
     expect(screen.getByTestId('event-end-picker-button')).toBeTruthy();
 
@@ -80,15 +114,16 @@ describe('CreateTaskModal - Task vs Event', () => {
     await render(<CreateTaskModal visible teams={[personal]} tasks={[]} onClose={jest.fn()} onCreated={jest.fn()} />);
     await fireEvent.press(screen.getByTestId('schedule-type-event'));
     await fireEvent.changeText(screen.getByTestId('create-task-title-input'), 'Workshop');
-    expect(screen.queryByText(/optional/i)).toBeNull(); // only "Estimated effort (optional)" lives on the Task form
+    expect(screen.getByText('End')).toBeTruthy();
+    expect(screen.queryByText('End (optional)')).toBeNull(); // the end of an event is a plain field, not an optional one
 
     await fireEvent.press(screen.getByTestId('event-end-picker-button'));
     await fireEvent.press(screen.getByTestId('event-end-picker-quick-week'));
     await fireEvent.press(screen.getByTestId('event-end-picker-time-1500'));
     await fireEvent.press(screen.getByTestId('event-end-picker-set'));
 
-    expect(screen.getByText(/Start: .*14:00/)).toBeTruthy();
-    expect(screen.getByText(/End: .*15:00/)).toBeTruthy();
+    expect(within(screen.getByTestId('event-start-picker-button')).getByText(/14:00/)).toBeTruthy();
+    expect(within(screen.getByTestId('event-end-picker-button')).getByText(/15:00/)).toBeTruthy();
 
     await fireEvent.press(screen.getByTestId('create-task-submit-button'));
     await waitFor(() => expect(mockedCreateTask).toHaveBeenCalled());
@@ -109,7 +144,7 @@ describe('CreateTaskModal - Task vs Event', () => {
     await fireEvent.press(screen.getByTestId('event-start-picker-quick-week'));
     await fireEvent.press(screen.getByTestId('event-start-picker-set'));
 
-    expect(screen.getByText(/End: /)).toBeTruthy(); // the end shows up by itself
+    expect(within(screen.getByTestId('event-end-picker-button')).queryByText('Not set')).toBeNull(); // the end shows up by itself
     await fireEvent.press(screen.getByTestId('create-task-submit-button'));
     await waitFor(() => expect(mockedCreateTask).toHaveBeenCalled());
     const { startUtc, endUtc } = mockedCreateTask.mock.calls[0][1];

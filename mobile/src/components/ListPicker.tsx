@@ -4,6 +4,7 @@ import { createList, getTeamLists } from '../services/listService';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { ItemListKind, type ItemListDto } from '../types/itemList';
 import type { ApiError } from '../types/api';
+import { FieldLabel } from './FieldLabel';
 
 type Props = {
   teamId: string | null;
@@ -87,19 +88,14 @@ export function ListPicker({ teamId, kind, value, onChange }: Props) {
         </Pressable>
       </View>
       {adding ? (
-        <View style={styles.addRow}>
-          <TextInput
-            testID="list-picker-name"
-            style={styles.input}
-            placeholder={kind === ItemListKind.MeetingList ? 'New meeting list' : 'New task list'}
-            placeholderTextColor={colors.textMuted}
-            value={name}
-            onChangeText={setName}
-            maxLength={100}
-          />
-          <Pressable testID="list-picker-add" onPress={add} style={styles.addButton}>
-            <Text style={styles.addButtonText}>Add</Text>
-          </Pressable>
+        <View>
+          <FieldLabel title={kind === ItemListKind.MeetingList ? 'Name of the new meeting list' : 'Name of the new task list'} />
+          <View style={styles.addRow}>
+            <TextInput testID="list-picker-name" style={styles.input} value={name} onChangeText={setName} maxLength={100} />
+            <Pressable testID="list-picker-add" onPress={add} style={styles.addButton}>
+              <Text style={styles.addButtonText}>Add</Text>
+            </Pressable>
+          </View>
         </View>
       ) : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}

@@ -254,6 +254,7 @@ export default function TaskDetailScreen() {
           ) : null}
           {reminders.length > 0 ? <MetaItem label="Reminders" value={reminders.map((r) => formatReminder(r, task.taskType)).join('\n')} /> : null}
           {task.externalSettings ? <MetaItem label="Google settings" value={task.externalSettings} /> : null}
+          {task.hasUnsentChanges ? <MetaItem label="Google" value="Your changes are sent at the next sync" /> : null}
           {recurrence ? (
             <MetaItem label="Repeats" value={recurrenceEnd ? `${recurrence}, until ${recurrenceEnd}` : recurrence} />
           ) : null}

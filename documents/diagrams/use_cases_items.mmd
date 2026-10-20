@@ -18,6 +18,7 @@ flowchart LR
             timeoff(["Mark time off or focus time"]):::uc
             block(["Mark item as blocked by another"]):::uc
             complete(["Complete data of an imported item"]):::uc
+            editgoogle(["Edit an imported item<br/>every field except its kind and repeat rule<br/>sent to Google at the next sync"]):::uc
             override(["Override urgency manually"]):::uc
             scope(["Choose scope of a series change"]):::uc
             recalc(["Recalculate Urgency Score"]):::uc
@@ -41,6 +42,7 @@ flowchart LR
     timeoff -.->|"«extend»"| create
     block -.->|"«extend»"| edit
     complete -.->|"«extend»"| edit
+    editgoogle -.->|"«extend»"| edit
     override -.->|"«extend»"| edit
     scope -.->|"«extend»"| edit
     scope -.->|"«extend»"| delete

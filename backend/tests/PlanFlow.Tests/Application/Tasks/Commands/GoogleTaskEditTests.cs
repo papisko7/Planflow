@@ -13,8 +13,8 @@ using TaskStatus = PlanFlow.Domain.Enums.TaskStatus;
 namespace PlanFlow.Tests.Application.Tasks.Commands;
 
 /// <summary>
-/// A task imported from Google Tasks. Google owns its title, notes and due day; PlanFlow owns the planned start, effort, impact
-/// and status. A task with no due day in Google carries a placeholder deadline that the user may replace until they confirm the item.
+/// A task imported from Google Tasks. Every field can be edited in the app (the sync brings Google's title, notes and due day back only when
+/// the task changes in Google). A task with no due day in Google carries a placeholder deadline that the user replaces or confirms by saving.
 /// </summary>
 public class GoogleTaskEditTests
 {
@@ -48,16 +48,16 @@ public class GoogleTaskEditTests
             CancellationToken.None);
 
     [Fact]
-    public async Task Update_KeepsGoogleFields_AndTakesTheStartEffortImpactAndStatus()
+    public async Task Update_TakesEveryField_TheTitleNotesDeadlineStartEffortImpactAndStatus()
     {
         var (db, item, userId) = await SetUpAsync();
 
         var dto = await UpdateAsync(db, item, userId, start: Day(2), deadline: Day(9), effort: 4, impact: 8, status: TaskStatus.InProgress);
 
-        Assert.Equal("Google title", dto.Title);              // Google's
-        Assert.Equal("Google notes", dto.Description);
-        Assert.Equal(Day(5), dto.DeadlineUtc);                 // the due day is Google's too; the request's value is ignored
-        Assert.Equal(Day(2), dto.StartUtc);                    // PlanFlow's
+        Assert.Equal("My title", dto.Title);                   // editable in the app although Google has it too
+        Assert.Equal("My notes", dto.Description);
+        Assert.Equal(Day(9), dto.DeadlineUtc);
+        Assert.Equal(Day(2), dto.StartUtc);
         Assert.Equal(4, dto.EstimatedEffortHours);
         Assert.Equal(8, dto.ImpactScore);
         Assert.Equal(TaskStatus.InProgress, dto.Status);
@@ -91,8 +91,8 @@ public class GoogleTaskEditTests
     {
         var (db, item, userId) = await SetUpAsync();
 
-        // The request claims a later deadline than the stored (Google's) one; the stored one wins.
-        var dto = await UpdateAsync(db, item, userId, start: Day(8), deadline: Day(20));
+        // The request sends no deadline, so the stored one stays and the later start is pulled back to it.
+        var dto = await UpdateAsync(db, item, userId, start: Day(8), deadline: null);
 
         Assert.Equal(Day(5), dto.DeadlineUtc);
         Assert.Equal(Day(5), dto.StartUtc);
@@ -121,13 +121,13 @@ public class GoogleTaskEditTests
     }
 
     [Fact]
-    public async Task Update_RealDueDay_CannotBeMovedFromTheApp()
+    public async Task Update_RealDueDay_CanBeMovedFromTheApp()
     {
         var (db, item, userId) = await SetUpAsync(defaultedDeadline: false);
 
         var dto = await UpdateAsync(db, item, userId, start: Day(0), deadline: Day(1));
 
-        Assert.Equal(Day(5), dto.DeadlineUtc);
+        Assert.Equal(Day(1), dto.DeadlineUtc);
     }
 
     [Fact]
@@ -150,7 +150,9 @@ public class GoogleTaskEditTests
                 StartUtc: start.AddDays(2), EndUtc: start.AddDays(2).AddHours(1)),
             CancellationToken.None);
 
-        Assert.Equal(start, dto.StartUtc); // a calendar event's time stays Google's
+        Assert.Equal(start.AddDays(2), dto.StartUtc); // an event edited in the app keeps its own time (the sync brings Google's back only if Google changes it)
+        Assert.Equal("x", dto.Title);
+        Assert.Null(dto.GoogleTaskListId);
     }
 
     // ---- what the app reads ----

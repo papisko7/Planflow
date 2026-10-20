@@ -40,6 +40,19 @@ public static class GoogleReminderMapper
         return result;
     }
 
+    /// <summary>
+    /// The reverse of <see cref="Map"/>: the reminders as "minutes before the start", the form Google takes. An offset reminder is its minutes;
+    /// a day reminder counts back from midnight of the first day, as Google does for an all-day event (1 day before at 09:00 = 900).
+    /// A reminder that counts back from a deadline has no counterpart in a Google event and is left out.
+    /// </summary>
+    public static IReadOnlyList<int> ToMinutes(IEnumerable<(Domain.Enums.ReminderAnchor Anchor, int? Offset, int? Days, int? TimeOfDay)> reminders) =>
+        reminders
+            .Where(r => r.Anchor == Domain.Enums.ReminderAnchor.Start)
+            .Select(r => r.Offset ?? (r.Days ?? 0) * MinutesPerDay - (r.TimeOfDay ?? 0))
+            .Distinct()
+            .OrderBy(minutes => minutes)
+            .ToList();
+
     private static ItemReminder? ToOffsetForm(int minutes) => minutes >= 0 ? ItemReminder.Offset(minutes) : null;
 
     /// <summary>

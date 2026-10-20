@@ -37,4 +37,29 @@ public static class ItemColors
         "11" => "tomato",
         _ => null
     };
+
+    /// <summary>
+    /// The colorId Google's event API knows for a palette colour, the reverse of <see cref="FromGoogleColorId"/>. False when the colour exists
+    /// only in the app (13 of the 24), so it cannot be sent to Google. The default colour (null key) gives an empty id, which clears the colour in Google.
+    /// </summary>
+    public static bool TryToGoogleColorId(string? key, out string? colorId)
+    {
+        colorId = key switch
+        {
+            null => string.Empty, // empty = clear the colour in Google
+            "lavender" => "1",
+            "sage" => "2",
+            "grape" => "3",
+            "flamingo" => "4",
+            "banana" => "5",
+            "tangerine" => "6",
+            "peacock" => "7",
+            "graphite" => "8",
+            "blueberry" => "9",
+            "basil" => "10",
+            "tomato" => "11",
+            _ => null
+        };
+        return colorId is not null;
+    }
 }

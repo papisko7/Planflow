@@ -57,6 +57,65 @@ describe('GoogleCalendarBanner - Google Tasks', () => {
     expect(screen.getByText(/Google Calendar:/)).toBeTruthy(); // the calendar itself is still shown as connected
   });
 
+  // An edit made in the app is sent to Google by the next sync - but only if the account allowed PlanFlow to change its data.
+  describe('permission to send changes', () => {
+    it('without it the banner explains that edits stay here and offers a reconnect', async () => {
+      mockedStatus.mockResolvedValue(status({ canWriteCalendar: false, canWriteTasks: false }));
+
+      await render(<GoogleCalendarBanner onSynced={jest.fn()} />);
+
+      await waitFor(() => expect(screen.getByTestId('google-write-reconnect-notice')).toBeTruthy());
+      expect(screen.getByText(/can't send your changes to Google yet/)).toBeTruthy();
+      expect(screen.getByTestId('google-write-reconnect')).toBeTruthy();
+      expect(screen.getByTestId('google-tasks-status')).toBeTruthy(); // reading Google Tasks works, so that line stays
+    });
+
+    it('missing only for the calendar (the user unticked it) is enough to offer the reconnect', async () => {
+      mockedStatus.mockResolvedValue(status({ canWriteCalendar: false, canWriteTasks: true }));
+
+      await render(<GoogleCalendarBanner onSynced={jest.fn()} />);
+
+      await waitFor(() => expect(screen.getByTestId('google-write-reconnect')).toBeTruthy());
+    });
+
+    it('with it, or from a server that does not report it, there is nothing to reconnect', async () => {
+      mockedStatus.mockResolvedValue(status({ canWriteCalendar: true, canWriteTasks: true }));
+      const { unmount } = await render(<GoogleCalendarBanner onSynced={jest.fn()} />);
+      await waitFor(() => expect(screen.getByTestId('google-tasks-status')).toBeTruthy());
+      expect(screen.queryByTestId('google-write-reconnect')).toBeNull();
+      await unmount();
+
+      mockedStatus.mockResolvedValue(status()); // an older server sends neither flag
+      await render(<GoogleCalendarBanner onSynced={jest.fn()} />);
+      await waitFor(() => expect(screen.getByTestId('google-tasks-status')).toBeTruthy());
+      expect(screen.queryByTestId('google-write-reconnect')).toBeNull();
+    });
+
+    it('when Google Tasks is not connected at all, only that reconnect is offered (it asks for the new permissions too)', async () => {
+      mockedStatus.mockResolvedValue(status({ tasksConnected: false, canWriteCalendar: false, canWriteTasks: false }));
+
+      await render(<GoogleCalendarBanner onSynced={jest.fn()} />);
+
+      await waitFor(() => expect(screen.getByTestId('google-tasks-reconnect')).toBeTruthy());
+      expect(screen.queryByTestId('google-write-reconnect')).toBeNull();
+    });
+
+    it('the reconnect opens the Google consent page and then syncs, like the other reconnect', async () => {
+      mockedStatus
+        .mockResolvedValueOnce(status({ canWriteCalendar: false, canWriteTasks: false })) // when the banner opens
+        .mockResolvedValue(status({ canWriteCalendar: true, canWriteTasks: true })); // after the user came back from Google
+      mockedConnectUrl.mockResolvedValue('https://accounts.google.com/consent');
+      await render(<GoogleCalendarBanner onSynced={jest.fn()} />);
+      await waitFor(() => expect(screen.getByTestId('google-write-reconnect')).toBeTruthy());
+
+      await fireEvent.press(screen.getByTestId('google-write-reconnect'));
+
+      await waitFor(() => expect(WebBrowser.openBrowserAsync).toHaveBeenCalledWith('https://accounts.google.com/consent'));
+      await waitFor(() => expect(mockedSync).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.queryByTestId('google-write-reconnect')).toBeNull());
+    }, 20000);
+  });
+
   // Google is fetched only on the button; the banner follows the server's `syncing` flag until the sync is over.
   describe('Sync now', () => {
     const SYNC_NOW = 'Sync now';

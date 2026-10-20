@@ -84,7 +84,7 @@ describe('CreateTaskModal - templates', () => {
     expect(screen.queryByTestId('create-task-impact-input')).toBeNull();
     expect(screen.queryByText('PlanFlow')).toBeNull();
     expect(screen.getByTestId('color-swatch-tomato')).toBeTruthy();
-    expect(screen.getByPlaceholderText('Out of office')).toBeTruthy();
+    expect(screen.getByText('Leave it empty to use "Out of office".')).toBeTruthy();
 
     await pickStartInAWeek(); // leave the title empty
     await fireEvent.press(screen.getByTestId('create-task-submit-button'));
@@ -158,7 +158,7 @@ describe('CreateTaskModal - templates', () => {
     await open();
     await fireEvent.press(screen.getByTestId('schedule-template-birthday'));
 
-    expect(screen.getByPlaceholderText('Name')).toBeTruthy();
+    expect(screen.getByText('Name')).toBeTruthy(); // the title field of a birthday is the person's name
     expect(screen.queryByTestId('schedule-allday-switch')).toBeNull();
     expect(screen.queryByTestId('event-end-picker-button')).toBeNull();
 

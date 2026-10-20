@@ -32,7 +32,7 @@ const base: TaskDto = {
 const form = (task: TaskDto) =>
   render(<TaskEditForm task={task} members={[]} canAssign={false} onSaved={jest.fn()} onCancel={jest.fn()} />);
 
-// The edit form follows the item's template, and an item imported from Google keeps Google's fields read-only.
+// The edit form follows the item's template. An item imported from Google is edited like any other, except for its kind and repeat rule.
 describe('TaskEditForm', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -71,21 +71,37 @@ describe('TaskEditForm', () => {
     expect(screen.queryByTestId('edit-task-verify-banner')).toBeNull();
   });
 
-  it('an item imported from Google shows its title read-only and offers only the PlanFlow fields', async () => {
+  it('an item imported from Google opens with every field editable, but cannot change its kind or repeat rule', async () => {
     await form({ ...base, isExternal: true, isDataIncomplete: true, title: 'Team offsite', location: 'Lisbon' });
 
     expect(screen.getByTestId('edit-task-imported-notice')).toBeTruthy();
-    expect(screen.getByText('Team offsite')).toBeTruthy();
-    expect(screen.queryByTestId('edit-task-title-input')).toBeNull();
-    expect(screen.queryByTestId('edit-task-description-input')).toBeNull();
-    expect(screen.queryByTestId('schedule-type-event')).toBeNull();
-    expect(screen.queryByTestId('schedule-location-input')).toBeNull();
-    expect(screen.queryByTestId('color-swatch-tomato')).toBeNull();
+    expect(screen.getByTestId('edit-task-title-input').props.value).toBe('Team offsite');
+    expect(screen.getByTestId('edit-task-description-input')).toBeTruthy();
+    expect(screen.getByTestId('schedule-location-input').props.value).toBe('Lisbon');
+    expect(screen.getByTestId('color-swatch-tomato')).toBeTruthy();
+    expect(screen.getByTestId('event-start-picker-button')).toBeTruthy();
+    expect(screen.getByTestId('effort-input')).toBeTruthy();
     expect(screen.getByTestId('edit-task-impact-input')).toBeTruthy();
     expect(screen.getByTestId('edit-task-status-6')).toBeTruthy();
+    expect(screen.queryByTestId('schedule-type-event')).toBeNull();        // what Google says it is cannot be switched
+    expect(screen.queryByTestId('schedule-recurring-switch')).toBeNull();  // ... and neither can how it repeats
   });
 
-  it('saving an imported item resends Google\'s fields untouched and changes only impact and status', async () => {
+  it('an imported event can be renamed, moved and recoloured in the app', async () => {
+    await form({ ...base, isExternal: true, title: 'Team offsite', location: 'Lisbon', colorKey: 'sage' });
+
+    await fireEvent.changeText(screen.getByTestId('edit-task-title-input'), 'Team offsite (Porto)');
+    await fireEvent.changeText(screen.getByTestId('schedule-location-input'), 'Porto');
+    await fireEvent.press(screen.getByTestId('color-swatch-tomato'));
+    await fireEvent.press(screen.getByTestId('edit-task-save'));
+
+    await waitFor(() => expect(mockedUpdateTask).toHaveBeenCalled());
+    expect(mockedUpdateTask.mock.calls[0][2]).toMatchObject({
+      title: 'Team offsite (Porto)', location: 'Porto', colorKey: 'tomato', taskType: TaskType.Event, eventTemplate: EventTemplate.Default,
+    });
+  });
+
+  it('saving an imported item without touching anything resends its fields as they were', async () => {
     const imported: TaskDto = {
       ...base, isExternal: true, isAllDay: true, startUtc: '2030-10-20T00:00:00.000Z', endUtc: '2030-10-22T00:00:00.000Z',
       title: 'Team offsite', description: 'Agenda', location: 'Lisbon', colorKey: 'sage', isBusy: false,
@@ -104,6 +120,23 @@ describe('TaskEditForm', () => {
     });
   });
 
+  it('the effort of an event is sent too (its preparation time)', async () => {
+    await form(base);
+
+    await fireEvent.changeText(screen.getByTestId('effort-input'), '90');
+    await fireEvent.press(screen.getByTestId('effort-unit-minute'));
+    await fireEvent.press(screen.getByTestId('edit-task-save'));
+
+    await waitFor(() => expect(mockedUpdateTask).toHaveBeenCalled());
+    expect(mockedUpdateTask.mock.calls[0][2]).toMatchObject({ taskType: TaskType.Event, estimatedEffortHours: 1.5 });
+  });
+
+  it('an Out of office item has no effort to set', async () => {
+    await form({ ...base, eventTemplate: EventTemplate.OutOfOffice, description: null });
+
+    expect(screen.queryByTestId('effort-input')).toBeNull();
+  });
+
   it('an older all-day event is saved back as whole days in the new convention', async () => {
     await form({
       ...base, isAllDay: false,
@@ -120,7 +153,70 @@ describe('TaskEditForm', () => {
   });
 });
 
-// A task imported from Google Tasks. Google owns its title, notes and due day; the user plans it (start, effort, impact).
+// What the form says about an edit of an imported item: the next sync sends it to Google, and when the item was also changed there the
+// later change wins. Only a kind of event Google keeps for itself (a birthday, a working location) stays in the app.
+describe('TaskEditForm - the way back to Google', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const SENT = /Your changes are sent to Google at the next sync/;
+  const LATER_WINS = /the later change wins/;
+  const KEPT_BY_GOOGLE = /Google keeps this kind of event for itself/;
+
+  it('tells that a change to an imported event is sent to Google at the next sync', async () => {
+    await form({ ...base, isExternal: true });
+
+    expect(screen.getByText(/Imported from Google Calendar/)).toBeTruthy();
+    expect(screen.getByText(SENT)).toBeTruthy();
+    expect(screen.getByText(LATER_WINS)).toBeTruthy();
+    expect(screen.queryByText(/Google's version replaces your changes/)).toBeNull();   // the old promise: Google overwrites the app
+    expect(screen.queryByText(KEPT_BY_GOOGLE)).toBeNull();
+  });
+
+  it('says the same for a task imported from Google Tasks', async () => {
+    await form({ ...base, taskType: TaskType.Task, status: TaskStatus.Backlog, isExternal: true, isAllDay: true, startUtc: null, endUtc: null, deadlineUtc: '2030-10-25T00:00:00.000Z' });
+
+    expect(screen.getByText(/Imported from Google Tasks/)).toBeTruthy();
+    expect(screen.getByText(SENT)).toBeTruthy();
+    expect(screen.getByText(LATER_WINS)).toBeTruthy();
+  });
+
+  it.each([
+    ['Out of office', EventTemplate.OutOfOffice],
+    ['Focus time', EventTemplate.FocusTime],
+  ])('an imported %s is sent back like a plain event', async (_name, template) => {
+    await form({ ...base, isExternal: true, eventTemplate: template, description: null });
+
+    expect(screen.getByText(SENT)).toBeTruthy();
+    expect(screen.queryByText(KEPT_BY_GOOGLE)).toBeNull();
+  });
+
+  it.each([
+    ['birthday', { eventTemplate: EventTemplate.Birthday, isAllDay: true, startUtc: '2030-10-19T00:00:00.000Z', endUtc: '2030-10-20T00:00:00.000Z' }],
+    ['working location', { eventTemplate: EventTemplate.WorkingLocation, location: 'Home' }],
+  ])('an imported %s stays in the app only, and the form says so', async (_name, over) => {
+    await form({ ...base, isExternal: true, description: null, ...over });
+
+    expect(screen.getByText(KEPT_BY_GOOGLE)).toBeTruthy();
+    expect(screen.queryByText(SENT)).toBeNull();
+  });
+
+  it('an item made in the app has no such notice at all', async () => {
+    await form(base);
+
+    expect(screen.queryByTestId('edit-task-imported-notice')).toBeNull();
+  });
+
+  it('reminds that an earlier change has not been sent yet - and only then', async () => {
+    const { unmount } = await form({ ...base, isExternal: true, hasUnsentChanges: true });
+    expect(screen.getByTestId('edit-task-unsent-notice')).toBeTruthy();
+    await unmount();
+
+    await form({ ...base, isExternal: true, hasUnsentChanges: false });
+    expect(screen.queryByTestId('edit-task-unsent-notice')).toBeNull();
+  });
+});
+
+// A task imported from Google Tasks. Every field can be edited here; the user also plans it (start, effort, impact).
 describe('TaskEditForm - task from Google Tasks', () => {
   const googleTask: TaskDto = {
     ...base,
@@ -147,17 +243,32 @@ describe('TaskEditForm - task from Google Tasks', () => {
     mockedUpdateTask.mockResolvedValue({} as never);
   });
 
-  it('explains it comes from Google Tasks, shows its title read-only and offers start, effort and impact', async () => {
+  it('explains it comes from Google Tasks and offers every field: title, notes, start, deadline, effort and impact', async () => {
     await form(googleTask);
 
     expect(screen.getByText(/Imported from Google Tasks/)).toBeTruthy();
-    expect(screen.getByText('Write chapter 3')).toBeTruthy();
-    expect(screen.queryByTestId('edit-task-title-input')).toBeNull();
-    expect(screen.queryByTestId('edit-task-description-input')).toBeNull();
+    expect(screen.getByTestId('edit-task-title-input').props.value).toBe('Write chapter 3');
+    expect(screen.getByTestId('edit-task-description-input').props.value).toBe('Check the sources');
     expect(screen.getByTestId('task-start-picker-button')).toBeTruthy();
+    expect(screen.getByTestId('deadline-picker-button')).toBeTruthy();
     expect(screen.getByTestId('effort-input')).toBeTruthy();
     expect(screen.getByTestId('edit-task-impact-input')).toBeTruthy();
-    expect(screen.queryByTestId('deadline-picker-button')).toBeNull(); // the due day is Google's
+  });
+
+  it('sends the edited title and notes, and a deadline moved to another day', async () => {
+    await form({ ...googleTask, startUtc: null }); // no planned start, so the earlier deadline cannot fall before it
+
+    await fireEvent.changeText(screen.getByTestId('edit-task-title-input'), 'Write chapter 4');
+    await fireEvent.changeText(screen.getByTestId('edit-task-description-input'), 'Check the sources twice');
+    await fireEvent.press(screen.getByTestId('deadline-picker-button'));
+    await fireEvent.press(screen.getByTestId('deadline-picker-quick-tomorrow'));
+    await fireEvent.press(screen.getByTestId('deadline-picker-set'));
+    await fireEvent.press(screen.getByTestId('edit-task-save'));
+
+    await waitFor(() => expect(mockedUpdateTask).toHaveBeenCalled());
+    expect(mockedUpdateTask.mock.calls[0][2]).toMatchObject({
+      title: 'Write chapter 4', description: 'Check the sources twice', deadlineUtc: tomorrowAsWireDay(), taskType: TaskType.Task,
+    });
   });
 
   it('saving resends the stored days untouched and the effort and impact the user typed', async () => {

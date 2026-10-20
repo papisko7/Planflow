@@ -101,6 +101,29 @@ public static partial class PlanflowTagParser
         return text.Length == 0 ? null : text;
     }
 
+    /// <summary>
+    /// The title to send to Google after an edit: the new title followed by the <c>[planflow]</c> part of the title Google holds now (from the
+    /// marker to the end), if it has one - so the impact and effort written there survive a rename.
+    /// </summary>
+    public static string TitleWithTagOf(string title, string? googleTitle)
+    {
+        var tag = string.IsNullOrEmpty(googleTitle) ? null : TagLine().Match(googleTitle);
+        return tag is { Success: true } ? $"{title} {tag.Value}" : title;
+    }
+
+    /// <summary>
+    /// The description to send to Google after an edit, as plain text: the new text followed by the <c>[planflow]</c> line(s) of the description
+    /// Google holds now, if any. Empty when nothing is left (which clears the description).
+    /// </summary>
+    public static string DescriptionWithTagOf(string? description, string? googleDescription)
+    {
+        var tagLines = (ToPlainText(googleDescription) ?? string.Empty)
+            .Replace("\r\n", "\n")
+            .Split('\n')
+            .Where(line => TagLine().IsMatch(line));
+        return string.Join('\n', new[] { description }.Concat(tagLines).Where(part => !string.IsNullOrWhiteSpace(part)));
+    }
+
     private static int? ReadImpact(string line)
     {
         var match = Impact().Match(line);

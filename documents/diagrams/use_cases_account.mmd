@@ -32,9 +32,9 @@ flowchart LR
             push(["Enable push on this device"]):::uc
         end
 
-        subgraph gint ["Google integration (read-only import)"]
+        subgraph gint ["Google integration (two-way sync, last write wins)"]
             connect(["Connect Google account"]):::uc
-            sync(["Sync now: import events and tasks"]):::uc
+            sync(["Sync now: import changes from Google<br/>and send edits made in the app to Google<br/>if both changed, the later change wins"]):::uc
             disconnect(["Disconnect Google account"]):::uc
         end
     end

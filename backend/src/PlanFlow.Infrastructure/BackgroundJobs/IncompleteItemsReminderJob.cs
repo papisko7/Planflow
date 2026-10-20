@@ -19,6 +19,10 @@ namespace PlanFlow.Infrastructure.BackgroundJobs;
 /// when the count is zero. Because the inbox row also drives the push, a user would otherwise collect one row per day; instead each
 /// user keeps a single "living" row that is refreshed (new count, unread again, moved to the top, pushed again).
 /// </para>
+/// <para>
+/// An item is listed in at most <see cref="MaxRemindersPerItem"/> reminders (<see cref="CalendarItem.IncompleteRemindersSent"/>); after that it
+/// is no longer nagged about, although it keeps its "needs details" mark in the lists until the user saves it.
+/// </para>
 /// </summary>
 [DisallowConcurrentExecution]
 public class IncompleteItemsReminderJob : IJob
@@ -28,6 +32,9 @@ public class IncompleteItemsReminderJob : IJob
 
     /// <summary>... and not from this local hour on (evening), so a late job run never wakes anyone up.</summary>
     public const int LastHour = 21;
+
+    /// <summary>How many reminders may list the same item before it is left out for good.</summary>
+    public const int MaxRemindersPerItem = 5;
 
     private readonly IApplicationDbContext _context;
     private readonly ILogger<IncompleteItemsReminderJob> _logger;
@@ -52,7 +59,7 @@ public class IncompleteItemsReminderJob : IJob
     {
         var candidates = await _context.CalendarItems
             .AsNoTracking()
-            .Where(i => i.IsDataIncomplete && i.AssignedUserId != null)
+            .Where(i => i.IsDataIncomplete && i.AssignedUserId != null && i.IncompleteRemindersSent < MaxRemindersPerItem)
             .Where(i => i.Status != TaskStatus.Completed && i.Status != TaskStatus.Cancelled)
             .Where(i => i.EndUtc == null || i.EndUtc > nowUtc) // an event that is over has nothing left to rank
             .Select(i => new Candidate(i.Id, i.TeamId, i.AssignedUserId!.Value, i.Title, i.TaskType, i.EventTemplate))
@@ -94,6 +101,7 @@ public class IncompleteItemsReminderJob : IJob
             .ToDictionary(g => g.Key, g => g.OrderByDescending(n => n.CreatedAtUtc).First());
 
         var reminded = 0;
+        var listedItemIds = new List<Guid>();
         foreach (var (userId, items) in byUser)
         {
             if (!users.TryGetValue(userId, out var user))
@@ -158,11 +166,18 @@ public class IncompleteItemsReminderJob : IJob
                 _context.NotificationPreferences.Add(prefs); // the row is created lazily, like everywhere else
             }
 
+            listedItemIds.AddRange(counted.Select(i => i.Id));
             reminded++;
         }
 
         if (reminded > 0)
         {
+            // Every item this reminder listed has now used one of its reminders.
+            foreach (var item in await _context.CalendarItems.Where(i => listedItemIds.Contains(i.Id)).ToListAsync(cancellationToken))
+            {
+                item.IncompleteRemindersSent++;
+            }
+
             await _context.SaveChangesAsync(cancellationToken);
         }
 

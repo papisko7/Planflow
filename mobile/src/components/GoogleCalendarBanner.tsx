@@ -120,6 +120,17 @@ export function GoogleCalendarBanner({ onSynced }: Props) {
               </Pressable>
             </View>
           )}
+          {/* An account connected before edits could be sent back, or one that refused the permission: an edit made here would stay here. */}
+          {status.tasksConnected && (status.canWriteCalendar === false || status.canWriteTasks === false) ? (
+            <View style={styles.reconnect}>
+              <Text testID="google-write-reconnect-notice" style={styles.hint}>
+                PlanFlow can't send your changes to Google yet. Reconnect and allow PlanFlow to change your events and tasks.
+              </Text>
+              <Pressable testID="google-write-reconnect" style={styles.button} onPress={connect} disabled={busy}>
+                <Text style={styles.buttonText}>Reconnect to send changes</Text>
+              </Pressable>
+            </View>
+          ) : null}
           <View style={styles.row}>
             <Pressable style={styles.button} onPress={() => run(syncNow)} disabled={busy}>
               <Text style={styles.buttonText}>{syncing ? 'Syncing…' : 'Sync now'}</Text>

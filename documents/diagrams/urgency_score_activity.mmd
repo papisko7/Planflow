@@ -1,5 +1,5 @@
 ---
-title: Urgency Score Algorithm (version 2) - Activity Diagram
+title: Urgency Score Algorithm (version 3) - Activity Diagram
 ---
 flowchart TD
     START(["BuildTeamScoreLogs<br/>active items of one team + now"]):::terminal
@@ -26,7 +26,7 @@ flowchart TD
         direction TB
         KIND{Task or Event?}
         KIND -- Task --> TT["effective deadline = deadline − effort − absence<br/>absence: the assignee's out-of-office time before the deadline,<br/>overlaps counted once, at most 7 days<br/>an all-day deadline ends at the END of its day in the assignee's time zone"]
-        KIND -- Event --> TE["effective deadline = start<br/>an event cannot be started earlier"]
+        KIND -- Event --> TE["effective deadline = start − effort<br/>the effort of an event is the work to do before it starts<br/>(preparation, travel); no absence is taken off"]
     end
 
     TIMING --> DDECAY
@@ -72,7 +72,7 @@ flowchart TD
     SCHEDULED --> WSUM["base = (0.40·D + 0.20·B + 0.10·O [+ 0.25·I] [+ 0.05·S])<br/>/ sum of the weights of the factors that apply<br/>an absent factor is left out, not counted as 0"]
     WSUM --> CLAMP1["score = clamp(base, 0, 1)"]
 
-    CLAMP1 --> IMMINENT{"Verified item and overdue or inside<br/>its imminent window?<br/>Task: its effort, 24 h when unknown<br/>Event: prep time, 1 h by default, at most 2 h"}
+    CLAMP1 --> IMMINENT{"Verified item and overdue or inside<br/>its imminent window?<br/>Task: its effort, 24 h when unknown<br/>Event: its effort, 1 h when unknown"}
     IMMINENT -- Yes --> FLOOR["score = max(score, 0.85)<br/>imminent floor"]
     IMMINENT -- No --> INHERIT_FLOOR
     FLOOR --> INHERIT_FLOOR["score = max(score, B)<br/>priority inheritance"]
@@ -87,7 +87,7 @@ flowchart TD
     BLOCKED_CHECK -- Yes --> PENALTY["finalScore = effective score × 0.5<br/>blocked penalty"]
     BLOCKED_CHECK -- No --> NOPEN["finalScore = effective score"]
 
-    PENALTY --> BUILDLOG["Build UrgencyScoreLog<br/>all factors, finalScore, IsBlocked, ReasonText,<br/>AlgorithmVersion = 2"]
+    PENALTY --> BUILDLOG["Build UrgencyScoreLog<br/>all factors, finalScore, IsBlocked, ReasonText,<br/>AlgorithmVersion = 3"]
     NOPEN --> BUILDLOG
 
     BUILDLOG --> MORE{More items?}

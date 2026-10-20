@@ -56,6 +56,25 @@ public class CalendarItem : BaseEntity
     public string? ExternalDescriptionHash { get; set; }
 
     /// <summary>
+    /// Hash of every Google value of an imported item that the user may also edit in the app (title, time, place...), as Google had them at
+    /// the last sync. Google counts as having changed the item only when its values no longer match this hash.
+    /// </summary>
+    public string? ExternalFieldsHash { get; set; }
+
+    /// <summary>
+    /// The Google-side fields of an imported item that the person changed in the app and Google has not received yet (None = nothing waits).
+    /// The next sync sends them to Google, unless Google changed the item later: then Google's version replaces them (last write wins).
+    /// </summary>
+    public Enums.MirroredFields LocalEditedFields { get; set; }
+
+    /// <summary>
+    /// When the person made the change in <see cref="LocalEditedFields"/> - the "updated at" of the app's version, compared with Google's own
+    /// update time when both sides changed the item. Null while nothing waits. Kept apart from <see cref="BaseEntity.UpdatedAtUtc"/>, which a
+    /// sync moves too and which therefore cannot tell who changed the item last.
+    /// </summary>
+    public DateTime? LocalEditedAtUtc { get; set; }
+
+    /// <summary>
     /// Google's visibility of an imported event: true = "private" or "confidential". Null = not known (never imported, or imported before
     /// the flag existed); for an imported event "not known" is treated as private, so a title can never leak because the flag is missing.
     /// </summary>
@@ -99,6 +118,9 @@ public class CalendarItem : BaseEntity
     /// <summary>True when the task was imported without enough data (e.g. no impact/effort in a calendar description) and the user should complete it.</summary>
     public bool IsDataIncomplete { get; set; }
 
+    /// <summary>How many daily "please complete it" reminders already listed this item; the reminders stop at a fixed maximum, the flag itself stays until the item is saved.</summary>
+    public int IncompleteRemindersSent { get; set; }
+
     /// <summary>Impact on a 0–10 scale; null = not rated yet (e.g. imported from Google Calendar), which the algorithm treats as "unknown", not zero.</summary>
     public int? ImpactScore { get; set; }
 
@@ -132,9 +154,9 @@ public class CalendarItem : BaseEntity
     public ExternalTaskList? ExternalTaskList { get; set; }
 
     /// <summary>
-    /// True for an item imported from Google (Calendar or Tasks). Google owns its title, time, place, description, colour and template
-    /// (a sync overwrites them), so the app lets the user change only the PlanFlow fields (impact, effort, status, assignee...).
-    /// Derived, not stored.
+    /// True for an item imported from Google (Calendar or Tasks). Everything except its kind (task / event / template) and repeat rule can be
+    /// edited in the app; a sync sends such an edit to Google, or takes Google's version when the item was changed there later
+    /// (see <see cref="LocalEditedFields"/>). Derived, not stored.
     /// </summary>
     public bool IsExternal => ExternalCalendarEventId is not null || ExternalTaskId is not null;
 

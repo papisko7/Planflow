@@ -27,9 +27,6 @@ public static class CalendarItemUrgencyScoreFactory
     /// <summary>An event with no end time is assumed to last this long (also decides when it counts as over).</summary>
     private const double DefaultEventDurationHours = 1.0;
 
-    /// <summary>An event never gets a floor window longer than this, however big its effort estimate is.</summary>
-    private const double MaxEventFloorWindowHours = 2.0;
-
     /// <summary><see cref="CalendarItem.ImpactScore"/> is authored on a 0–10 scale.</summary>
     private const double MaxImpactScore = 10.0;
 
@@ -201,8 +198,14 @@ public static class CalendarItemUrgencyScoreFactory
             {
                 return "no start time";
             }
-            return start <= nowUtc
-                ? $"in progress, started {FormatSpan(nowUtc - start)} ago"
+            if (start <= nowUtc)
+            {
+                return $"in progress, started {FormatSpan(nowUtc - start)} ago";
+            }
+
+            var prep = task.EstimatedEffortHours ?? 0.0;
+            return prep > 0.0 && timing.EffectiveDeadlineUtc <= nowUtc
+                ? $"not enough time: needs {FormatSpan(TimeSpan.FromHours(prep))} of effort, starts in {FormatSpan(start - nowUtc)}"
                 : $"starts in {FormatSpan(start - nowUtc)}";
         }
 
@@ -288,7 +291,7 @@ public static class CalendarItemUrgencyScoreFactory
     }
 
     /// <param name="TargetUtc">The moment that matters: a Task's deadline, an Event's start.</param>
-    /// <param name="EffectiveDeadlineUtc">When the clock really runs out: a Task must START by deadline minus its effort; an Event by its start.</param>
+    /// <param name="EffectiveDeadlineUtc">When the clock really runs out: the work must START by the target minus its effort (a Task's deadline, an Event's start).</param>
     /// <param name="FloorWindowHours">How long before <paramref name="TargetUtc"/> the item counts as "imminent" and gets the score floor.</param>
     /// <param name="Absence">Out-of-office time of the assignee between now and the deadline that was taken off <paramref name="EffectiveDeadlineUtc"/>.</param>
     private readonly record struct Timing(DateTime? TargetUtc, DateTime? EffectiveDeadlineUtc, double FloorWindowHours, TimeSpan Absence = default);
@@ -297,16 +300,16 @@ public static class CalendarItemUrgencyScoreFactory
     //        be finished anymore) and so is a job due Friday by someone who is away from Wednesday.
     //        The floor window is the effort itself (24h when no estimate, which equals the original fixed rule).
     //        A day-long deadline (a Google task is due on a day, not at a time) runs out at the END of that day in the person's zone.
-    // Event: happens at its start (the beginning of the first day when all-day); effort is not subtracted because an event cannot be
-    //        started earlier. The floor window is the effort/prep time, 1h by default, capped at 2h. Once its end has passed the
-    //        score is 0 (see Breakdown).
+    // Event: happens at its start (the beginning of the first day when all-day). Its effort is the work that has to be done before it
+    //        (preparing the talk, travelling there), so the same rule as for a task applies: effectiveDeadline = start - effort, and the
+    //        floor window is the effort itself (1h when no estimate). Once its end has passed the score is 0 (see Breakdown).
     private static Timing ResolveTiming(CalendarItem task, TimeZoneInfo zone, DateTime nowUtc, IReadOnlyList<AbsenceSpan>? absences)
     {
         if (task.TaskType == TaskType.Event)
         {
             var start = Moment(task.StartUtc, task.IsAllDay, zone);
-            var window = Math.Min(task.EstimatedEffortHours ?? DefaultEventFloorWindowHours, MaxEventFloorWindowHours);
-            return new Timing(start, start, window);
+            var prep = Math.Max(task.EstimatedEffortHours ?? 0.0, 0.0);
+            return new Timing(start, start?.AddHours(-prep), task.EstimatedEffortHours ?? DefaultEventFloorWindowHours);
         }
 
         var effort = Math.Max(task.EstimatedEffortHours ?? 0.0, 0.0);

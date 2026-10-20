@@ -12,7 +12,7 @@ namespace PlanFlow.Tests.Application.Tasks.Common;
 
 /// <summary>
 /// The deadline clock now depends on the item type and its effort estimate
-/// (Task: deadline minus effort, Event: its start), and the "imminent" floor window is dynamic.
+/// (deadline of a Task / start of an Event, minus the effort), and the "imminent" floor window is dynamic.
 /// </summary>
 public class TaskTimingTests
 {
@@ -100,20 +100,33 @@ public class TaskTimingTests
     }
 
     [Fact]
-    public void Event_EffortIsNotSubtractedFromTheClock()
+    public void Event_Effort_ShiftsTheClockEarlier_LikeATasks()
     {
-        var evt = Item(TaskType.Event, start: Now.AddDays(2), effort: 24);
+        var withEffort = Score(Item(TaskType.Event, start: Now.AddDays(2), effort: 24));
+        var noEffort = Score(Item(TaskType.Event, start: Now.AddDays(2)));
 
-        Assert.Equal(Math.Exp(-2.0 / 7.0), Score(evt).DeadlineComponent, precision: 9);
+        Assert.Equal(Math.Exp(-1.0 / 7.0), withEffort.DeadlineComponent, precision: 9);   // 2 days to the start, 1 day of work first
+        Assert.Equal(Math.Exp(-2.0 / 7.0), noEffort.DeadlineComponent, precision: 9);
+        Assert.True(withEffort.FinalScore > noEffort.FinalScore);
+    }
+
+    [Fact]
+    public void Event_EffortLongerThanTimeLeft_IsAlreadyOverdueAndGetsTheFloor()
+    {
+        // 6h of preparation, the event starts in 4h: the work can no longer be done in time.
+        var log = Score(Item(TaskType.Event, start: Now.AddHours(4), effort: 6));
+
+        Assert.Equal(1.0, log.DeadlineComponent);
+        Assert.True(log.FinalScore >= UrgencyScoreCalculator.ImminentDeadlineFloor);
     }
 
     [Theory]
     [InlineData(null, 0.9, true)]   // default window 1h: starts in 54 minutes -> imminent
     [InlineData(null, 1.5, false)]  // ... starts in 90 minutes -> not yet
-    [InlineData(1.5, 1.4, true)]    // 1.5h prep window
-    [InlineData(10.0, 1.9, true)]   // huge estimate is capped at 2h
-    [InlineData(10.0, 2.5, false)]  // ... so 2.5h before is still outside the window
-    public void Event_FloorWindowIsEffortOrOneHourCappedAtTwo(double? effort, double hoursToStart, bool expectedImminent)
+    [InlineData(1.5, 1.4, true)]    // 1.5h effort window
+    [InlineData(10.0, 9.0, true)]   // the window is the effort itself, no longer capped at 2h
+    [InlineData(10.0, 11.0, false)] // ... so 11h before is still outside it
+    public void Event_FloorWindowIsItsEffortOrOneHourWhenUnknown(double? effort, double hoursToStart, bool expectedImminent)
     {
         var log = Score(Item(TaskType.Event, start: Now.AddHours(hoursToStart), effort: effort));
 

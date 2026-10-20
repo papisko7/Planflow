@@ -11,7 +11,7 @@ export type LocationMode = 'none' | 'text' | 'workingLocation';
 export interface TemplateRules {
   label: string;
   defaultTitle: string | null; // pre-filled when the title is left empty
-  titlePlaceholder: string;
+  titleLabel: string; // the caption above the title field
   allDay: AllDayMode;
   location: LocationMode;
   allowsColor: boolean;
@@ -25,7 +25,7 @@ export interface TemplateRules {
 const TASK: TemplateRules = {
   label: 'Task',
   defaultTitle: null,
-  titlePlaceholder: 'Task title',
+  titleLabel: 'Title',
   allDay: 'optional',
   location: 'none',
   allowsColor: true,
@@ -40,7 +40,7 @@ const EVENT_RULES: Record<EventTemplate, TemplateRules> = {
   [EventTemplate.Default]: {
     label: 'Event',
     defaultTitle: null,
-    titlePlaceholder: 'Event title',
+    titleLabel: 'Title',
     allDay: 'optional',
     location: 'text',
     allowsColor: true,
@@ -53,7 +53,7 @@ const EVENT_RULES: Record<EventTemplate, TemplateRules> = {
   [EventTemplate.OutOfOffice]: {
     label: 'Out of office',
     defaultTitle: 'Out of office',
-    titlePlaceholder: 'Out of office',
+    titleLabel: 'Title',
     allDay: 'optional',
     location: 'none',
     allowsColor: true,
@@ -66,7 +66,7 @@ const EVENT_RULES: Record<EventTemplate, TemplateRules> = {
   [EventTemplate.FocusTime]: {
     label: 'Focus time',
     defaultTitle: 'Focus time',
-    titlePlaceholder: 'Focus time',
+    titleLabel: 'Title',
     allDay: 'never',
     location: 'text',
     allowsColor: true,
@@ -79,7 +79,7 @@ const EVENT_RULES: Record<EventTemplate, TemplateRules> = {
   [EventTemplate.WorkingLocation]: {
     label: 'Working location',
     defaultTitle: 'Working location',
-    titlePlaceholder: 'Working location',
+    titleLabel: 'Title',
     allDay: 'optional',
     location: 'workingLocation',
     allowsColor: false,
@@ -92,7 +92,7 @@ const EVENT_RULES: Record<EventTemplate, TemplateRules> = {
   [EventTemplate.Birthday]: {
     label: 'Birthday',
     defaultTitle: null,
-    titlePlaceholder: 'Name',
+    titleLabel: 'Name',
     allDay: 'always',
     location: 'none',
     allowsColor: true,
@@ -110,6 +110,17 @@ export function rulesFor(type: TaskType, template: EventTemplate): TemplateRules
 
 export function isInformational(item: { taskType: TaskType; eventTemplate: EventTemplate }): boolean {
   return rulesFor(item.taskType, item.eventTemplate).informational;
+}
+
+// Whether an edit of an imported item is sent back to Google by the next sync. Google takes changes to its tasks and to plain events,
+// Out of office and Focus time; a birthday or a working location it keeps for itself, so an edit of those stays in the app only.
+export function sendsEditsToGoogle(item: { taskType: TaskType; eventTemplate: EventTemplate }): boolean {
+  return (
+    item.taskType === TaskType.Task ||
+    item.eventTemplate === EventTemplate.Default ||
+    item.eventTemplate === EventTemplate.OutOfOffice ||
+    item.eventTemplate === EventTemplate.FocusTime
+  );
 }
 
 // All-day once the template has had its say: Birthday always, Focus time never, a Task is never flagged (its all-day
